@@ -178,6 +178,10 @@ let stravaExpires = load("lk_strava_expires", 0);
 let stravaActivities = load("lk_strava_activities", []);
 let syncing = false;
 let syncMsg = "";
+let githubToken = load("lk_github_token", "");
+let gistId = load("lk_gist_id", "");
+let gistSyncing = false;
+let gistMsg = "";
 
 // Récupère les tokens depuis l'URL après OAuth
 (function checkOAuthCallback() {
@@ -303,6 +307,96 @@ function predict10K() {
     details,
   };
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GITHUB GIST SYNC
+// ══════════════════════════════════════════════════════════════════════════════
+function getBackupData() {
+  return JSON.stringify({ statuses, notesList, version: 1, savedAt: new Date().toISOString() });
+}
+
+let gistSaveTimer = null;
+
+async function gistSave(silent = false) {
+  if (!githubToken) return;
+  try {
+    const body = { description: "Plan 10K Laurent — backup", public: false,
+      files: { "plan10k_backup.json": { content: getBackupData() } } };
+    let url = "https://api.github.com/gists";
+    let method = "POST";
+    if (gistId) { url += "/" + gistId; method = "PATCH"; }
+    const resp = await fetch(url, { method, headers: {
+      "Authorization": "token " + githubToken,
+      "Content-Type": "application/json"
+    }, body: JSON.stringify(body) });
+    if (!resp.ok) throw new Error(resp.status);
+    const data = await resp.json();
+    gistId = data.id;
+    save("lk_gist_id", gistId);
+    if (!silent) { gistMsg = "☁️ Sauvegardé " + new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}); render(); setTimeout(()=>{gistMsg="";render();},3000); }
+  } catch(e) {
+    if (!silent) { gistMsg = "❌ Erreur sync"; render(); setTimeout(()=>{gistMsg="";render();},3000); }
+  }
+}
+
+// Sauvegarde différée : évite de spammer l'API si plusieurs changements rapides
+function scheduleSave() {
+  if (!githubToken) return;
+  if (gistSaveTimer) clearTimeout(gistSaveTimer);
+  gistSaveTimer = setTimeout(() => gistSave(true), 2000);
+}
+
+async function gistLoad() {
+  if (!githubToken || !gistId) return;
+  try {
+    const resp = await fetch("https://api.github.com/gists/" + gistId, {
+      headers: { "Authorization": "token " + githubToken }
+    });
+    if (!resp.ok) throw new Error(resp.status);
+    const data = await resp.json();
+    const raw = data.files["plan10k_backup.json"]?.content;
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    // Restaure seulement si localStorage est vide (premier chargement sur nouvel appareil)
+    if (Object.keys(statuses).length === 0 && notesList.length === 0) {
+      statuses = parsed.statuses || {};
+      notesList = parsed.notesList || [];
+      save("lk_statuses", statuses);
+      save("lk_notes", notesList);
+      gistMsg = "☁️ Données restaurées depuis le cloud";
+      render();
+      setTimeout(()=>{gistMsg="";render();},4000);
+    }
+  } catch(e) {}
+}
+
+async function gistForceRestore() {
+  if (!githubToken || !gistId) { gistMsg = "❌ Pas de sauvegarde"; render(); setTimeout(()=>{gistMsg="";render();},3000); return; }
+  try {
+    const resp = await fetch("https://api.github.com/gists/" + gistId, {
+      headers: { "Authorization": "token " + githubToken }
+    });
+    if (!resp.ok) throw new Error(resp.status);
+    const data = await resp.json();
+    const raw = data.files["plan10k_backup.json"]?.content;
+    if (!raw) throw new Error();
+    const parsed = JSON.parse(raw);
+    statuses = parsed.statuses || {};
+    notesList = parsed.notesList || [];
+    save("lk_statuses", statuses);
+    save("lk_notes", notesList);
+    gistMsg = "✅ Restauré · " + (parsed.savedAt ? new Date(parsed.savedAt).toLocaleDateString("fr-FR") : "");
+    render();
+    setTimeout(()=>{gistMsg="";render();},4000);
+  } catch(e) {
+    gistMsg = "❌ Erreur restauration";
+    render();
+    setTimeout(()=>{gistMsg="";render();},3000);
+  }
+}
+
+// Auto-restore au démarrage si token présent
+if (githubToken && gistId) { gistLoad(); }
 
 // ══════════════════════════════════════════════════════════════════════════════
 // STRAVA SYNC
@@ -494,6 +588,43 @@ function renderDashboard() {
     ) : el("div",{class:"muted",style:{fontSize:"11px",fontStyle:"italic"}},"📊 "+pred.method)
   );
 
+
+  // ── GitHub Gist Sync ──
+  const gistSection = el("div",{style:{marginBottom:"16px"}},
+    el("div",{class:"label"},"Sauvegarde cloud (GitHub)"),
+    !githubToken
+      ? el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"12px 14px"}},
+          el("div",{class:"muted",style:{fontSize:"12px",marginBottom:"8px"}},"Entre ton token GitHub (scope gist) pour activer la sauvegarde."),
+          el("div",{style:{display:"flex",gap:"8px"}},
+            el("input",{type:"password", placeholder:"ghp_...", id:"github-token-input",
+              style:{flex:"1",background:"#0f1117",border:"1px solid #2e3347",borderRadius:"8px",padding:"8px 12px",color:"#f1f5f9",fontSize:"13px",outline:"none"}}),
+            el("button",{
+              style:{background:"#60a5fa22",border:"1px solid #60a5fa55",borderRadius:"8px",padding:"8px 14px",color:"#60a5fa",fontWeight:"700",fontSize:"13px",cursor:"pointer"},
+              onClick:()=>{
+                const t = document.getElementById("github-token-input").value.trim();
+                if (t) { githubToken = t; save("lk_github_token", t); render(); }
+              }
+            },"OK")
+          )
+        )
+      : el("div",{style:{display:"flex",gap:"8px",flexDirection:"column"}},
+          el("div",{style:{display:"flex",gap:"8px"}},
+            el("div",{style:{color:"#22c55e",fontSize:"12px",padding:"4px 0"}},
+              "✅ Sync auto activée"
+            ),
+            el("button",{
+              style:{flex:"1",background:"#60a5fa22",border:"1px solid #60a5fa55",borderRadius:"10px",padding:"11px",color:"#60a5fa",fontWeight:"700",fontSize:"13px",cursor:"pointer"},
+              onClick:()=>{ gistForceRestore(); }
+            },"📥 Forcer restauration")
+          ),
+          gistMsg ? el("div",{style:{fontSize:"12px",color:gistMsg.startsWith("✅")?"#22c55e":"#ef4444",textAlign:"center",padding:"4px 0"}},gistMsg) : null,
+          el("button",{
+            style:{background:"none",border:"none",color:"#475569",fontSize:"11px",cursor:"pointer",textAlign:"right",padding:"2px 0"},
+            onClick:()=>{ githubToken=""; gistId=""; save("lk_github_token",""); save("lk_gist_id",""); render(); }
+          },"Déconnecter")
+        )
+  );
+
   const stravaSection = el("div",{style:{marginBottom:"16px"}},
     el("div",{class:"label"},"Strava"),
     stravaToken
@@ -556,7 +687,7 @@ function renderDashboard() {
     })
   );
 
-  return el("div",{style:{padding:"0 16px 100px"}}, hero, predCard, stravaSection, todayEl||"", stats, phases);
+  return el("div",{style:{padding:"0 16px 100px"}}, hero, predCard, gistSection, stravaSection, todayEl||"", stats, phases);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -639,7 +770,7 @@ function renderWeekDetail(weekNum) {
       SOPTS.forEach(opt=>{
         const cur=statuses[uid]||"—";
         const b=el("button",{style:{background:cur===opt?SCOLORS[opt]+"33":"#232738",border:`1px solid ${cur===opt?SCOLORS[opt]:"#2e3347"}`,borderRadius:"6px",padding:"5px 10px",cursor:"pointer",color:cur===opt?SCOLORS[opt]:"#475569",fontSize:"13px",fontWeight:cur===opt?"700":"400"}},opt==="—"?"–":opt);
-        b.addEventListener("click",()=>{ statuses[uid]=opt; save("lk_statuses",statuses); render(); });
+        b.addEventListener("click",()=>{ statuses[uid]=opt; save("lk_statuses",statuses); scheduleSave(); render(); });
         statusRow.appendChild(b);
       });
       card.appendChild(statusRow);
@@ -672,7 +803,7 @@ function renderNotes() {
   addBtn.addEventListener("click",()=>{
     const txt=input.value.trim(); if(!txt) return;
     notesList.unshift({text:txt,date:today(),id:Date.now()});
-    save("lk_notes",notesList); input.value=""; render();
+    save("lk_notes",notesList); scheduleSave(); input.value=""; render();
   });
   input.addEventListener("keydown",e=>{ if(e.key==="Enter") addBtn.click(); });
 
@@ -685,7 +816,7 @@ function renderNotes() {
       ? el("div",{class:"muted",style:{textAlign:"center",padding:"40px 0",fontSize:"14px"}},"Aucune note pour l'instant.",el("span",{style:{fontSize:"28px",display:"block",marginTop:"8px"}},"📝"))
       : el("div",{},...notesList.map(note=>{
           const del=el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"18px",cursor:"pointer",padding:"0 4px",alignSelf:"flex-start"}},"×");
-          del.addEventListener("click",()=>{ notesList=notesList.filter(n=>n.id!==note.id); save("lk_notes",notesList); render(); });
+          del.addEventListener("click",()=>{ notesList=notesList.filter(n=>n.id!==note.id); save("lk_notes",notesList); scheduleSave(); render(); });
           return el("div",{class:"card",style:{display:"flex",gap:"10px"}},
             el("div",{style:{flex:"1"}},el("div",{class:"muted",style:{fontSize:"11px",marginBottom:"4px"}},note.date),el("div",{style:{color:"#f1f5f9",fontSize:"14px"}},note.text)),
             del
