@@ -867,6 +867,62 @@ function getEffortLaps(activity) {
   return laps.filter(l => l.average_speed >= p70 && (1000/l.average_speed) < 360);
 }
 
+function predict10KAtDate(dateStr) {
+  // Calcule l\'estimation 10K en ne prenant que les activités antérieures à dateStr
+  const BASE_TIME = 3021;
+  const runs = stravaActivities.filter(a => a.type === "Run" && a.start_date_local?.slice(0,10) <= dateStr);
+  const estimates = [];
+
+  // SPEC → allure directe
+  const specRuns = runs.filter(r => ALL_SESSIONS.find(s => s.date===r.start_date_local?.slice(0,10) && s.type==="SPEC"));
+  const specLaps = specRuns.flatMap(r => getEffortLaps(r));
+  if (specLaps.length > 0) {
+    const avgSpeed = specLaps.reduce((s,l)=>s+l.average_speed,0)/specLaps.length;
+    estimates.push({ value: 10000/avgSpeed, weight: 0.45 });
+  }
+
+  // VMA → vitesse × 0.87
+  const vmaRuns = runs.filter(r => ALL_SESSIONS.find(s => s.date===r.start_date_local?.slice(0,10) && s.type==="VMA"));
+  const vmaLaps = vmaRuns.flatMap(r => getEffortLaps(r));
+  if (vmaLaps.length > 0) {
+    const avgSpeed = vmaLaps.reduce((s,l)=>s+l.average_speed,0)/vmaLaps.length;
+    estimates.push({ value: 10000/(avgSpeed*0.87), weight: 0.35 });
+  }
+
+  if (estimates.length === 0) return BASE_TIME;
+
+  const totalWeight = estimates.reduce((s,e)=>s+e.weight,0);
+  const weighted = estimates.reduce((s,e)=>s+e.value*e.weight,0)/totalWeight;
+  const hasVma = vmaLaps.length > 0;
+  const hasSpec = specLaps.length > 0;
+  const lavWeight = (hasVma && hasSpec) ? 0.10 : (hasVma || hasSpec) ? 0.30 : 1.00;
+  return Math.round(BASE_TIME * lavWeight + weighted * (1 - lavWeight));
+}
+
+function rebuildPredHistory() {
+  if (!stravaActivities.length) return;
+  // Générer une entrée par jour depuis le début du plan jusqu\'à aujourd\'hui
+  const startDate = PLAN[0].sessions[0].date;
+  const endDate = today();
+  const newHistory = [];
+  let d = new Date(startDate + "T00:00:00");
+  const end = new Date(endDate + "T00:00:00");
+  while (d <= end) {
+    const dateStr = d.toISOString().slice(0,10);
+    const time = predict10KAtDate(dateStr);
+    const confidence = stravaActivities.filter(a=>a.start_date_local?.slice(0,10)<=dateStr).length > 0 ? 45 : 30;
+    newHistory.push({ date: dateStr, time, confidence });
+    d.setDate(d.getDate()+1);
+  }
+  predHistory = newHistory;
+  save("lk_pred_history", predHistory);
+}
+
+// Reconstruire l\'historique si manquant ou incomplet
+if (predHistory.length <= 1 && stravaActivities.length > 0) {
+  rebuildPredHistory();
+}
+
 function predict10K() {
   const BASE_TIME = 3021; // 50'21" Lavandou
   const runs = stravaActivities.filter(a => a.type === "Run");
