@@ -1493,13 +1493,13 @@ function renderStats() {
     lvl.setAttribute("fill","#f1f5f9");lvl.setAttribute("font-size","10");lvl.setAttribute("text-anchor","middle");lvl.setAttribute("font-weight","700");
     lvl.textContent=fmtTime(lastVal.time);svg.appendChild(lvl);
     // Labels semaines sur l'axe X
-    // On mappe les dates du plan aux positions X
+    // Positionner selon la date dans predHistory
     PLAN.forEach((week, wi) => {
-      const weekDate = new Date(week.sessions[0].date);
-      // Trouver si on a un point predHistory proche de cette semaine
       const weekDateStr = week.sessions[0].date;
-      // Position X basée sur l'index de la semaine dans le plan (0-10)
-      const xPos = PAD.l + (wi / (PLAN.length - 1)) * iW;
+      // Trouver l'index de cette date dans predHistory
+      const idx = predHistory.findIndex(p => p.date >= weekDateStr);
+      if (idx < 0) return;
+      const xPos = xScale(idx);
       // Petite marque verticale pour toutes les semaines
       const tick = mk("line",{x1:xPos,y1:PAD.t+iH,x2:xPos,y2:PAD.t+iH+4,stroke:"#2e3347",strokeWidth:"1"});
       svg.appendChild(tick);
