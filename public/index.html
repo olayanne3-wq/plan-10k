@@ -599,14 +599,6 @@ async function fetchWeather() {
 fetchWeather();
 setInterval(fetchWeather, 30 * 60 * 1000); // refresh toutes les 30 min
 
-// Auto-synchro Strava si token valide et dernière synchro > 1h
-(function autoSync() {
-  const ONE_HOUR = 60 * 60 * 1000;
-  if (stravaToken && (Date.now() - lastSyncTime) > ONE_HOUR) {
-    setTimeout(() => syncStrava(), 1500); // légère pause pour laisser l'UI se charger
-  }
-})();
-
 (function checkOAuthCallback() {
   const params = new URLSearchParams(window.location.search);
   if (params.get("access_token")) {
@@ -826,13 +818,17 @@ if (!coachMsg || coachDate !== today()) {
   setTimeout(fetchCoachMsg, 2000);
 }
 
-// ── Référentiel allures cibles ────────────────────────────────────────────
-const PACE_REFS = {
-  VMA:   { effort:"4:10–4:25/km", tolerance:"±10 sec", recup:"≥ 6:00/km" },
-  SPEC:  { effort:"4:51/km",      tolerance:"±10 sec", recup:"≥ 6:00/km" },
-  SEUIL: { effort:"4:55/km",      tolerance:"±10 sec", recup:"≥ 6:00/km" },
-  TEST:  { effort:"4:51/km",      tolerance:"±10 sec", recup:"≥ 6:00/km" },
+// ── Source de vérité unique — allures & seuils de validation ────────────────
+const SESSION_TARGETS = {
+  VMA:   { targetMin:250, targetMax:265, okPace:270,  warnPace:290,  repOk:0.80, repWarn:0.60, effort:"4:10–4:25/km", tolerance:"±10 sec", recup:"≥ 6:00/km" },
+  SPEC:  { targetMin:291, targetMax:298, okPace:298,  warnPace:310,  repOk:0.80, repWarn:0.60, effort:"4:51/km",      tolerance:"±7 sec",  recup:"≥ 6:00/km" },
+  SEUIL: { targetMin:295, targetMax:305, okPace:305,  warnPace:320,  repOk:null, repWarn:null,  effort:"4:55/km",      tolerance:"±10 sec", recup:"≥ 6:00/km" },
+  TEST:  { targetMin:291, targetMax:298, okPace:298,  warnPace:310,  repOk:0.80, repWarn:0.60, effort:"4:51/km",      tolerance:"±7 sec",  recup:"≥ 6:00/km" },
 };
+// Alias pour compatibilité affichage
+const PACE_REFS = Object.fromEntries(
+  Object.entries(SESSION_TARGETS).map(([k,v]) => [k, { effort:v.effort, tolerance:v.tolerance, recup:v.recup }])
+);
 // ── Zones FC cible (FC max 181 bpm Laurent) ──────────────────────────────
 const FC_ZONES = {
   EF:    { min:118, max:136, label:"65–75%", color:"#60a5fa" },
@@ -874,7 +870,7 @@ function predict10KAtDate(dateStr) {
   const estimates = [];
 
   // SPEC → allure directe
-  const specRuns = runs.filter(r => ALL_SESSIONS.find(s => s.date===r.start_date_local?.slice(0,10) && s.type==="SPEC"));
+  const specRuns = runs.filter(r => { const s = ALL_SESSIONS.find(s => s.date===r.start_date_local?.slice(0,10) && s.type==="SPEC"); return s && statuses[s.uid]!=="❌"; });
   const specLaps = specRuns.flatMap(r => getEffortLaps(r));
   if (specLaps.length > 0) {
     const avgSpeed = specLaps.reduce((s,l)=>s+l.average_speed,0)/specLaps.length;
@@ -882,7 +878,7 @@ function predict10KAtDate(dateStr) {
   }
 
   // VMA → vitesse × 0.87
-  const vmaRuns = runs.filter(r => ALL_SESSIONS.find(s => s.date===r.start_date_local?.slice(0,10) && s.type==="VMA"));
+  const vmaRuns = runs.filter(r => { const s = ALL_SESSIONS.find(s => s.date===r.start_date_local?.slice(0,10) && s.type==="VMA"); return s && statuses[s.uid]!=="❌"; });
   const vmaLaps = vmaRuns.flatMap(r => getEffortLaps(r));
   if (vmaLaps.length > 0) {
     const avgSpeed = vmaLaps.reduce((s,l)=>s+l.average_speed,0)/vmaLaps.length;
@@ -1408,6 +1404,17 @@ function renderWeekDetail(weekNum) {
         el("div",{class:"text2",style:{fontSize:"12px",marginTop:"4px"}},"Km 1-3 : prudent · Km 4-7 : contrôle · Km 8-10 : tout donner !")
       ));
     } else if (s.type!=="REPOS") {
+      // Raison du statut ❌ ou ⚠️
+      const reason = stravaRun ? validateReason({...s, uid}, stravaRun) : null;
+      if (reason) {
+        card.appendChild(el("div",{style:{
+          background: statuses[uid]==="❌" ? "#ef444411" : "#eab30811",
+          border: `1px solid ${statuses[uid]==="❌" ? "#ef444433" : "#eab30833"}`,
+          borderRadius:"6px", padding:"6px 10px", marginTop:"4px", marginBottom:"4px",
+          color: statuses[uid]==="❌" ? "#ef4444" : "#eab308",
+          fontSize:"11px"
+        }}, (statuses[uid]==="❌"?"❌ ":"⚠️ ")+reason));
+      }
       const statusRow=el("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap",marginTop:"4px"}});
       SOPTS.forEach(opt=>{
         const cur=statuses[uid]||"—";
@@ -1581,9 +1588,9 @@ function renderStats() {
   const paceRows = [
     {type:"EF",      label:"Endurance fondamentale", pace:"6:20", heat:"6:40", fc:"118–136", pct:"65–75%", color:"#60a5fa"},
     {type:"LONGUE",  label:"Sortie longue",           pace:"6:20", heat:"6:40", fc:"118–136", pct:"65–75%", color:"#22c55e"},
-    {type:"SEUIL",   label:"Seuil",                   pace:"4:55", heat:null,   fc:"163–172", pct:"90–95%", color:"#eab308"},
-    {type:"SPEC",    label:"Spécifique 10K",           pace:"4:51", heat:null,   fc:"154–163", pct:"85–90%", color:"#a855f7"},
-    {type:"VMA",     label:"VMA",                     pace:"4:10–4:25", heat:null, fc:"163–181", pct:"90–100%", color:"#f97316"},
+    {type:"SEUIL",   label:"Seuil",                   pace:SESSION_TARGETS.SEUIL.effort, heat:null, fc:"163–172", pct:"90–95%", color:"#eab308"},
+    {type:"SPEC",    label:"Spécifique 10K",           pace:SESSION_TARGETS.SPEC.effort,  heat:null, fc:"154–163", pct:"85–90%", color:"#a855f7"},
+    {type:"VMA",     label:"VMA",                     pace:SESSION_TARGETS.VMA.effort,   heat:null, fc:"163–181", pct:"90–100%", color:"#f97316"},
   ];
   const paceEl=el("div",{style:{marginBottom:"16px"}},
     el("div",{class:"label"},"Référentiel allures & FC"),
@@ -1592,7 +1599,7 @@ function renderStats() {
         el("div",{style:{width:"4px",height:"32px",borderRadius:"2px",background:r.color,flexShrink:"0"}}),
         el("div",{style:{flex:"1"}},
           el("div",{style:{color:"#f1f5f9",fontSize:"12px",fontWeight:"600",marginBottom:"2px"}},r.label),
-          el("div",{class:"muted",style:{fontSize:"11px"}},r.heat?"Chaud : "+r.heat:"Tolérance ±10\"")
+          el("div",{class:"muted",style:{fontSize:"11px"}},r.heat?"Chaud : "+r.heat:SESSION_TARGETS[r.type]?"Tolérance "+SESSION_TARGETS[r.type].tolerance:"—")
         ),
         el("div",{style:{textAlign:"right"}},
           el("div",{style:{color:r.color,fontSize:"13px",fontWeight:"700"}},r.pace+"/km"),
@@ -1694,7 +1701,19 @@ function renderSettings() {
     el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px"}},
       el("div",{style:{padding:"10px",background:"#f9731622",border:"1px solid #f9731633",borderRadius:"8px",marginBottom:"8px"}},
         el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}},
-          el("span",{style:{color:"#f97316",fontSize:"13px",fontWeight:"700"}},"v1.8.7"),
+          el("span",{style:{color:"#f97316",fontSize:"13px",fontWeight:"700"}},"🟠 v1.8.8"),
+          el("span",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"600"}},"Validation & prédicteur affinés"),
+          el("span",{style:{background:"#f9731633",color:"#f97316",fontSize:"10px",fontWeight:"700",padding:"2px 6px",borderRadius:"10px"}},"actuelle")
+        ),
+        el("div",{style:{color:"#94a3b8",fontSize:"12px",marginTop:"3px"}},"• 📋 Source de vérité unique SESSION_TARGETS"),
+        el("div",{style:{color:"#94a3b8",fontSize:"12px",marginTop:"3px"}},"• 💬 Raison du statut ❌ ou ⚠️ dans le détail de séance"),
+        el("div",{style:{color:"#94a3b8",fontSize:"12px",marginTop:"3px"}},"• 📊 Exclusion des séances ❌ du prédicteur 10K"),
+        el("div",{style:{color:"#94a3b8",fontSize:"12px",marginTop:"3px"}},"• 🎯 Seuil ✅ SPEC resserré à ≤ 4:58/km"),
+        el("div",{style:{color:"#94a3b8",fontSize:"12px",marginTop:"3px"}},"• 📈 Tableau allures synchronisé avec les seuils de validation")
+      ),
+      el("div",{style:{padding:"10px",background:"transparent",border:"none",borderRadius:"8px",marginBottom:"8px"}},
+        el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}},
+          el("span",{style:{color:"#94a3b8",fontSize:"13px",fontWeight:"700"}},"v1.8.7"),
           el("span",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"600"}},"Coach, séance clé & détails"),el("span",{style:{background:"#f9731633",color:"#f97316",fontSize:"10px",fontWeight:"700",padding:"2px 6px",borderRadius:"10px"}},"actuelle")
         ),
         el("div",{style:{color:"#94a3b8",fontSize:"12px",marginTop:"3px"}},"• 🤖 Message Coach quotidien via Claude API"),
@@ -1808,6 +1827,158 @@ function renderSettings() {
     cloudSection, stravaSection, versionSection
   );
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STRAVA
+// ══════════════════════════════════════════════════════════════════════════════
+async function ensureFreshToken() {
+  if (!stravaToken) return false;
+  if (Date.now()/1000 < stravaExpires-60) return true;
+  try {
+    const resp = await fetch("/api/strava/refresh",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({refresh_token:stravaRefresh})});
+    const data = await resp.json();
+    stravaToken=data.access_token; stravaRefresh=data.refresh_token; stravaExpires=data.expires_at;
+    save("lk_strava_token",stravaToken); save("lk_strava_refresh",stravaRefresh); save("lk_strava_expires",stravaExpires);
+    return true;
+  } catch { return false; }
+}
+
+async function syncStrava() {
+  syncing=true; syncMsg="Connexion à Strava..."; render();
+  const ok = await ensureFreshToken();
+  if (!ok) { syncing=false; syncMsg="Erreur de token"; render(); return; }
+  try {
+    syncMsg="Récupération des activités..."; render();
+    const intervalDates = [...INTERVAL_SESSION_DATES].join(",");
+    const planStart = PLAN[0].sessions[0].date;
+    const resp = await fetch(`/api/strava/activities?token=${stravaToken}&interval_dates=${intervalDates}&plan_start=${planStart}`);
+    const activities = await resp.json();
+    if (Array.isArray(activities)) {
+      const runs = activities.filter(a => a.type === "Run" || a.sport_type === "Run");
+      stravaActivities=runs; save("lk_strava_activities",runs);
+      matchActivitiesToPlan(activities);
+      lastSyncTime = Date.now();
+      save("lk_last_sync", lastSyncTime);
+      syncMsg=`✅ ${activities.length} activité${activities.length>1?"s":""} synchronisée${activities.length>1?"s":""}`;
+      scheduleSave();
+    } else { syncMsg="❌ Erreur Strava"; }
+  } catch(e) { syncMsg="❌ Erreur réseau"; }
+  syncing=false; render();
+  setTimeout(()=>{ syncMsg=""; render(); },3000);
+}
+
+function parseTargetMinutes(session) {
+  const m = session.match(/(\d+)(?:–|-)(\d+)\s*min|^(\d+)\s*min/);
+  if (!m) return null;
+  return m[3] ? parseInt(m[3]) : (parseInt(m[1]) + parseInt(m[2])) / 2;
+}
+
+function parseTargetReps(session) {
+  const m = session.match(/^(\d+)×/);
+  return m ? parseInt(m[1]) : null;
+}
+
+function autoValidate(session, stravaRun) {
+  if (!stravaRun) return null;
+  const type = session.type;
+  const effortLaps = getEffortLaps(stravaRun);
+  const target = SESSION_TARGETS[type];
+
+  if (type === "EF" || type === "LONGUE") {
+    const targetMin = parseTargetMinutes(session.session);
+    if (!targetMin) return "✅";
+    const actualMin = stravaRun.moving_time / 60;
+    const ratio = actualMin / targetMin;
+    const actualPace = stravaRun.average_speed > 0 ? 1000 / stravaRun.average_speed : 999;
+    const inPace = actualPace >= 340 && actualPace <= 420;
+    if (ratio >= 0.90 && inPace) return "✅";
+    if (ratio >= 0.70) return "⚠️";
+    return "❌";
+  }
+
+  if (!target) return "✅";
+
+  if (effortLaps.length === 0) {
+    if (type === "SEUIL") {
+      const pace = stravaRun.average_speed > 0 ? 1000/stravaRun.average_speed : 999;
+      if (pace <= target.okPace) return "✅";
+      if (pace <= target.warnPace) return "⚠️";
+      return "❌";
+    }
+    return stravaRun.moving_time > 1200 ? "⚠️" : "❌";
+  }
+
+  const avgPace = effortLaps.reduce((s,l)=>s+1000/l.average_speed,0)/effortLaps.length;
+  const targetReps = parseTargetReps(session.session);
+  const repRatio = targetReps && target.repOk ? effortLaps.length / targetReps : 1;
+
+  if (avgPace <= target.okPace && repRatio >= (target.repOk||0)) return "✅";
+  if (avgPace <= target.warnPace && repRatio >= (target.repWarn||0)) return "⚠️";
+  return "❌";
+}
+
+function validateReason(session, stravaRun) {
+  if (!stravaRun) return null;
+  const type = session.type;
+  const status = statuses[session.uid];
+  if (status !== "❌" && status !== "⚠️") return null;
+  const effortLaps = getEffortLaps(stravaRun);
+  const target = SESSION_TARGETS[type];
+
+  if (type === "EF" || type === "LONGUE") {
+    const targetMin = parseTargetMinutes(session.session);
+    if (!targetMin) return null;
+    const actualMin = Math.round(stravaRun.moving_time / 60);
+    const ratio = actualMin / targetMin;
+    if (ratio < 0.90) return `Durée ${actualMin}' / ${Math.round(targetMin)}' prévues (${Math.round(ratio*100)}%)`;
+    const actualPace = stravaRun.average_speed > 0 ? 1000 / stravaRun.average_speed : 999;
+    if (actualPace > 420) return `Allure trop lente : ${fmtPace(stravaRun.average_speed)}/km`;
+    if (actualPace < 340) return `Allure trop rapide : ${fmtPace(stravaRun.average_speed)}/km`;
+    return null;
+  }
+
+  if (!target) return null;
+
+  if (effortLaps.length === 0) return "Pas de laps d\'effort détectés";
+
+  const avgPace = Math.round(effortLaps.reduce((s,l)=>s+1000/l.average_speed,0)/effortLaps.length);
+  const targetReps = parseTargetReps(session.session);
+  const repRatio = targetReps ? effortLaps.length / targetReps : 1;
+
+  const reasons = [];
+  if (avgPace > target.okPace) {
+    const paceStr = `${Math.floor(avgPace/60)}:${(avgPace%60).toString().padStart(2,"0")}`;
+    const targetStr = `${Math.floor(target.okPace/60)}:${(target.okPace%60).toString().padStart(2,"0")}`;
+    reasons.push(`Allure ${paceStr}/km — cible ≤${targetStr}/km`);
+  }
+  if (targetReps && target.repOk && repRatio < target.repOk) {
+    reasons.push(`${effortLaps.length}/${targetReps} répétitions détectées`);
+  }
+  return reasons.length ? reasons.join(" · ") : null;
+}
+
+function matchActivitiesToPlan(activities) {
+  const runs = activities.filter(a=>a.type==="Run");
+  ALL_SESSIONS.forEach(s => {
+    if (s.type==="REPOS"||s.type==="RACE") return;
+    const match = runs.find(r=>r.start_date_local?.slice(0,10)===s.date);
+    if (match) {
+      if (!statuses[s.uid] || statuses[s.uid]==="—") {
+        const auto = autoValidate(s, match);
+        if (auto) statuses[s.uid] = auto;
+      }
+    }
+  });
+  save("lk_statuses",statuses);
+}
+
+// Auto-synchro Strava si token valide et dernière synchro > 1h
+(function autoSync() {
+  const ONE_HOUR = 60 * 60 * 1000;
+  if (stravaToken && (Date.now() - lastSyncTime) > ONE_HOUR) {
+    setTimeout(() => syncStrava(), 1500);
+  }
+})();
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DOM HELPERS
