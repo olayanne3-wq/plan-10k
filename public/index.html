@@ -562,6 +562,8 @@ let gistId = load("lk_gist_id", "");
 let gistMsg = "";
 let predHistory = load("lk_pred_history", []); // [{date, time, confidence}]
 let changelogExpanded = false;
+let isRebuilding = false;
+let lastRebuildDate = load("lk_last_rebuild", null);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // MÉTÉO — Open-Meteo (Toulon fixe)
@@ -917,7 +919,8 @@ function predict10KAtDate(dateStr) {
 }
 
 function rebuildPredHistory() {
-  if (!stravaActivities.length) return;
+  if (!stravaActivities.length || isRebuilding) return;
+  isRebuilding = true; render();
   // Générer une entrée par jour depuis le début du plan jusqu\'à aujourd\'hui
   const startDate = PLAN[0].sessions[0].date;
   const endDate = today();
@@ -933,6 +936,10 @@ function rebuildPredHistory() {
   }
   predHistory = newHistory;
   save("lk_pred_history", predHistory);
+  lastRebuildDate = today();
+  save("lk_last_rebuild", lastRebuildDate);
+  isRebuilding = false;
+  render();
 }
 
 // Reconstruire l\'historique si manquant ou incomplet
@@ -979,8 +986,8 @@ function predict10K() {
   if (specData) {
     const estimate10k = 10000 / specData.speed;
     estimates.push({ value: estimate10k, weight: 0.45 });
-    details.push({ label:`SPEC moy. pond. (${specData.laps.length} laps, ${specData.runs.length} séances)`, value:fmtPace(specData.speed)+"/km" });
-    details.push({ label:"→ 10K estimé (allure directe)", value:fmtTime(Math.round(estimate10k)) });
+    const lastSpecDate = specData.runs.map(r=>r.start_date_local?.slice(0,10)).filter(Boolean).sort().pop();
+    details.push({ label:`SPEC · ${specData.runs.length} séance${specData.runs.length>1?"s":""} · dernier ${lastSpecDate||"?"}`, value:fmtPace(specData.speed)+"/km → "+fmtTime(Math.round(estimate10k)) });
   }
 
   // ── 2. SEUIL → allure × 0.98 ─────────────────────────────────────────────
@@ -998,8 +1005,8 @@ function predict10K() {
   if (vmaData) {
     const estimate10k = 10000 / (vmaData.speed * 0.87);
     estimates.push({ value: estimate10k, weight: 0.35 });
-    details.push({ label:`VMA moy. pond. (${vmaData.laps.length} laps, ${vmaData.runs.length} séances)`, value:fmtPace(vmaData.speed)+"/km" });
-    details.push({ label:"→ 10K estimé (×0.87)", value:fmtTime(Math.round(estimate10k)) });
+    const lastVmaDate = vmaData.runs.map(r=>r.start_date_local?.slice(0,10)).filter(Boolean).sort().pop();
+    details.push({ label:`VMA · ${vmaData.runs.length} séance${vmaData.runs.length>1?"s":""} · dernier ${lastVmaDate||"?"}`, value:fmtPace(vmaData.speed)+"/km → "+fmtTime(Math.round(estimate10k)) });
   }
 
   // ── Pondération Lavandou selon qualité des données ────────────────────────
@@ -1048,6 +1055,10 @@ function predict10K() {
   if (!lastEntry || lastEntry.date !== todayStr) {
     predHistory.push({ date: todayStr, time: Math.round(estimate), confidence, predictorVersion: PREDICTOR_VERSION });
     if (predHistory.length > 80) predHistory.shift();
+    save("lk_pred_history", predHistory);
+  } else if (lastEntry.date === todayStr && lastEntry.time !== Math.round(estimate)) {
+    // Mettre à jour l'entrée du jour si l'estimation a changé
+    predHistory[predHistory.length-1] = { date: todayStr, time: Math.round(estimate), confidence, predictorVersion: PREDICTOR_VERSION };
     save("lk_pred_history", predHistory);
   }
 
@@ -1146,15 +1157,22 @@ function renderDashboard() {
     pred.time <= 2910
       ? el("div",{style:{color:"#22c55e",fontSize:"12px",fontWeight:"700",textAlign:"center",marginBottom:"10px"}},"🎉 Objectif dépassé !")
       : null,
-    el("div",{style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",paddingTop:"10px",borderTop:"1px solid #2e3347"}},
-      el("span",{style:{color:"#22c55e",fontWeight:"700"}},"✅ "+done),
-      el("span",{class:"muted"},"·"),
-      el("span",{style:{color:"#eab308",fontWeight:"700"}},"⚠️ "+adapted),
-      el("span",{class:"muted"},"·"),
-      el("span",{style:{color:"#ef4444",fontWeight:"700"}},"❌ "+missed),
-      el("span",{class:"muted"},"·"),
-      el("span",{class:"muted"},"J–"+cd+" · S"+cw+" · "+phaseOf(cw).label)
-    )
+    (()=>{
+      const phase = phaseOf(cw);
+      const phaseSessions = ALL_SESSIONS.filter(s=>s.phase===phase.id&&s.type!=="REPOS"&&s.type!=="RACE");
+      const phaseRemaining = phaseSessions.filter(s=>s.date>=today()&&!statuses[s.uid]).length;
+      return el("div",{style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",paddingTop:"10px",borderTop:"1px solid #2e3347",flexWrap:"wrap"}},
+        el("span",{style:{color:"#22c55e",fontWeight:"700"}},"✅ "+done),
+        el("span",{class:"muted"},"·"),
+        el("span",{style:{color:"#eab308",fontWeight:"700"}},"⚠️ "+adapted),
+        el("span",{class:"muted"},"·"),
+        el("span",{style:{color:"#ef4444",fontWeight:"700"}},"❌ "+missed),
+        el("span",{class:"muted"},"·"),
+        el("span",{class:"muted"},"J–"+cd+" · S"+cw),
+        el("span",{class:"muted"},"·"),
+        el("span",{style:{color:phase.color,fontWeight:"600"}},phase.label+" · "+phaseRemaining+" séance"+(phaseRemaining>1?"s":"")+" restante"+(phaseRemaining>1?"s":""))
+      );
+    })()
   );
 
   const syncAgo = lastSyncTime > 0 ? Math.round((Date.now()-lastSyncTime)/60000) : null;
@@ -1217,6 +1235,28 @@ function renderDashboard() {
 
   let todayEl=null;
   if (todaySessions.length) {
+    const isFullRepos = todaySessions.every(s=>s.type==="REPOS");
+    // Séance clé demain ?
+    const tomorrowStr = new Date(new Date().getTime()+86400000).toISOString().slice(0,10);
+    const tomorrowKey = ALL_SESSIONS.find(s=>s.date===tomorrowStr&&["VMA","SPEC","SEUIL","TEST","RACE"].includes(s.type));
+    if (isFullRepos) {
+      todayEl = el("div",{style:{marginBottom:"12px"}},
+        el("div",{class:"label"},"Aujourd\'hui"),
+        el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"16px",textAlign:"center"}},
+          el("div",{style:{fontSize:"28px",marginBottom:"6px"}},"😴"),
+          el("div",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"600",marginBottom:"4px"}},todaySessions[0].session),
+          todaySessions[0].notes?el("div",{class:"muted",style:{fontSize:"12px",fontStyle:"italic",marginBottom:"8px"}},todaySessions[0].notes):null,
+          tomorrowKey?el("div",{style:{
+            background:(STYPES[tomorrowKey.type]?.color||"#f97316")+"22",
+            border:"1px solid "+(STYPES[tomorrowKey.type]?.color||"#f97316")+"44",
+            borderRadius:"8px",padding:"8px 12px",marginTop:"8px",textAlign:"left"
+          }},
+            el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"4px"}},"⚡ Demain"),
+            el("div",{style:{color:STYPES[tomorrowKey.type]?.color||"#f97316",fontSize:"13px",fontWeight:"700"}},(STYPES[tomorrowKey.type]?.short||tomorrowKey.type)+" · "+tomorrowKey.session)
+          ):null
+        )
+      );
+    } else {
     todayEl=el("div",{style:{marginBottom:"16px"}},
       el("div",{class:"label"},"Aujourd\'hui"),
       ...todaySessions.filter(s=>s.type!=="REPOS").map(s=>{
@@ -1267,6 +1307,7 @@ function renderDashboard() {
         return card;
       })
     );
+    } // fin else isFullRepos
   }
 
   const cw2 = currentWeek();
@@ -1460,13 +1501,41 @@ function renderWeekDetail(weekNum) {
               : el("span",{style:{color:"#475569",fontStyle:"italic"}},"🌡️ Chargement météo...")
           ):null,
         effortLaps.length>0?el("div",{style:{borderTop:"1px solid #fc4c0222",paddingTop:"8px"}},
-          el("div",{class:"muted",style:{fontSize:"12px",marginBottom:"6px",textTransform:"uppercase",letterSpacing:"0.5px"}},"Intervalles d\'effort ("+effortLaps.length+")"),
-          ...effortLaps.map((lap,i)=>el("div",{style:{display:"flex",gap:"12px",marginBottom:"4px",alignItems:"center"}},
-            el("span",{style:{color:"#94a3b8",fontSize:"12px",minWidth:"16px"}},""+(i+1)),
-            el("span",{style:{color:"#f1f5f9",fontSize:"12px",fontWeight:"600"}},fmtPace(lap.average_speed)+"/km"),
-            el("span",{class:"muted",style:{fontSize:"11px"}},(lap.distance/1000).toFixed(2)+"km"),
-            lap.average_heartrate?el("span",{class:"muted",style:{fontSize:"11px"}},Math.round(lap.average_heartrate)+" bpm"):null
-          ))
+          el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}},
+            el("div",{class:"muted",style:{fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.5px"}},"Répétitions ("+effortLaps.length+")"),
+            (()=>{
+              const target = SESSION_TARGETS[s.type];
+              if (!target) return null;
+              const inTarget = effortLaps.filter(l=>(1000/l.average_speed)<=target.okPace).length;
+              const color = inTarget===effortLaps.length?"#22c55e":inTarget>0?"#eab308":"#ef4444";
+              return el("span",{style:{color,fontSize:"11px",fontWeight:"700"}},inTarget+"/"+effortLaps.length+" dans la cible");
+            })()
+          ),
+          el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"6px"}},
+            SESSION_TARGETS[s.type] ? "cible "+SESSION_TARGETS[s.type].effort+" "+SESSION_TARGETS[s.type].tolerance : ""
+          ),
+          ...effortLaps.map((lap,i)=>{
+            const target = SESSION_TARGETS[s.type];
+            const pace = 1000/lap.average_speed;
+            let barColor = "#94a3b8", emoji = "";
+            if (target) {
+              if (pace <= target.okPace) { barColor="#22c55e"; emoji="🟢"; }
+              else if (pace <= target.warnPace) { barColor="#eab308"; emoji="🟡"; }
+              else { barColor="#ef4444"; emoji="🔴"; }
+            }
+            const maxPace = target ? target.warnPace + 30 : 400;
+            const minPace = target ? target.targetMin - 20 : 240;
+            const barWidth = Math.max(0, Math.min(100, (1-(pace-minPace)/(maxPace-minPace))*100));
+            return el("div",{style:{display:"grid",gridTemplateColumns:"28px 1fr 64px 56px 20px",gap:"4px",alignItems:"center",marginBottom:"5px"}},
+              el("span",{style:{color:"#64748b",fontSize:"11px"}},"R"+(i+1)),
+              el("div",{style:{height:"4px",background:"#232738",borderRadius:"2px"}},
+                el("div",{style:{width:barWidth+"%",height:"100%",background:barColor,borderRadius:"2px"}})
+              ),
+              el("span",{style:{color:"#f1f5f9",fontSize:"12px",fontWeight:"500",textAlign:"right"}},fmtPace(lap.average_speed)+"/km"),
+              lap.average_heartrate?el("span",{class:"muted",style:{fontSize:"11px",textAlign:"right"}},Math.round(lap.average_heartrate)+" bpm"):el("span",{},""),
+              el("span",{style:{fontSize:"12px",textAlign:"center"}},emoji)
+            );
+          })
         ):null
       ):null
     );
@@ -1534,7 +1603,11 @@ function renderStats() {
 
   // ── Graphique évolution ───────────────────────────────────────────────
   let graphEl = null;
-  if (predHistory.length >= 2) {
+  if (isRebuilding) {
+    graphEl = el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"16px",marginBottom:"16px",textAlign:"center"}},
+      el("div",{class:"muted",style:{fontSize:"12px",fontStyle:"italic"}},"⏳ Recalcul de l\'historique...")
+    );
+  } else if (predHistory.length >= 2) {
     const TARGET = 48.5*60, BASE = 3021;
     const W = 340, H = 120, PAD = {t:16,r:40,b:28,l:44};
     const iW = W-PAD.l-PAD.r, iH = H-PAD.t-PAD.b;
@@ -1760,8 +1833,14 @@ function renderSettings() {
             style:{width:"100%",background:syncing?"#1a1d27":"#fc4c0222",border:"1px solid #fc4c0255",borderRadius:"10px",padding:"11px",cursor:"pointer",color:"#fc4c02",fontWeight:"700",fontSize:"13px",marginBottom:"8px"},
             onClick:()=>{ if(!syncing) syncStrava(); }
           },syncing?"⏳ "+syncMsg:"🔄 Synchroniser avec Strava"),
-          el("div",{style:{marginTop:"4px",paddingTop:"12px",borderTop:"1px solid #2e3347"}},
-            el("button",{style:{background:"none",border:"none",color:"#94a3b8",fontSize:"12px",cursor:"pointer",padding:"0"},
+          el("div",{style:{marginTop:"12px",paddingTop:"12px",borderTop:"1px solid #2e3347",display:"flex",flexDirection:"column",gap:"8px"}},
+            el("button",{style:{background:"#60a5fa11",border:"1px solid #60a5fa33",borderRadius:"8px",padding:"8px",color:"#60a5fa",fontSize:"12px",cursor:"pointer",fontWeight:"600"},
+              onClick:()=>{ localStorage.removeItem("lk_strava_activities"); localStorage.removeItem("lk_last_sync"); stravaActivities=[]; lastSyncTime=0; syncStrava(); }
+            },"🗑️ Vider cache & forcer synchro complète"),
+            el("button",{style:{background:"#a855f711",border:"1px solid #a855f733",borderRadius:"8px",padding:"8px",color:"#a855f7",fontSize:"12px",cursor:"pointer",fontWeight:"600"},
+              onClick:()=>{ localStorage.removeItem("lk_pred_history"); predHistory=[]; rebuildPredHistory(); render(); }
+            },"🔄 Forcer recalcul de l\'historique"+(lastRebuildDate?" · dernier : "+lastRebuildDate:"")),
+            el("button",{style:{background:"none",border:"none",color:"#64748b",fontSize:"12px",cursor:"pointer",padding:"0"},
               onClick:()=>{ stravaToken=null;stravaRefresh=null;stravaExpires=0;stravaActivities=[];save("lk_strava_token",null);save("lk_strava_refresh",null);save("lk_strava_expires",0);save("lk_strava_activities",[]);render(); }
             },"🔓 Déconnecter Strava")
           )
@@ -1771,7 +1850,18 @@ function renderSettings() {
 
   const versionSection = (function buildVersionSection() {
     const VERSIONS = [
-      { ver:"v1.8.9", title:"Prédicteur honnête & UX", current:true, notes:[
+      { ver:"v1.8.10", title:"Répétitions & robustesse", current:true, notes:[
+        "🔁 Affichage détaillé des répétitions (barre + allure + FC + 🟢🟡🔴)",
+        "📊 Résumé X/Y répétitions dans la cible",
+        "🔄 Graphique/dashboard synchronisés",
+        "⏳ Indicateur Recalcul... sur le graphique",
+        "🛡️ Conservation activités Strava si synchro échoue",
+        "🔓 Boutons vider cache & forcer recalcul",
+        "🎯 Rappel séance clé demain dans carte repos",
+        "📅 Séances restantes dans la phase",
+        "📊 Sources du prédicteur avec dates",
+      ]},
+      { ver:"v1.8.9", title:"Prédicteur honnête & UX", current:false, notes:[
         "🎯 Fourchette d\'estimation (ex. 48\'10\"–49\'20\")",
         "🔍 Détail des sources en tap sur l\'estimation",
         "📊 Pondération Lavandou conservative (< 5 séances)",
@@ -1892,7 +1982,10 @@ async function syncStrava() {
       syncMsg=`✅ ${activities.length} activité${activities.length>1?"s":""} synchronisée${activities.length>1?"s":""}`;
       scheduleSave();
     } else { syncMsg="❌ Erreur Strava"; }
-  } catch(e) { syncMsg="❌ Erreur réseau"; }
+  } catch(e) {
+    syncMsg="❌ Erreur réseau — activités précédentes conservées";
+    // On ne vide pas stravaActivities — on conserve le cache
+  }
   syncing=false; render();
   setTimeout(()=>{ syncMsg=""; render(); },3000);
 }
