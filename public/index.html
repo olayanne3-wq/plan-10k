@@ -847,11 +847,19 @@ async function fetchCoachMsg() {
   const prompt = `Tu es Léa, coach running pour Laurent qui prépare le ${RACE_NAME} le 6 septembre 2026 à ${RACE_LOCATION} (objectif ${fmtTime(raceGoalTime)}).
 Estimation actuelle : ${predNow.timeStr} (${gapStr}).
 ${sessionDone ? `Séance ${sessType} terminée ce soir — statut ${todaySessionStatus}.${todayAvgPace ? ' Allure effort : '+todayAvgPace+'.' : ''}${todayInTarget ? ' '+todayInTarget+'.' : ''}` : `Aujourd'hui : ${sessType} — ${sessDesc}.`}
-${isEveOfKeySession ? `Demain séance clé : ${tomorrowKeySess.type} — ${tomorrowKeySess.session}.` : tomorrowKeySess ? `Demain : ${tomorrowKeySess.type}.` : ''}
+${isEveOfKeySession ? `Demain séance clé : ${tomorrowKeySess.type} — ${tomorrowKeySess.session}.` : ''}
 ${weatherTemp ? 'Température : '+weatherTemp+'°C.' : ''}
 ${isLastTwoWeeks ? `J–${cd} avant la course.` : ""}
 ${vmaInfo}
-${sessionDone ? 'Fais une courte analyse de la séance terminée (qualité, points positifs, axes d\'amélioration). 2-3 phrases max.' : isEveOfKeySession ? 'Donne un conseil spécifique pour bien préparer la séance clé de demain (récupération, sommeil, hydratation). 2-3 phrases max.' : 'Génère UN message de coaching court et motivant. 2-3 phrases max.'}
+${sessionDone
+  ? (sessType==='EF'||sessType==='LONGUE')
+    ? 'Commente brièvement la sortie EF (sensations, récupération). Pas de conseil technique de course intensive. 2-3 phrases max.'
+    : 'Fais une courte analyse de la séance terminée (qualité, points positifs, axes d\'amélioration). 2-3 phrases max.'
+  : isEveOfKeySession
+    ? 'Donne un conseil pour bien préparer la séance clé de demain (récupération, sommeil, hydratation). 2-3 phrases max.'
+    : (sessType==='EF'||sessType==='LONGUE'||sessType==='REPOS')
+      ? 'Message court sur la récupération ou la régularité de l\'entraînement. 2-3 phrases max.'
+      : 'Génère UN message de coaching court et motivant sur la séance à venir. 2-3 phrases max.'}
 ${isLastTwoWeeks ? "Mentionne le compte à rebours." : "Ne mentionne pas le nombre de jours restants."}
 Réponds uniquement avec le message, sans guillemets.`;
 
@@ -1248,10 +1256,16 @@ function renderDashboard() {
   const todayStatus4Coach = statuses[ALL_SESSIONS.find(s=>s.date===today()&&s.type!=="REPOS")?.uid];
   const coachBorderColor = todayStatus4Coach==="✅"?"#22c55e33":todayStatus4Coach==="⚠️"?"#eab30833":todayStatus4Coach==="❌"?"#ef444433":"#2e3347";
   const coachLabel = todayStatus4Coach&&["✅","⚠️","❌"].includes(todayStatus4Coach) ? "🤖 Coach · Analyse" : "🤖 Coach";
-  const coachEl = coachMsg ? el("div",{style:{background:"#1a1d27",border:"1px solid "+coachBorderColor,borderRadius:"10px",padding:"12px 14px",marginBottom:"12px"}},
-    el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"6px"}},coachLabel),
-    el("div",{style:{color:"#f1f5f9",fontSize:"13px",fontStyle:"italic",lineHeight:"1.5"}},coachMsg)
-  ) : null;
+  const refreshCoachBtn = el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"14px",cursor:"pointer",padding:"0",lineHeight:"1"},
+    onClick:()=>{ coachMsg=null; coachDate=""; save("lk_coach_msg",null); save("lk_coach_date",""); fetchCoachMsg(); }
+  },"🔄");
+  const coachEl = el("div",{style:{background:"#1a1d27",border:"1px solid "+coachBorderColor,borderRadius:"10px",padding:"12px 14px",marginBottom:"12px"}},
+    el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"6px"}},
+      el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px"}},coachLabel),
+      refreshCoachBtn
+    ),
+    el("div",{style:{color:"#f1f5f9",fontSize:"13px",fontStyle:"italic",lineHeight:"1.5"}},coachMsg||el("span",{class:"muted",style:{fontSize:"12px"}},"Chargement..."))
+  );
 
   const nextKey = nextKeySession();
   const daysNext = nextKey ? daysUntil(nextKey.date) : 99;
