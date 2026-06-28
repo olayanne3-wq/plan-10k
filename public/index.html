@@ -1954,37 +1954,56 @@ function renderStats() {
 
   // ── Prédiction de progression ────────────────────────────────────────────
   let progressionEl = null;
+  // Prédiction de progression — modèle logarithmique avec fourchette
   if (predHistory.length >= 3) {
-    const recent = predHistory.slice(-7);
-    const oldest = recent[0].time;
-    const newest = recent[recent.length-1].time;
-    const deltaPerDay = (newest - oldest) / Math.max(recent.length - 1, 1);
-    const daysLeft = countdown();
-    // Limiter la projection à ±3 min max pour éviter les valeurs folles
-    const deltaPerDayCapped = Math.max(-10, Math.min(10, deltaPerDay));
-    const projectedTime = Math.round(newest + deltaPerDayCapped * daysLeft);
-    const trend = deltaPerDay < -5 ? "📉 En progression" : deltaPerDay > 5 ? "📈 En régression" : "➡️ Stable";
-    const trendColor = deltaPerDay < -5 ? "#22c55e" : deltaPerDay > 5 ? "#ef4444" : "#94a3b8";
+    const currentTime = pred.time;
+    const BASE_TIME_START = 3021; // 50'21" Lavandou
+    const gainMax = BASE_TIME_START - raceGoalTime; // gain théorique max
+    const gainRealist = Math.round(gainMax * 0.85); // 85% du gain max
+    const gainSoFar = BASE_TIME_START - currentTime;
+
+    // Coefficient k calibré sur le gain réalisé à ce stade
+    const weeksElapsed = Math.max(1, (predHistory.length - 1) / 7);
+    const k = gainSoFar > 0 ? -Math.log(1 - Math.min(gainSoFar / gainRealist, 0.99)) / weeksElapsed : 0.1;
+    const weeksTotal = 11;
+    const projectedGain = Math.round(gainRealist * (1 - Math.exp(-k * weeksTotal)));
+    const projectedTime = BASE_TIME_START - projectedGain;
+
+    // Fourchette selon la quantité de données
+    const oldestEntry = predHistory[0]?.date;
+    const newestEntry = predHistory[predHistory.length-1]?.date;
+    const daySpan = oldestEntry && newestEntry
+      ? Math.round((new Date(newestEntry) - new Date(oldestEntry)) / 86400000)
+      : 0;
+    const toleranceSec = daySpan >= 21 ? 30 : daySpan >= 14 ? 60 : 120;
+    const projLow = fmtTime(projectedTime - toleranceSec);
+    const projHigh = fmtTime(projectedTime + toleranceSec);
+    const hasVerdict = daySpan >= 21;
 
     progressionEl = el("div",{style:{marginBottom:"16px"}},
-      el("div",{class:"label"},"🎯 Prédiction de progression"),
+      el("div",{class:"label"},"🎯 Trajectoire au 6 septembre"),
       el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"14px"}},
         el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}},
           el("div",{},
-            el("div",{class:"muted",style:{fontSize:"11px",marginBottom:"2px"}},"À ce rythme le 6 septembre"),
-            el("div",{style:{color:"#f1f5f9",fontSize:"24px",fontWeight:"800",letterSpacing:"-0.5px"}},fmtTime(projectedTime))
+            el("div",{class:"muted",style:{fontSize:"11px",marginBottom:"2px"}},"Projection"),
+            el("div",{style:{color:"#f1f5f9",fontSize:"22px",fontWeight:"800",letterSpacing:"-0.5px"}},projLow+" – "+projHigh)
           ),
           el("div",{style:{textAlign:"right"}},
-            el("div",{style:{color:trendColor,fontSize:"13px",fontWeight:"700"}},trend),
-            el("div",{class:"muted",style:{fontSize:"11px"}},Math.abs(Math.round(deltaPerDay))+" sec/jour "+(deltaPerDay<0?"de mieux":"de moins"))
+            el("div",{class:"muted",style:{fontSize:"10px",marginBottom:"4px"}},"Fiabilité"),
+            el("div",{style:{
+              color:daySpan>=21?"#22c55e":daySpan>=14?"#eab308":"#94a3b8",
+              fontSize:"12px",fontWeight:"700"
+            }},daySpan>=21?"Bonne":"Faible — peu de données")
           )
         ),
-        el("div",{style:{display:"flex",justifyContent:"space-between",paddingTop:"8px",borderTop:"1px solid #2e3347"}},
-          el("span",{class:"muted",style:{fontSize:"11px"}},"vs objectif 48\'30\""),
+        hasVerdict ? el("div",{style:{display:"flex",justifyContent:"space-between",paddingTop:"8px",borderTop:"1px solid #2e3347"}},
+          el("span",{class:"muted",style:{fontSize:"11px"}},"vs objectif "+fmtTime(raceGoalTime)),
           el("span",{style:{
-            color:projectedTime<=2910?"#22c55e":projectedTime<=2940?"#eab308":"#ef4444",
+            color:projectedTime<=raceGoalTime?"#22c55e":projectedTime<=raceGoalTime+30?"#eab308":"#ef4444",
             fontSize:"12px",fontWeight:"700"
-          }},projectedTime<=2910?"✅ Objectif atteignable !":projectedTime<=2970?"⚠️ Objectif serré":"❌ Objectif à risque")
+          }},projectedTime<=raceGoalTime?"✅ Atteignable !":projectedTime<=raceGoalTime+30?"⚠️ Serré":"❌ À risque")
+        ) : el("div",{style:{paddingTop:"8px",borderTop:"1px solid #2e3347"}},
+          el("span",{class:"muted",style:{fontSize:"11px",fontStyle:"italic"}},"Verdict disponible à partir de 3 semaines de données")
         )
       )
     );
