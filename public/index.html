@@ -2259,14 +2259,14 @@ function renderCourse() {
         el("span",{class:"muted",style:{fontSize:"13px"}},"Retrait dossards"),
         el("input",{type:"text",placeholder:"ex. 7h00",style:{width:"80px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"4px 8px",color:"#f1f5f9",fontSize:"13px",textAlign:"right"},
           value:raceHoraires.dossard||"",
-          onChange:(e)=>{ raceHoraires.dossard=e.target.value; save("lk_race_horaires",raceHoraires); }
+          onInput:(e)=>{ raceHoraires.dossard=e.target.value; save("lk_race_horaires",raceHoraires); scheduleSave(); }
         })
       ),
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
         el("span",{class:"muted",style:{fontSize:"13px"}},"Départ course"),
         el("input",{type:"text",placeholder:"ex. 9h30",style:{width:"80px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"4px 8px",color:"#f1f5f9",fontSize:"13px",textAlign:"right"},
           value:raceHoraires.depart||"",
-          onChange:(e)=>{ raceHoraires.depart=e.target.value; save("lk_race_horaires",raceHoraires); }
+          onInput:(e)=>{ raceHoraires.depart=e.target.value; save("lk_race_horaires",raceHoraires); scheduleSave(); }
         })
       )
     )
@@ -2328,7 +2328,7 @@ function renderCourse() {
     el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px"}},
       el("input",{type:"text",placeholder:"Lien GPX ou carte du parcours...",style:{width:"100%",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"8px 12px",color:"#f1f5f9",fontSize:"13px"},
         value:raceParcoursUrl,
-        onChange:(e)=>{ raceParcoursUrl=e.target.value; save("lk_race_parcours",raceParcoursUrl); }
+        onInput:(e)=>{ raceParcoursUrl=e.target.value; save("lk_race_parcours",raceParcoursUrl); scheduleSave(); }
       }),
       raceParcoursUrl?el("a",{href:raceParcoursUrl,target:"_blank",style:{display:"block",marginTop:"8px",color:"#60a5fa",fontSize:"12px"}},"→ Voir le parcours"):null
     )
@@ -2513,7 +2513,8 @@ function renderSettings() {
     el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px"}},
       el("input",{type:"text",placeholder:"Votre code PPS...",style:{width:"100%",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"8px 12px",color:"#f1f5f9",fontSize:"13px"},
         value:runnerPps,
-        onChange:(e)=>{ runnerPps=e.target.value; save("lk_pps",runnerPps); }
+        onInput:(e)=>{ runnerPps=e.target.value; save("lk_pps",runnerPps); },
+        onBlur:(e)=>{ runnerPps=e.target.value; save("lk_pps",runnerPps); scheduleSave(); }
       }),
       el("div",{class:"muted",style:{fontSize:"11px",marginTop:"6px"}},"Requis pour l\'inscription aux courses FFA")
     )
