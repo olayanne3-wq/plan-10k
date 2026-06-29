@@ -566,6 +566,18 @@ let syncing = false;
 let syncMsg = "";
 let lastSyncTime = load("lk_last_sync", 0);
 let githubToken = load("lk_github_token", "");
+
+// Récupérer le token depuis l\'URL si présent
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const urlToken = params.get("token");
+  if (urlToken) {
+    githubToken = urlToken;
+    save("lk_github_token", githubToken);
+    // Nettoyer l\'URL
+    window.history.replaceState({}, "", window.location.pathname);
+  }
+})();
 let gistId = load("lk_gist_id", "");
 let gistMsg = "";
 let predHistory = load("lk_pred_history", []); // [{date, time, confidence}]
@@ -1035,12 +1047,9 @@ function rebuildPredHistory() {
   const end = new Date(endDate + "T00:00:00");
   while (d <= end) {
     const dateStr = d.toISOString().slice(0,10);
-    // Ne pas inclure aujourd\'hui — predict10K() s\'en chargera avec la valeur correcte
-    if (dateStr < today()) {
-      const time = predict10KAtDate(dateStr);
-      const confidence = stravaActivities.filter(a=>a.start_date_local?.slice(0,10)<=dateStr).length > 0 ? 45 : 30;
-      newHistory.push({ date: dateStr, time, confidence, predictorVersion: PREDICTOR_VERSION });
-    }
+    const time = predict10KAtDate(dateStr);
+    const confidence = stravaActivities.filter(a=>a.start_date_local?.slice(0,10)<=dateStr).length > 0 ? 45 : 30;
+    newHistory.push({ date: dateStr, time, confidence, predictorVersion: PREDICTOR_VERSION });
     d.setDate(d.getDate()+1);
   }
   predHistory = newHistory;
@@ -2893,7 +2902,13 @@ async function gistForceRestore() {
   } catch(e) { gistMsg="❌ Erreur restauration"; render(); setTimeout(()=>{gistMsg="";render();},3000); }
 }
 
-if (githubToken&&gistId) { gistLoad(); }
+if (githubToken&&gistId) {
+  gistLoad();
+  // Sauvegarder automatiquement si on a des données locales
+  setTimeout(()=>{
+    if (Object.keys(statuses).length > 0) gistSave(true);
+  }, 3000);
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // STRAVA
