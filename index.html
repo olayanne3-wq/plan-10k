@@ -2573,14 +2573,27 @@ function renderSettings() {
     el("div",{class:"label"},"🪪 PPS"),
     el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px"}},
 (()=>{
+        const wrap = document.createElement("div");
+        wrap.style.cssText = "display:flex;gap:8px;";
         const inp = document.createElement("input");
         inp.type = "text";
         inp.placeholder = "Votre code PPS...";
         inp.id = "pps-input";
-        inp.style.cssText = "width:100%;background:#232738;border:1px solid #2e3347;border-radius:6px;padding:8px 12px;color:#f1f5f9;font-size:13px;box-sizing:border-box;";
+        inp.style.cssText = "flex:1;background:#232738;border:1px solid #2e3347;border-radius:6px;padding:8px 12px;color:#f1f5f9;font-size:13px;box-sizing:border-box;";
         inp.value = runnerPps || "";
-        inp.addEventListener("input", (e)=>{ runnerPps=e.target.value; save("lk_pps",runnerPps); scheduleSave(); });
-        return inp;
+        const btn = document.createElement("button");
+        btn.textContent = "✓";
+        btn.style.cssText = "background:#f9731622;border:1px solid #f9731644;border-radius:6px;padding:8px 12px;color:#f97316;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;";
+        btn.addEventListener("click", ()=>{
+          runnerPps = inp.value.trim();
+          save("lk_pps", runnerPps);
+          scheduleSave();
+          btn.textContent = "✅";
+          setTimeout(()=>{ btn.textContent = "✓"; }, 1500);
+        });
+        wrap.appendChild(inp);
+        wrap.appendChild(btn);
+        return wrap;
       })(),
       el("div",{class:"muted",style:{fontSize:"11px",marginTop:"6px"}},"Requis pour l\'inscription aux courses FFA")
     )
