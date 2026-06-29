@@ -45,9 +45,9 @@ const PHASES = [
 const STYPES = {
   EF:    { label:"Endurance fondamentale", color:"#60a5fa",  short:"EF"    },
   VMA:   { label:"Intervalles VMA",        color:"#f97316",  short:"VMA"   },
-  SEUIL: { label:"Travail au seuil",       color:"#eab308",  short:"SEUIL" },
+  SEUIL: { label:"Travail au seuil",       color:"#22c55e",  short:"SEUIL" },
   SPEC:  { label:"Allure spécifique 10K",  color:"#a855f7",  short:"SPEC"  },
-  LONGUE:{ label:"Sortie longue",          color:"#22c55e",  short:"LONG"  },
+  LONGUE:{ label:"Sortie longue",          color:"#60a5fa",  short:"LONG"  },
   TEST:  { label:"Séance test",            color:"#f97316",  short:"TEST"  },
   REPOS: { label:"Repos",                  color:"#94a3b8",  short:"REPOS" },
   RACE:  { label:"Course",                 color:"#f97316",  short:"RACE"  },
@@ -2017,7 +2017,7 @@ function renderStats() {
   const paceRows = [
     {type:"EF",      label:"Endurance fondamentale", pace:"6:20", heat:"6:40", fc:"118–136", pct:"65–75%", color:"#60a5fa"},
     {type:"LONGUE",  label:"Sortie longue",           pace:"6:20", heat:"6:40", fc:"118–136", pct:"65–75%", color:"#22c55e"},
-    {type:"SEUIL",   label:"Seuil",                   pace:SESSION_TARGETS.SEUIL.effort, heat:null, fc:"163–172", pct:"90–95%", color:"#eab308"},
+    {type:"SEUIL",   label:"Seuil",                   pace:SESSION_TARGETS.SEUIL.effort, heat:null, fc:"163–172", pct:"90–95%", color:"#22c55e"},
     {type:"SPEC",    label:"Spécifique 10K",           pace:SESSION_TARGETS.SPEC.effort,  heat:null, fc:"154–163", pct:"85–90%", color:"#a855f7"},
     {type:"VMA",     label:"VMA",                     pace:SESSION_TARGETS.VMA.effort,   heat:null, fc:"163–181", pct:"90–100%", color:"#f97316"},
   ];
@@ -2042,7 +2042,7 @@ function renderStats() {
     if (points.length) { ieData[type]=points; cadData[type]=points; }
   });
 
-  const typeColors2 = { VMA:"#f97316", SPEC:"#a855f7", SEUIL:"#eab308" };
+  const typeColors2 = { VMA:"#f97316", SPEC:"#a855f7", SEUIL:"#22c55e" };
 
   function drawCurve(data, label, yKey, yLabel, refLine) {
     if (!Object.keys(data).length) return null;
@@ -2051,7 +2051,7 @@ function renderStats() {
     const W=320, H=90, PL=30, PT=12, PB=22;
     const minY=Math.min(...allVals)-5, maxY=Math.max(...allVals)+5;
     const svg = document.createElementNS("http://www.w3.org/2000/svg","svg");
-    svg.setAttribute("viewBox",`0 0 ${W} ${H+PT+PB}`);
+    svg.setAttribute("viewBox",`0 0 ${W} ${H+PT+PB+14}`);
     svg.style.width="100%";
 
     if (refLine) {
@@ -2064,6 +2064,20 @@ function renderStats() {
       t.setAttribute("x",PL-2); t.setAttribute("y",ry+3); t.setAttribute("fill","#475569"); t.setAttribute("font-size","8"); t.setAttribute("text-anchor","end");
       t.textContent=refLine; svg.appendChild(t);
     }
+
+    // Labels semaines sur l'axe X (S1, S3, S5, S7, S9, S11)
+    [1,3,5,7,9,11].forEach(w => {
+      const x = PL+(w-1)/10*(W-PL);
+      const tick = document.createElementNS("http://www.w3.org/2000/svg","line");
+      tick.setAttribute("x1",x); tick.setAttribute("x2",x);
+      tick.setAttribute("y1",PT+H); tick.setAttribute("y2",PT+H+4);
+      tick.setAttribute("stroke","#2e3347"); tick.setAttribute("stroke-width","1");
+      svg.appendChild(tick);
+      const lbl = document.createElementNS("http://www.w3.org/2000/svg","text");
+      lbl.setAttribute("x",x); lbl.setAttribute("y",PT+H+12);
+      lbl.setAttribute("fill","#475569"); lbl.setAttribute("font-size","8"); lbl.setAttribute("text-anchor","middle");
+      lbl.textContent="S"+w; svg.appendChild(lbl);
+    });
 
     let legendX = PL;
     Object.entries(data).forEach(([type,pts]) => {
@@ -2091,10 +2105,10 @@ function renderStats() {
         t.textContent=p[yKey]; svg.appendChild(t);
       });
       const dot=document.createElementNS("http://www.w3.org/2000/svg","circle");
-      dot.setAttribute("cx",legendX); dot.setAttribute("cy",H+PT+14); dot.setAttribute("r","4"); dot.setAttribute("fill",color);
+      dot.setAttribute("cx",legendX); dot.setAttribute("cy",H+PT+26); dot.setAttribute("r","4"); dot.setAttribute("fill",color);
       svg.appendChild(dot);
       const lt=document.createElementNS("http://www.w3.org/2000/svg","text");
-      lt.setAttribute("x",legendX+7); lt.setAttribute("y",H+PT+17); lt.setAttribute("fill",color); lt.setAttribute("font-size","9");
+      lt.setAttribute("x",legendX+7); lt.setAttribute("y",H+PT+29); lt.setAttribute("fill",color); lt.setAttribute("font-size","9");
       lt.textContent=type; svg.appendChild(lt);
       legendX+=55;
     });
