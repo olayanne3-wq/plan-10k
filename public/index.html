@@ -15,8 +15,8 @@ body { background: #0f1117; color: #f1f5f9; font-family: -apple-system,'Helvetic
 button, input { font-family: inherit; }
 .pill { border-radius: 4px; padding: 2px 7px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; flex-shrink: 0; }
 .card { background: #1a1d27; border: 1px solid #2e3347; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
-.muted { color: #64748b; }
-.text2 { color: #94a3b8; }
+.muted { color: #b0bec5; }
+.text2 { color: #e2e8f0; }
 .orange { color: #f97316; }
 .green { color: #22c55e; }
 .label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #64748b; margin-bottom: 8px; }
@@ -47,9 +47,9 @@ const STYPES = {
   VMA:   { label:"Intervalles VMA",        color:"#f97316",  short:"VMA"   },
   SEUIL: { label:"Travail au seuil",       color:"#22c55e",  short:"SEUIL" },
   SPEC:  { label:"Allure spécifique 10K",  color:"#a855f7",  short:"SPEC"  },
-  LONGUE:{ label:"Sortie longue",          color:"#60a5fa",  short:"LONG"  },
+  LONGUE:{ label:"Sortie longue",          color:"#06b6d4",  short:"LONG"  },
   TEST:  { label:"Séance test",            color:"#f97316",  short:"TEST"  },
-  REPOS: { label:"Repos",                  color:"#94a3b8",  short:"REPOS" },
+  REPOS: { label:"Repos",                  color:"#e2e8f0",  short:"REPOS" },
   RACE:  { label:"Course",                 color:"#f97316",  short:"RACE"  },
 };
 
@@ -667,7 +667,7 @@ function globalPct() {
   const done = ALL_SESSIONS.filter(s=>statuses[s.uid]==="✅").length;
   return Math.round(done/total*100);
 }
-function phaseOf(weekNum) { return PHASES.find(p=>p.weeks.includes(weekNum))||{color:"#94a3b8",label:""}; }
+function phaseOf(weekNum) { return PHASES.find(p=>p.weeks.includes(weekNum))||{color:"#e2e8f0",label:""}; }
 
 // ── Projections Riegel multi-distances ────────────────────────────────────
 function riegelProjections(time10k) {
@@ -953,7 +953,7 @@ function economyScore(lap, sessionType) {
   return Math.round(iecTheo / iecReal * 100);
 }
 function economyColor(score, n) {
-  if (!score || n < 3) return "#94a3b8";
+  if (!score || n < 3) return "#e2e8f0";
   if (score > 110) return "#22c55e";
   if (score >= 90) return "#eab308";
   return "#ef4444";
@@ -1294,7 +1294,7 @@ function renderDashboard() {
     el("span",{style:{color:isHot?"#f97316":"#60a5fa",fontSize:"12px",fontWeight:"700"}}, weatherTemp+"°C · Toulon"),
     el("span",{class:"muted",style:{fontSize:"12px"}},"·"),
     isHot ? el("span",{style:{fontSize:"12px"}},"🔥") : null,
-    el("span",{style:{color:isHot?"#f97316":"#94a3b8",fontSize:"12px",fontWeight:"600"}}, "Allure EF : "+(isHot?"6:40":"6:20")+"/km")
+    el("span",{style:{color:isHot?"#f97316":"#e2e8f0",fontSize:"12px",fontWeight:"600"}}, "Allure EF : "+(isHot?"6:40":"6:20")+"/km")
   ) : null;
 
   const todayStatus4Coach = statuses[ALL_SESSIONS.find(s=>s.date===today()&&s.type!=="REPOS")?.uid];
@@ -1384,7 +1384,7 @@ function renderDashboard() {
               el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"3px"}},"⚡ Demain"),
               el("div",{style:{color:STYPES[tomorrowKey.type]?.color||"#f97316",fontSize:"12px",fontWeight:"700"}},(STYPES[tomorrowKey.type]?.short||tomorrowKey.type)+" · "+tomorrowKey.session)
             ),
-            el("span",{style:{color:"#64748b",fontSize:"18px"}},"›")
+            el("span",{style:{color:"#e2e8f0",fontSize:"18px"}},"›")
           ):null
         )
       );
@@ -1424,12 +1424,12 @@ function renderDashboard() {
           ),
           !isRest && (s.warmup||s.cooldown) ? el("div",{style:{background:"#232738",borderRadius:"8px",padding:"8px 10px",marginBottom:"8px"}},
             s.warmup ? el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:s.cooldown?"6px":"0"}},
-              el("span",{style:{color:"#94a3b8",fontSize:"11px",minWidth:"24px"}},"▶"),
-              el("span",{style:{color:"#94a3b8",fontSize:"12px"}},s.warmup)
+              el("span",{style:{color:"#e2e8f0",fontSize:"11px",minWidth:"24px"}},"▶"),
+              el("span",{style:{color:"#e2e8f0",fontSize:"12px"}},s.warmup)
             ) : null,
             s.cooldown ? el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
-              el("span",{style:{color:"#94a3b8",fontSize:"11px",minWidth:"24px"}},"◀"),
-              el("span",{style:{color:"#94a3b8",fontSize:"12px"}},s.cooldown)
+              el("span",{style:{color:"#e2e8f0",fontSize:"11px",minWidth:"24px"}},"◀"),
+              el("span",{style:{color:"#e2e8f0",fontSize:"12px"}},s.cooldown)
             ) : null
           ) : null,
           s.notes ? el("div",{style:{color:"#60a5facc",fontSize:"12px",fontStyle:"italic",marginBottom:"8px"}},"💡 "+s.notes) : null,
@@ -1481,7 +1481,7 @@ function renderDashboard() {
               ...effortLaps2.map((lap,i)=>{
                 const tgt=SESSION_TARGETS[s.type];
                 const pace=1000/lap.average_speed;
-                let bc="#94a3b8",em="";
+                let bc="#e2e8f0",em="";
                 if(tgt){if(pace<=tgt.okPace){bc="#22c55e";em="🟢";}else if(pace<=tgt.warnPace){bc="#eab308";em="🟡";}else{bc="#ef4444";em="🔴";}}
                 const maxP=tgt?tgt.warnPace+30:400, minP=tgt?tgt.targetMin-20:240;
                 const bw=Math.max(0,Math.min(100,(1-(pace-minP)/(maxP-minP))*100));
@@ -1495,7 +1495,7 @@ function renderDashboard() {
                 const cadence = lap.average_cadence ? Math.round(lap.average_cadence*2)+" spm" : "";
                 return el("div",{style:{marginBottom:"6px"}},
                   el("div",{style:{display:"grid",gridTemplateColumns:"28px 1fr 64px 56px 20px",gap:"4px",alignItems:"center",marginBottom:"2px"}},
-                    el("span",{style:{color:"#64748b",fontSize:"11px"}},"R"+(i+1)),
+                    el("span",{style:{color:"#e2e8f0",fontSize:"11px"}},"R"+(i+1)),
                     el("div",{style:{height:"4px",background:"#232738",borderRadius:"2px"}},el("div",{style:{width:bw+"%",height:"100%",background:bc,borderRadius:"2px"}})),
                     el("span",{style:{color:"#f1f5f9",fontSize:"12px",fontWeight:"500",textAlign:"right"}},fmtPace(lap.average_speed)+"/km"),
                     lap.average_heartrate?el("span",{class:"muted",style:{fontSize:"11px",textAlign:"right"}},Math.round(lap.average_heartrate)+" bpm"):el("span",{},""),
@@ -1515,9 +1515,9 @@ function renderDashboard() {
           },
             el("div",{},
               el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"3px"}},"Prochaine séance · "+new Date(nextSess.date+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})),
-              el("div",{style:{color:"#94a3b8",fontSize:"12px"}},(STYPES[nextSess.type]?.short||nextSess.type)+" · "+nextSess.session)
+              el("div",{style:{color:"#e2e8f0",fontSize:"12px"}},(STYPES[nextSess.type]?.short||nextSess.type)+" · "+nextSess.session)
             ),
-            el("span",{style:{color:"#64748b",fontSize:"18px"}},"›")
+            el("span",{style:{color:"#e2e8f0",fontSize:"18px"}},"›")
           ):null,
           !isRest && !isDone ? el("button",{style:{width:"100%",marginTop:"8px",background:"#f9731611",border:"1px solid #f9731633",borderRadius:"8px",padding:"8px",color:"#f97316",fontSize:"12px",fontWeight:"700",cursor:"pointer"},
             onClick:()=>{ selectedWeek=s.week; setView("weekDetail"); }
@@ -1569,7 +1569,7 @@ function renderDashboard() {
               el("div",{style:{color:"#60a5fa",fontSize:"13px",fontWeight:"700"}},fmtPace(1000/report.avgEfPace)+"/km"),
               report.prevEfPace ? el("span",{style:{
                 fontSize:"11px",
-                color: report.avgEfPace < report.prevEfPace ? "#22c55e" : report.avgEfPace > report.prevEfPace+10 ? "#ef4444" : "#94a3b8"
+                color: report.avgEfPace < report.prevEfPace ? "#22c55e" : report.avgEfPace > report.prevEfPace+10 ? "#ef4444" : "#e2e8f0"
               }}, report.avgEfPace < report.prevEfPace ? "📈" : report.avgEfPace > report.prevEfPace+10 ? "📉" : "➡️") : null
             ),
             el("div",{class:"muted",style:{fontSize:"11px"}},"allure moy. EF"+(report.prevEfPace?(" · "+(report.avgEfPace<report.prevEfPace?"-":"+")+(Math.abs(Math.round(report.avgEfPace-report.prevEfPace)))+"\" vs S"+(cw2-1)):""))
@@ -1579,7 +1579,7 @@ function renderDashboard() {
               el("div",{style:{color:"#f97316",fontSize:"13px",fontWeight:"700"}},report.avgEfHr+" bpm"),
               report.prevEfHr ? el("span",{style:{
                 fontSize:"11px",
-                color: report.avgEfHr < report.prevEfHr ? "#22c55e" : report.avgEfHr > report.prevEfHr+3 ? "#ef4444" : "#94a3b8"
+                color: report.avgEfHr < report.prevEfHr ? "#22c55e" : report.avgEfHr > report.prevEfHr+3 ? "#ef4444" : "#e2e8f0"
               }}, report.avgEfHr < report.prevEfHr ? "📈" : report.avgEfHr > report.prevEfHr+3 ? "📉" : "➡️") : null
             ),
             el("div",{class:"muted",style:{fontSize:"11px"}},"FC moy. EF"+(report.prevEfHr?(" · "+(report.avgEfHr<report.prevEfHr?"-":"+")+(Math.abs(report.avgEfHr-report.prevEfHr))+" bpm vs S"+(cw2-1)):""))
@@ -1589,7 +1589,7 @@ function renderDashboard() {
             if (!efSessions.length) return null;
             const avgTemp = Math.round(efSessions.reduce((s,e)=>s+historicalWeatherCache[e.date],0)/efSessions.length);
             return el("div",{},
-              el("div",{style:{color:avgTemp>28?"#f97316":"#94a3b8",fontSize:"13px",fontWeight:"700"}},avgTemp+"°C"),
+              el("div",{style:{color:avgTemp>28?"#f97316":"#e2e8f0",fontSize:"13px",fontWeight:"700"}},avgTemp+"°C"),
               el("div",{class:"muted",style:{fontSize:"11px"}},"temp. moy. séances")
             );
           })()
@@ -1666,7 +1666,7 @@ function renderDashboard() {
 function renderWeeks() {
   const cw=currentWeek();
   return el("div",{style:{padding:"0 16px 100px"}},
-    el("div",{style:{marginTop:"8px",marginBottom:"12px",color:"#94a3b8",fontSize:"12px"}},"Semaine actuelle : ",el("span",{style:{color:"#f97316",fontWeight:"700"}},"S"+cw)),
+    el("div",{style:{marginTop:"8px",marginBottom:"12px",color:"#e2e8f0",fontSize:"12px"}},"Semaine actuelle : ",el("span",{style:{color:"#f97316",fontWeight:"700"}},"S"+cw)),
     ...PLAN.map(week=>{
       const pct=weekPct(week), isActive=week.week===cw, color=phaseOf(week.week).color;
       const b=el("button",{style:{width:"100%",background:isActive?"#232738":"#1a1d27",border:`1px solid ${isActive?"#f9731655":"#2e3347"}`,borderLeft:`3px solid ${color}`,borderRadius:"10px",padding:"12px 14px",marginBottom:"8px",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"12px"}},
@@ -1735,7 +1735,7 @@ function renderWeekDetail(weekNum) {
 
     const card=el("div",{style:{background:isToday?"#232738":"#1a1d27",border:`1px solid ${isToday?"#f9731644":"#2e3347"}`,borderLeft:`3px solid ${st.color}`,borderRadius:"10px",padding:"12px 14px",marginBottom:"8px"}},
       el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"6px"}},
-        el("div",{style:{color:isPast?"#475569":"#94a3b8",fontSize:"11px",fontWeight:"700",minWidth:"60px"}},s.day+" "+s.date.slice(8)),
+        el("div",{style:{color:isPast?"#475569":"#e2e8f0",fontSize:"11px",fontWeight:"700",minWidth:"60px"}},s.day+" "+s.date.slice(8)),
         isToday?el("span",{style:{background:"#f9731633",color:"#f97316",fontSize:"11px",fontWeight:"700",padding:"1px 5px",borderRadius:"3px"}},"AUJOURD\'HUI"):null,
         badge(s.type)
       ),
@@ -1764,7 +1764,7 @@ function renderWeekDetail(weekNum) {
           el("span",{class:"muted",style:{fontSize:"11px"}},"FC moy. "+Math.round(stravaRun.average_heartrate)+" bpm · cible "+FC_ZONES[s.type].min+"–"+FC_ZONES[s.type].max+" bpm")
         ):null,
         stravaRun&&stravaRun.start_latlng?.length===2&&s.date?
-          el("div",{style:{fontSize:"11px",color:"#94a3b8",paddingTop:"4px",paddingBottom:"4px"}},
+          el("div",{style:{fontSize:"11px",color:"#e2e8f0",paddingTop:"4px",paddingBottom:"4px"}},
             historicalWeatherCache[s.date]!=null
               ? "🌡️ "+historicalWeatherCache[s.date]+"°C au départ"+(historicalWeatherCache[s.date]>28?" 🔥":"")
               : el("span",{style:{color:"#475569",fontStyle:"italic"}},"🌡️ Chargement météo...")
@@ -1786,7 +1786,7 @@ function renderWeekDetail(weekNum) {
           ...effortLaps.map((lap,i)=>{
             const target = SESSION_TARGETS[s.type];
             const pace = 1000/lap.average_speed;
-            let barColor = "#94a3b8", emoji = "";
+            let barColor = "#e2e8f0", emoji = "";
             if (target) {
               if (pace <= target.okPace) { barColor="#22c55e"; emoji="🟢"; }
               else if (pace <= target.warnPace) { barColor="#eab308"; emoji="🟡"; }
@@ -1805,7 +1805,7 @@ function renderWeekDetail(weekNum) {
             const cadence2 = lap.average_cadence ? Math.round(lap.average_cadence*2)+" spm" : "";
             return el("div",{style:{marginBottom:"6px"}},
               el("div",{style:{display:"grid",gridTemplateColumns:"28px 1fr 64px 56px 20px",gap:"4px",alignItems:"center",marginBottom:"2px"}},
-                el("span",{style:{color:"#64748b",fontSize:"11px"}},"R"+(i+1)),
+                el("span",{style:{color:"#e2e8f0",fontSize:"11px"}},"R"+(i+1)),
                 el("div",{style:{height:"4px",background:"#232738",borderRadius:"2px"}},
                   el("div",{style:{width:barWidth+"%",height:"100%",background:barColor,borderRadius:"2px"}})
                 ),
@@ -1855,7 +1855,7 @@ function renderWeekDetail(weekNum) {
         else{delete sessionNotes[uid];}
         save("lk_session_notes",sessionNotes); scheduleSave();
       });
-      if(sessionNotes[uid]){card.appendChild(el("div",{style:{color:"#94a3b8",fontSize:"12px",fontStyle:"italic",marginTop:"4px"}},"💬 "+sessionNotes[uid]));}
+      if(sessionNotes[uid]){card.appendChild(el("div",{style:{color:"#e2e8f0",fontSize:"12px",fontStyle:"italic",marginTop:"4px"}},"💬 "+sessionNotes[uid]));}
       card.appendChild(noteInput);
     }
     return card;
@@ -1920,7 +1920,7 @@ function renderStats() {
     [BASE,TARGET].forEach(t=>{
       const lbl=document.createElementNS("http://www.w3.org/2000/svg","text");
       lbl.setAttribute("x",PAD.l-4);lbl.setAttribute("y",yScale(t)+4);
-      lbl.setAttribute("fill","#94a3b8");lbl.setAttribute("font-size","9");lbl.setAttribute("text-anchor","end");
+      lbl.setAttribute("fill","#e2e8f0");lbl.setAttribute("font-size","9");lbl.setAttribute("text-anchor","end");
       lbl.textContent=fmtTime(t);svg.appendChild(lbl);
     });
     const lastVal=predHistory[predHistory.length-1];
@@ -1944,7 +1944,7 @@ function renderStats() {
         const lbl = document.createElementNS("http://www.w3.org/2000/svg","text");
         lbl.setAttribute("x", xPos);
         lbl.setAttribute("y", PAD.t+iH+14);
-        lbl.setAttribute("fill","#64748b");
+        lbl.setAttribute("fill","#e2e8f0");
         lbl.setAttribute("font-size","9");
         lbl.setAttribute("text-anchor","middle");
         lbl.textContent = "S"+(wi+1);
@@ -1957,7 +1957,7 @@ function renderStats() {
     tooltip.style.display = "none";
     const tooltipBg = mk("rect",{x:0,y:0,width:80,height:32,rx:"4",fill:"#232738",stroke:"#2e3347",strokeWidth:"1"});
     const tooltipDate = document.createElementNS("http://www.w3.org/2000/svg","text");
-    tooltipDate.setAttribute("font-size","9"); tooltipDate.setAttribute("fill","#94a3b8");
+    tooltipDate.setAttribute("font-size","9"); tooltipDate.setAttribute("fill","#e2e8f0");
     const tooltipVal = document.createElementNS("http://www.w3.org/2000/svg","text");
     tooltipVal.setAttribute("font-size","11"); tooltipVal.setAttribute("fill","#f1f5f9"); tooltipVal.setAttribute("font-weight","700");
     tooltip.appendChild(tooltipBg); tooltip.appendChild(tooltipDate); tooltip.appendChild(tooltipVal);
@@ -2003,7 +2003,7 @@ function renderStats() {
       el("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}},
         ...riegelProjections(pred.time).map(p=>
           el("div",{style:{background:p.target?"#f9731622":"#232738",border:p.target?"1px solid #f9731644":"none",borderRadius:"8px",padding:"10px 12px"}},
-            el("div",{style:{color:p.target?"#f97316":"#94a3b8",fontSize:"11px",marginBottom:"4px"}},p.label+(p.target?" 🎯":"")),
+            el("div",{style:{color:p.target?"#f97316":"#e2e8f0",fontSize:"11px",marginBottom:"4px"}},p.label+(p.target?" 🎯":"")),
             el("div",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"700"}},p.timeStr),
             el("div",{class:"muted",style:{fontSize:"11px"}},p.paceStr)
           )
@@ -2081,7 +2081,7 @@ function renderStats() {
 
     let legendX = PL;
     Object.entries(data).forEach(([type,pts]) => {
-      const color=typeColors2[type]||"#94a3b8";
+      const color=typeColors2[type]||"#e2e8f0";
       const vp=pts.filter(p=>p[yKey]!==null);
       if (!vp.length) return;
       if (vp.length>=2) {
@@ -2177,7 +2177,7 @@ function renderStats() {
           el("div",{style:{textAlign:"right"}},
             el("div",{class:"muted",style:{fontSize:"10px",marginBottom:"4px"}},"Fiabilité"),
             el("div",{style:{
-              color:daySpan>=21?"#22c55e":daySpan>=14?"#eab308":"#94a3b8",
+              color:daySpan>=21?"#22c55e":daySpan>=14?"#eab308":"#e2e8f0",
               fontSize:"12px",fontWeight:"700"
             }},daySpan>=21?"Bonne":"Faible — peu de données")
           )
@@ -2293,7 +2293,7 @@ function renderCourse() {
             border:checked?"1px solid #f97316":"1px solid #2e3347",
             display:"flex",alignItems:"center",justifyContent:"center"
           }}, checked?el("span",{style:{color:"#fff",fontSize:"12px",fontWeight:"700"}},"✓"):null),
-          el("span",{style:{color:checked?"#94a3b8":"#f1f5f9",fontSize:"13px",textDecoration:checked?"line-through":"none"}},item.label)
+          el("span",{style:{color:checked?"#e2e8f0":"#f1f5f9",fontSize:"13px",textDecoration:checked?"line-through":"none"}},item.label)
         );
         row.addEventListener("click",()=>{
           checklistItems[item.key]=!checked;
@@ -2437,7 +2437,7 @@ function renderSettings() {
             },"📥 Forcer restauration")
           ),
           el("div",{style:{marginTop:"12px",paddingTop:"12px",borderTop:"1px solid #2e3347"}},
-            el("button",{style:{background:"none",border:"none",color:"#64748b",fontSize:"12px",cursor:"pointer",padding:"0"},
+            el("button",{style:{background:"none",border:"none",color:"#e2e8f0",fontSize:"12px",cursor:"pointer",padding:"0"},
               onClick:()=>{ githubToken="";gistId="";save("lk_github_token","");save("lk_gist_id","");render(); }
             },"🔓 Déconnecter le compte GitHub")
           )
@@ -2527,7 +2527,7 @@ function renderSettings() {
             el("div",{style:{width:"8px",height:"8px",borderRadius:"50%",background:"#fc4c02",flexShrink:"0"}}),
             el("div",{style:{color:"#fc4c02",fontSize:"13px",fontWeight:"600"}},"Connecté · "+stravaActivities.length+" activité"+(stravaActivities.length!==1?"s":""))
           ),
-          syncMsg?el("div",{style:{fontSize:"12px",color:syncMsg.startsWith("✅")?"#22c55e":"#94a3b8",marginBottom:"10px",padding:"8px 10px",background:"#232738",borderRadius:"8px"}},syncMsg):null,
+          syncMsg?el("div",{style:{fontSize:"12px",color:syncMsg.startsWith("✅")?"#22c55e":"#e2e8f0",marginBottom:"10px",padding:"8px 10px",background:"#232738",borderRadius:"8px"}},syncMsg):null,
           el("button",{
             style:{width:"100%",background:syncing?"#1a1d27":"#fc4c0222",border:"1px solid #fc4c0255",borderRadius:"10px",padding:"11px",cursor:"pointer",color:"#fc4c02",fontWeight:"700",fontSize:"13px",marginBottom:"8px"},
             onClick:()=>{ if(!syncing) syncStrava(); }
@@ -2539,7 +2539,7 @@ function renderSettings() {
             el("button",{style:{background:"#a855f711",border:"1px solid #a855f733",borderRadius:"8px",padding:"8px",color:"#a855f7",fontSize:"12px",cursor:"pointer",fontWeight:"600"},
               onClick:()=>{ localStorage.removeItem("lk_pred_history"); predHistory=[]; rebuildPredHistory(); render(); }
             },"🔄 Forcer recalcul de l\'historique"+(lastRebuildDate?" · dernier : "+lastRebuildDate:"")),
-            el("button",{style:{background:"none",border:"none",color:"#64748b",fontSize:"12px",cursor:"pointer",padding:"0"},
+            el("button",{style:{background:"none",border:"none",color:"#e2e8f0",fontSize:"12px",cursor:"pointer",padding:"0"},
               onClick:()=>{ stravaToken=null;stravaRefresh=null;stravaExpires=0;stravaActivities=[];save("lk_strava_token",null);save("lk_strava_refresh",null);save("lk_strava_expires",0);save("lk_strava_activities",[]);render(); }
             },"🔓 Déconnecter Strava")
           )
@@ -2643,11 +2643,11 @@ function renderSettings() {
     function buildBloc(v, isLast) {
       return el("div",{style:{padding:"10px",background:v.current?"#f9731622":"transparent",border:v.current?"1px solid #f9731633":"none",borderRadius:"8px",marginBottom:isLast?"0":"8px"}},
         el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}},
-          el("span",{style:{color:v.current?"#f97316":"#94a3b8",fontSize:"13px",fontWeight:"700"}},v.current?"🟠 "+v.ver:v.ver),
+          el("span",{style:{color:v.current?"#f97316":"#e2e8f0",fontSize:"13px",fontWeight:"700"}},v.current?"🟠 "+v.ver:v.ver),
           el("span",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"600"}},v.title),
           v.current?el("span",{style:{background:"#f9731633",color:"#f97316",fontSize:"10px",fontWeight:"700",padding:"2px 6px",borderRadius:"10px"}},"actuelle"):null
         ),
-        ...v.notes.map(n=>el("div",{style:{color:"#94a3b8",fontSize:"12px",marginTop:"3px"}},"• "+n))
+        ...v.notes.map(n=>el("div",{style:{color:"#e2e8f0",fontSize:"12px",marginTop:"3px"}},"• "+n))
       );
     }
 
@@ -2658,7 +2658,7 @@ function renderSettings() {
 
     const toggleBtn = el("button",{style:{
       width:"100%",background:"none",border:"1px solid #2e3347",borderRadius:"8px",
-      padding:"8px",color:"#94a3b8",fontSize:"12px",cursor:"pointer",marginTop:"8px"
+      padding:"8px",color:"#e2e8f0",fontSize:"12px",cursor:"pointer",marginTop:"8px"
     }}, changelogExpanded ? "▲ Réduire" : "▼ Voir tout l\'historique ("+VERSIONS.length+" versions)");
     toggleBtn.addEventListener("click", () => {
       changelogExpanded = !changelogExpanded;
@@ -2680,7 +2680,7 @@ function renderSettings() {
   let advancedOpen = false;
   const advancedToggle = el("button",{style:{
     width:"100%",background:"none",border:"1px solid #2e3347",borderRadius:"8px",
-    padding:"10px",color:"#64748b",fontSize:"12px",cursor:"pointer",marginBottom:"8px"
+    padding:"10px",color:"#e2e8f0",fontSize:"12px",cursor:"pointer",marginBottom:"8px"
   }}, "⚙️ Options avancées");
   const advancedContent = el("div",{style:{display:"none"}}, cloudSection, stravaSection);
   advancedToggle.addEventListener("click",()=>{
@@ -3111,7 +3111,7 @@ function render() {
       );
       const b=el("button",{style:{flex:"1",background:"none",border:"none",cursor:"pointer",padding:"10px 0 14px",display:"flex",flexDirection:"column",alignItems:"center",gap:"3px",opacity:activeNav===n.id?"1":"0.45"}},
         iconWrap,
-        el("span",{style:{fontSize:"12px",fontWeight:"700",letterSpacing:"0.3px",color:activeNav===n.id?"#f97316":"#94a3b8"}},n.label)
+        el("span",{style:{fontSize:"12px",fontWeight:"700",letterSpacing:"0.3px",color:activeNav===n.id?"#f97316":"#e2e8f0"}},n.label)
       );
       b.addEventListener("click",()=>{ if(n.id==="weeks") selectedWeek=currentWeek(); setView(n.id); });
       return b;
