@@ -9,9 +9,10 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <title>Run by Léa</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-body { background: #0f1117; color: #f1f5f9; font-family: -apple-system,'Helvetica Neue',Arial,sans-serif; max-width: 430px; margin: 0 auto; }
+body { background: #0f1117; color: #f1f5f9; font-family: 'Inter',-apple-system,'Helvetica Neue',Arial,sans-serif; font-variant-numeric: tabular-nums; max-width: 430px; margin: 0 auto; }
 button, input { font-family: inherit; }
 .pill { border-radius: 4px; padding: 2px 7px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; flex-shrink: 0; }
 .card { background: #1a1d27; border: 1px solid #2e3347; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
@@ -19,11 +20,13 @@ button, input { font-family: inherit; }
 .text2 { color: #e2e8f0; }
 .orange { color: #f97316; }
 .green { color: #22c55e; }
-.label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #64748b; margin-bottom: 8px; }
+.label { font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #64748b; margin-bottom: 8px; }
 input[type=text], input[type=number], input[type=password] {
   background: #1a1d27; border: 1px solid #2e3347; border-radius: 10px;
   padding: 10px 14px; color: #f1f5f9; font-size: 14px; outline: none; width: 100%;
 }
+#app > div { animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 </style>
 </head>
 <body>
@@ -1423,9 +1426,10 @@ function renderDashboard() {
 
         const card=el("div",{style:{
           background:"#1a1d27",
-          border:`1px solid ${isDone?statusColor+"55":st.color+"55"}`,
-          borderLeft:`3px solid ${isDone?statusColor:st.color}`,
-          borderRadius:"10px",padding:"14px",marginBottom:"8px"
+          border:`1px solid ${isDone?statusColor+"33":st.color+"33"}`,
+          borderTop:`3px solid ${isDone?statusColor:st.color}`,
+          borderRadius:"12px",padding:"14px",marginBottom:"8px",
+          boxShadow:`0 6px 24px ${isDone?statusColor:st.color}22, 0 2px 8px rgba(0,0,0,0.4)`
         }},
           el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"8px"}},
             el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
@@ -1760,7 +1764,7 @@ function renderWeekDetail(weekNum) {
     const stravaRun=weekRuns.find(r=>r.start_date_local?.slice(0,10)===s.date);
     const effortLaps=stravaRun?getEffortLaps(stravaRun):[];
 
-    const card=el("div",{style:{background:isToday?"#232738":"#1a1d27",border:`1px solid ${isToday?"#f9731644":"#2e3347"}`,borderLeft:`3px solid ${st.color}`,borderRadius:"10px",padding:"12px 14px",marginBottom:"8px"}},
+    const card=el("div",{style:{background:isToday?"#232738":"#1a1d27",border:`1px solid ${isToday?"#f9731633":st.color+"22"}`,borderTop:`3px solid ${st.color}`,borderRadius:"12px",boxShadow:`0 6px 24px ${st.color}1a, 0 2px 8px rgba(0,0,0,0.4)`,padding:"12px 14px",marginBottom:"8px"}},
       el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"6px"}},
         el("div",{style:{color:isPast?"#475569":"#e2e8f0",fontSize:"11px",fontWeight:"700",minWidth:"60px"}},s.day+" "+s.date.slice(8)),
         isToday?el("span",{style:{background:"#f9731633",color:"#f97316",fontSize:"11px",fontWeight:"700",padding:"1px 5px",borderRadius:"3px"}},"AUJOURD\'HUI"):null,
@@ -2603,7 +2607,14 @@ function renderSettings() {
 
   const versionSection = (function buildVersionSection() {
     const VERSIONS = [
-      { ver:"v1.8.15", title:"Run by Léa & courbes IE", current:true, notes:[
+      { ver:"v1.8.16", title:"Nouveau design & Inter", current:true, notes:[
+        "🔤 Police Inter",
+        "🃏 Bordure top colorée + ombres par type de séance",
+        "🔄 Transition douce entre onglets",
+        "📐 Labels en majuscules + chiffres tabulaires",
+        "📊 Barres de progression avec gradient",
+      ]},
+      { ver:"v1.8.15", title:"Run by Léa & courbes IE", current:false, notes:[
         "🏷️ Renommage en Run by Léa",
         "🎨 Nouvelle icône runner",
         "📊 Courbes IE + Cadence dans Stats",
