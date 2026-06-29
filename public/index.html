@@ -917,7 +917,7 @@ const PACE_REFS = Object.fromEntries(
 // ── Zones FC cible (FC max 181 bpm Laurent) ──────────────────────────────
 const FC_ZONES = {
   EF:    { min:118, max:136, label:"65–75%", color:"#60a5fa" },
-  LONGUE:{ min:118, max:136, label:"65–75%", color:"#22c55e" },
+  LONGUE:{ min:118, max:136, label:"65–75%", color:"#06b6d4" },
   SPEC:  { min:154, max:163, label:"85–90%", color:"#a855f7" },
   SEUIL: { min:163, max:172, label:"90–95%", color:"#eab308" },
   VMA:   { min:163, max:181, label:"90–100%",color:"#f97316" },
@@ -2016,7 +2016,7 @@ function renderStats() {
   // ── Référentiel allures ───────────────────────────────────────────────
   const paceRows = [
     {type:"EF",      label:"Endurance fondamentale", pace:"6:20", heat:"6:40", fc:"118–136", pct:"65–75%", color:"#60a5fa"},
-    {type:"LONGUE",  label:"Sortie longue",           pace:"6:20", heat:"6:40", fc:"118–136", pct:"65–75%", color:"#22c55e"},
+    {type:"LONGUE",  label:"Sortie longue",           pace:"6:20", heat:"6:40", fc:"118–136", pct:"65–75%", color:"#06b6d4"},
     {type:"SEUIL",   label:"Seuil",                   pace:SESSION_TARGETS.SEUIL.effort, heat:null, fc:"163–172", pct:"90–95%", color:"#22c55e"},
     {type:"SPEC",    label:"Spécifique 10K",           pace:SESSION_TARGETS.SPEC.effort,  heat:null, fc:"154–163", pct:"85–90%", color:"#a855f7"},
     {type:"VMA",     label:"VMA",                     pace:SESSION_TARGETS.VMA.effort,   heat:null, fc:"163–181", pct:"90–100%", color:"#f97316"},
