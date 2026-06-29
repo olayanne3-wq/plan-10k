@@ -1035,9 +1035,12 @@ function rebuildPredHistory() {
   const end = new Date(endDate + "T00:00:00");
   while (d <= end) {
     const dateStr = d.toISOString().slice(0,10);
-    const time = predict10KAtDate(dateStr);
-    const confidence = stravaActivities.filter(a=>a.start_date_local?.slice(0,10)<=dateStr).length > 0 ? 45 : 30;
-    newHistory.push({ date: dateStr, time, confidence, predictorVersion: PREDICTOR_VERSION });
+    // Ne pas inclure aujourd\'hui — predict10K() s\'en chargera avec la valeur correcte
+    if (dateStr < today()) {
+      const time = predict10KAtDate(dateStr);
+      const confidence = stravaActivities.filter(a=>a.start_date_local?.slice(0,10)<=dateStr).length > 0 ? 45 : 30;
+      newHistory.push({ date: dateStr, time, confidence, predictorVersion: PREDICTOR_VERSION });
+    }
     d.setDate(d.getDate()+1);
   }
   predHistory = newHistory;
