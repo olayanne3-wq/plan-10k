@@ -707,6 +707,14 @@ function riegelProjections(time10k) {
 }
 
 // ── Stats semaine pour la vue Semaines ───────────────────────────────────
+// ── Km parcourus sur une semaine du plan ────────────────────────────────────
+function weekKm(weekNum) {
+  return Math.round(stravaActivities.filter(a=>{
+    const w = PLAN.find(w=>w.week===weekNum);
+    return w && w.sessions.map(s=>s.date).includes(a.start_date_local?.slice(0,10));
+  }).reduce((s,a)=>s+a.distance,0)/100)/10;
+}
+
 function weekStats(weekNum) {
   const week = PLAN.find(w=>w.week===weekNum);
   if (!week) return null;
@@ -864,10 +872,7 @@ async function fetchCoachMsg() {
   const isMonday = new Date().getDay() === 1;
   const prevWeekNum = currentWeek() > 1 ? currentWeek() - 1 : null;
   const prevWeekReport = prevWeekNum ? weeklyReport(prevWeekNum) : null;
-  const prevWeekKm = prevWeekNum ? Math.round(stravaActivities.filter(a=>{
-    const w = PLAN.find(w=>w.week===prevWeekNum);
-    return w && w.sessions.map(s=>s.date).includes(a.start_date_local?.slice(0,10));
-  }).reduce((s,a)=>s+a.distance,0)/100)/10 : 0;
+  const prevWeekKm = prevWeekNum ? weekKm(prevWeekNum) : 0;
   const nextWeekSessions = ALL_SESSIONS.filter(s=>{
     const w = PLAN.find(w=>w.week===currentWeek());
     return w && w.sessions.map(s=>s.date).includes(s.date) && s.type!=="REPOS";
@@ -1003,6 +1008,42 @@ function getEffortLaps(activity) {
   // Garder laps au-dessus du P70 ET allure < 6:00/km
   return laps.filter(l => l.average_speed >= p70 && (1000/l.average_speed) < 360);
 }
+
+// ── Affichage commun d\'une répétition (dashboard + weekDetail) ────────────
+function renderLapRow(lap, i, sessionType) {
+  const tgt = SESSION_TARGETS[sessionType];
+  const pace = 1000/lap.average_speed;
+  let bc = "#e2e8f0", em = "";
+  if (tgt) {
+    if (pace <= tgt.okPace) { bc="#22c55e"; em="🟢"; }
+    else if (pace <= tgt.warnPace) { bc="#eab308"; em="🟡"; }
+    else { bc="#ef4444"; em="🔴"; }
+  }
+  const maxP = tgt ? tgt.warnPace+30 : 400, minP = tgt ? tgt.targetMin-20 : 240;
+  const bw = Math.max(0, Math.min(100, (1-(pace-minP)/(maxP-minP))*100));
+  const nSameType = stravaActivities.filter(a=>{
+    const d = a.start_date_local?.slice(0,10);
+    return ALL_SESSIONS.find(ss=>ss.date===d&&ss.type===sessionType);
+  }).length;
+  const se = economyScore(lap, sessionType);
+  const seColor = economyColor(se, nSameType);
+  const seLabel = economyLabel(se, nSameType);
+  const cadence = lap.average_cadence ? Math.round(lap.average_cadence*2)+" spm" : "";
+  return el("div",{style:{marginBottom:"6px"}},
+    el("div",{style:{display:"grid",gridTemplateColumns:"28px 1fr 64px 56px 20px",gap:"4px",alignItems:"center",marginBottom:"2px"}},
+      el("span",{style:{color:"#e2e8f0",fontSize:"11px"}},"R"+(i+1)),
+      el("div",{style:{height:"4px",background:"#232738",borderRadius:"2px"}},el("div",{style:{width:bw+"%",height:"100%",background:bc,borderRadius:"2px"}})),
+      el("span",{style:{color:"#f1f5f9",fontSize:"12px",fontWeight:"500",textAlign:"right"}},fmtPace(lap.average_speed)+"/km"),
+      lap.average_heartrate?el("span",{class:"muted",style:{fontSize:"11px",textAlign:"right"}},Math.round(lap.average_heartrate)+" bpm"):el("span",{},""),
+      el("span",{style:{fontSize:"12px",textAlign:"center"}},em)
+    ),
+    (cadence||se)?el("div",{style:{display:"flex",gap:"8px",paddingLeft:"32px"}},
+      cadence?el("span",{class:"muted",style:{fontSize:"10px"}},cadence):null,
+      se?el("span",{style:{color:seColor,fontSize:"10px",fontWeight:"600"}},"IE "+se+(seLabel?" "+seLabel:"")):null
+    ):null
+  );
+}
+
 
 function predict10KAtDate(dateStr) {
   // Calcule l\'estimation 10K en ne prenant que les activités antérieures à dateStr
@@ -1378,10 +1419,7 @@ function renderDashboard() {
       const bilanWeekNum = isMonday2 ? Math.max(1, cw2early-1) : cw2early;
       const bilanReport = weeklyReport(bilanWeekNum);
       const bilanLabel = isMonday2 ? "Bilan semaine "+bilanWeekNum : "Semaine "+bilanWeekNum+" en cours";
-      const bilanKm = Math.round(stravaActivities.filter(a=>{
-        const w = PLAN.find(w=>w.week===bilanWeekNum);
-        return w && w.sessions.map(s=>s.date).includes(a.start_date_local?.slice(0,10));
-      }).reduce((s,a)=>s+a.distance,0)/100)/10;
+      const bilanKm = weekKm(bilanWeekNum);
 
       todayEl = el("div",{style:{marginBottom:"12px"}},
         el("div",{class:"label"},"Aujourd\'hui"),
@@ -1510,35 +1548,7 @@ function renderDashboard() {
                   return el("span",{style:{color:nb===effortLaps2.length?"#22c55e":nb>0?"#eab308":"#ef4444",fontSize:"11px",fontWeight:"700"}},nb+"/"+effortLaps2.length+" dans la cible");
                 })()
               ),
-              ...effortLaps2.map((lap,i)=>{
-                const tgt=SESSION_TARGETS[s.type];
-                const pace=1000/lap.average_speed;
-                let bc="#e2e8f0",em="";
-                if(tgt){if(pace<=tgt.okPace){bc="#22c55e";em="🟢";}else if(pace<=tgt.warnPace){bc="#eab308";em="🟡";}else{bc="#ef4444";em="🔴";}}
-                const maxP=tgt?tgt.warnPace+30:400, minP=tgt?tgt.targetMin-20:240;
-                const bw=Math.max(0,Math.min(100,(1-(pace-minP)/(maxP-minP))*100));
-                const nSameType = stravaActivities.filter(a=>{
-                  const d=a.start_date_local?.slice(0,10);
-                  return ALL_SESSIONS.find(ss=>ss.date===d&&ss.type===s.type);
-                }).length;
-                const se = economyScore(lap, s.type);
-                const seColor = economyColor(se, nSameType);
-                const seLabel = economyLabel(se, nSameType);
-                const cadence = lap.average_cadence ? Math.round(lap.average_cadence*2)+" spm" : "";
-                return el("div",{style:{marginBottom:"6px"}},
-                  el("div",{style:{display:"grid",gridTemplateColumns:"28px 1fr 64px 56px 20px",gap:"4px",alignItems:"center",marginBottom:"2px"}},
-                    el("span",{style:{color:"#e2e8f0",fontSize:"11px"}},"R"+(i+1)),
-                    el("div",{style:{height:"4px",background:"#232738",borderRadius:"2px"}},el("div",{style:{width:bw+"%",height:"100%",background:bc,borderRadius:"2px"}})),
-                    el("span",{style:{color:"#f1f5f9",fontSize:"12px",fontWeight:"500",textAlign:"right"}},fmtPace(lap.average_speed)+"/km"),
-                    lap.average_heartrate?el("span",{class:"muted",style:{fontSize:"11px",textAlign:"right"}},Math.round(lap.average_heartrate)+" bpm"):el("span",{},""),
-                    el("span",{style:{fontSize:"12px",textAlign:"center"}},em)
-                  ),
-                  (cadence||se)?el("div",{style:{display:"flex",gap:"8px",paddingLeft:"32px"}},
-                    cadence?el("span",{class:"muted",style:{fontSize:"10px"}},cadence):null,
-                    se?el("span",{style:{color:seColor,fontSize:"10px",fontWeight:"600"}},"IE "+se+(seLabel?" "+seLabel:"")):null
-                  ):null
-                );
-              })
+              ...effortLaps2.map((lap,i)=>renderLapRow(lap,i,s.type))
             ):null
           ):null,
           // Prochaine séance
@@ -1826,42 +1836,7 @@ function renderWeekDetail(weekNum) {
           el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"6px"}},
             SESSION_TARGETS[s.type] ? "cible "+SESSION_TARGETS[s.type].effort+" "+SESSION_TARGETS[s.type].tolerance : ""
           ),
-          ...effortLaps.map((lap,i)=>{
-            const target = SESSION_TARGETS[s.type];
-            const pace = 1000/lap.average_speed;
-            let barColor = "#e2e8f0", emoji = "";
-            if (target) {
-              if (pace <= target.okPace) { barColor="#22c55e"; emoji="🟢"; }
-              else if (pace <= target.warnPace) { barColor="#eab308"; emoji="🟡"; }
-              else { barColor="#ef4444"; emoji="🔴"; }
-            }
-            const maxPace = target ? target.warnPace + 30 : 400;
-            const minPace = target ? target.targetMin - 20 : 240;
-            const barWidth = Math.max(0, Math.min(100, (1-(pace-minPace)/(maxPace-minPace))*100));
-            const nSameType2 = stravaActivities.filter(a=>{
-              const d=a.start_date_local?.slice(0,10);
-              return ALL_SESSIONS.find(ss=>ss.date===d&&ss.type===s.type);
-            }).length;
-            const se2 = economyScore(lap, s.type);
-            const seColor2 = economyColor(se2, nSameType2);
-            const seLabel2 = economyLabel(se2, nSameType2);
-            const cadence2 = lap.average_cadence ? Math.round(lap.average_cadence*2)+" spm" : "";
-            return el("div",{style:{marginBottom:"6px"}},
-              el("div",{style:{display:"grid",gridTemplateColumns:"28px 1fr 64px 56px 20px",gap:"4px",alignItems:"center",marginBottom:"2px"}},
-                el("span",{style:{color:"#e2e8f0",fontSize:"11px"}},"R"+(i+1)),
-                el("div",{style:{height:"4px",background:"#232738",borderRadius:"2px"}},
-                  el("div",{style:{width:barWidth+"%",height:"100%",background:barColor,borderRadius:"2px"}})
-                ),
-                el("span",{style:{color:"#f1f5f9",fontSize:"12px",fontWeight:"500",textAlign:"right"}},fmtPace(lap.average_speed)+"/km"),
-                lap.average_heartrate?el("span",{class:"muted",style:{fontSize:"11px",textAlign:"right"}},Math.round(lap.average_heartrate)+" bpm"):el("span",{},""),
-                el("span",{style:{fontSize:"12px",textAlign:"center"}},emoji)
-              ),
-              (cadence2||se2)?el("div",{style:{display:"flex",gap:"8px",paddingLeft:"32px"}},
-                cadence2?el("span",{class:"muted",style:{fontSize:"10px"}},cadence2):null,
-                se2?el("span",{style:{color:seColor2,fontSize:"10px",fontWeight:"600"}},"IE "+se2+(seLabel2?" "+seLabel2:"")):null
-              ):null
-            );
-          })
+          ...effortLaps.map((lap,i)=>renderLapRow(lap,i,s.type))
         ):null
       ):null
     );
@@ -2394,7 +2369,7 @@ function renderCourse() {
 
   const parcoursCard = el("div",{style:{marginBottom:"16px"}},
     el("div",{class:"label"},"🗺️ Parcours"),
-    el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px"}},
+    card(
       el("input",{type:"text",placeholder:"Lien GPX ou carte du parcours...",style:{width:"100%",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"8px 12px",color:"#f1f5f9",fontSize:"13px"},
         value:raceParcoursUrl,
         onInput:(e)=>{ raceParcoursUrl=e.target.value; save("lk_race_parcours",raceParcoursUrl); scheduleSave(); }
@@ -2482,7 +2457,7 @@ function renderSettings() {
   const cloudSection=el("div",{style:{marginBottom:"24px"}},
     el("div",{class:"label"},"☁️ Sauvegarde cloud"),
     !githubToken
-      ? el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px"}},
+      ? card(
           el("div",{class:"muted",style:{fontSize:"12px",marginBottom:"10px",lineHeight:"1.6"}},"Scanne le QR code depuis un appareil configuré, ou entre ton token GitHub."),
           el("div",{style:{display:"flex",gap:"8px"}},
             el("input",{type:"password",placeholder:"ghp_...",id:"github-token-input",style:{flex:"1",background:"#232738",border:"1px solid #2e3347",borderRadius:"8px",padding:"8px",color:"#f1f5f9",fontSize:"13px"}}),
@@ -2491,7 +2466,7 @@ function renderSettings() {
             },"OK")
           )
         )
-      : el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px"}},
+      : card(
           el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
             el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
               el("div",{style:{width:"8px",height:"8px",borderRadius:"50%",background:"#22c55e",flexShrink:"0"}}),
@@ -2551,13 +2526,11 @@ function renderSettings() {
       )
     )
   );
-  const goalSection = null;
-  const ppsSection = null;
 
     const stravaSection=el("div",{style:{marginBottom:"24px"}},
     el("div",{class:"label"},"Strava"),
     stravaToken
-      ?el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px"}},
+      ?card(
           el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"12px"}},
             el("div",{style:{width:"8px",height:"8px",borderRadius:"50%",background:"#fc4c02",flexShrink:"0"}}),
             el("div",{style:{color:"#fc4c02",fontSize:"13px",fontWeight:"600"}},"Connecté · "+stravaActivities.length+" activité"+(stravaActivities.length!==1?"s":""))
@@ -2584,7 +2557,12 @@ function renderSettings() {
 
   const versionSection = (function buildVersionSection() {
     const VERSIONS = [
-      { ver:"v1.8.16", title:"Nouveau design & Inter", current:true, notes:[
+      { ver:"v1.9", title:"Refactoring & nettoyage", current:true, notes:[
+        "🔧 Fusion du code dupliqué (répétitions, cartes, calcul km)",
+        "🗑️ Suppression du code mort",
+        "📦 Fonctions communes renderLapRow, card, weekKm",
+      ]},
+      { ver:"v1.8.16", title:"Nouveau design & Inter", current:false, notes:[
         "🔤 Police Inter",
         "🃏 Bordure top colorée + ombres par type de séance",
         "🔄 Transition douce entre onglets",
@@ -2709,7 +2687,7 @@ function renderSettings() {
 
     return el("div",{style:{marginBottom:"24px"}},
       el("div",{class:"label"},"Version & Changelog"),
-      el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px"}},
+      card(
         ...visibleBlocs,
         hiddenContainer,
         toggleBtn
@@ -2734,7 +2712,7 @@ function renderSettings() {
   // ── QR Code pour configurer un autre appareil ─────────────────────────────
   const qrSection = el("div",{style:{marginBottom:"16px"}},
     el("div",{class:"label"},"📱 Configurer sur un autre appareil"),
-    el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px"}},
+    card(
       el("div",{class:"muted",style:{fontSize:"12px",marginBottom:"10px"}},"Scanne ce QR code depuis ton smartphone pour transférer la configuration automatiquement."),
       el("div",{id:"qr-container",style:{display:"flex",justifyContent:"center",marginBottom:"10px"}}),
       el("button",{style:{width:"100%",background:"#f9731611",border:"1px solid #f9731633",borderRadius:"8px",padding:"8px",color:"#f97316",fontSize:"12px",fontWeight:"700",cursor:"pointer"},
@@ -3085,6 +3063,11 @@ function matchActivitiesToPlan(activities) {
 // ══════════════════════════════════════════════════════════════════════════════
 // DOM HELPERS
 // ══════════════════════════════════════════════════════════════════════════════
+// ── Helper carte standard ────────────────────────────────────────────────
+function card(...children) {
+  return el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px"}},...children);
+}
+
 function el(tag, attrs, ...children) {
   const e = document.createElement(tag);
   if (attrs) Object.entries(attrs).forEach(([k,v]) => {
