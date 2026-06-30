@@ -629,7 +629,9 @@ async function fetchWeather() {
     else if (code <= 67) weatherDesc = "🌧️";
     else weatherDesc = "🌡️";
     render();
-  } catch(e) {}
+  } catch(e) {
+    console.warn("Météo indisponible:", e.message);
+  }
 }
 fetchWeather();
 setInterval(fetchWeather, 30 * 60 * 1000); // refresh toutes les 30 min
@@ -915,7 +917,15 @@ Réponds uniquement avec le message, sans guillemets.`;
       save("lk_coach_date", coachDate);
       render();
     }
-  } catch(e) {}
+  } catch(e) {
+    console.warn("Coach indisponible:", e.message);
+    if (!coachMsg) {
+      // Message de secours si jamais aucun message n\'a pu être chargé
+      coachMsg = "🤖 Léa fait une pause — réessaie dans quelques instants.";
+      coachDate = t;
+      render();
+    }
+  }
 }
 
 // Fetcher le message coach au démarrage
@@ -1786,11 +1796,32 @@ function renderWeekDetail(weekNum) {
     const stravaRun=weekRuns.find(r=>r.start_date_local?.slice(0,10)===s.date);
     const effortLaps=stravaRun?getEffortLaps(stravaRun):[];
 
-    const card=el("div",{style:{background:isToday?"#232738":"#1a1d27",border:`1px solid ${isToday?"#f9731633":st.color+"22"}`,borderTop:`3px solid ${st.color}`,borderRadius:"12px",boxShadow:`0 6px 24px ${st.color}1a, 0 2px 8px rgba(0,0,0,0.4)`,padding:"12px 14px",marginBottom:"8px"}},
+    const uidStatus = statuses[uid];
+    const isDoneSession = (uidStatus==="✅"||uidStatus==="⚠️") && s.type!=="REPOS";
+    let cardExpanded = false;
+    const card=el("div",{style:{
+      background:isToday?"#232738":"#1a1d27",
+      border:`1px solid ${isToday?"#f9731633":st.color+"22"}`,
+      borderTop:`3px solid ${st.color}`,
+      borderRadius:"12px",
+      boxShadow:`0 6px 24px ${st.color}1a, 0 2px 8px rgba(0,0,0,0.4)`,
+      padding:"12px 14px",marginBottom:"8px",
+      opacity:isDoneSession?"0.5":"1",
+      cursor:isDoneSession?"pointer":"default",
+      transition:"opacity 0.2s ease"
+    }},
       el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"6px"}},
         el("div",{style:{color:isPast?"#475569":"#e2e8f0",fontSize:"11px",fontWeight:"700",minWidth:"60px"}},s.day+" "+s.date.slice(8)),
         isToday?el("span",{style:{background:"#f9731633",color:"#f97316",fontSize:"11px",fontWeight:"700",padding:"1px 5px",borderRadius:"3px"}},"AUJOURD\'HUI"):null,
-        badge(s.type)
+        badge(s.type),
+        el("div",{style:{flex:"1"}}),
+        isDoneSession?el("span",{style:{
+          background:uidStatus==="✅"?"#22c55e":"#eab308",
+          color:uidStatus==="✅"?"#fff":"#1a1d27",
+          borderRadius:"50%",width:"20px",height:"20px",
+          display:"flex",alignItems:"center",justifyContent:"center",
+          fontSize:"12px",fontWeight:"900",flexShrink:"0"
+        }}, uidStatus==="✅"?"✓":"!") : null
       ),
       el("div",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"600",marginBottom:"4px"}},s.session),
       (s.warmup||s.cooldown)?el("div",{style:{display:"flex",gap:"12px",marginBottom:"6px",flexWrap:"wrap"}},
@@ -1876,6 +1907,19 @@ function renderWeekDetail(weekNum) {
       if(sessionNotes[uid]){card.appendChild(el("div",{style:{color:"#e2e8f0",fontSize:"12px",fontStyle:"italic",marginTop:"4px"}},"💬 "+sessionNotes[uid]));}
       card.appendChild(noteInput);
     }
+
+    // Si séance terminée : masquer le détail par défaut, cliquer pour le révéler
+    if (isDoneSession) {
+      const childrenToHide = Array.from(card.children).slice(1); // tout sauf le header
+      childrenToHide.forEach(c => { c.style.display = "none"; });
+      card.addEventListener("click", (e)=>{
+        if (e.target.tagName === "BUTTON" || e.target.tagName === "INPUT") return;
+        cardExpanded = !cardExpanded;
+        card.style.opacity = cardExpanded ? "1" : "0.5";
+        childrenToHide.forEach(c => { c.style.display = cardExpanded ? "" : "none"; });
+      });
+    }
+
     return card;
   });
 
@@ -2444,8 +2488,47 @@ function renderCourse() {
     )
   );
 
+  // ── Petit guide d\'utilisation ─────────────────────────────────────────────
+  const guideOpenKey = "guide_open";
+  let guideOpen = false;
+  const guideToggle = el("button",{style:{
+    width:"100%",background:"none",border:"1px solid #2e3347",borderRadius:"8px",
+    padding:"10px",color:"#94a3b8",fontSize:"12px",cursor:"pointer",marginBottom:"16px",
+    display:"flex",alignItems:"center",justifyContent:"center",gap:"6px"
+  }}, "❓ Comment utiliser Run by Léa ?");
+  const guideContent = el("div",{style:{display:"none",background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",marginBottom:"16px"}},
+    el("div",{style:{display:"flex",flexDirection:"column",gap:"12px"}},
+      el("div",{},
+        el("div",{style:{color:"#f97316",fontSize:"13px",fontWeight:"700",marginBottom:"3px"}},"⚡ Dashboard"),
+        el("div",{class:"muted",style:{fontSize:"12px",lineHeight:"1.5"}},"Ta séance du jour, ton estimation de temps, et les conseils de Léa.")
+      ),
+      el("div",{},
+        el("div",{style:{color:"#60a5fa",fontSize:"13px",fontWeight:"700",marginBottom:"3px"}},"📅 Semaines"),
+        el("div",{class:"muted",style:{fontSize:"12px",lineHeight:"1.5"}},"Le détail de chaque semaine d\'entraînement. Tape sur une séance pour la valider ✅⚠️❌.")
+      ),
+      el("div",{},
+        el("div",{style:{color:"#a855f7",fontSize:"13px",fontWeight:"700",marginBottom:"3px"}},"📊 Stats"),
+        el("div",{class:"muted",style:{fontSize:"12px",lineHeight:"1.5"}},"Ta progression dans le temps, ton économie de course (IE) et ta cadence.")
+      ),
+      el("div",{},
+        el("div",{style:{color:"#22c55e",fontSize:"13px",fontWeight:"700",marginBottom:"3px"}},"🏁 Course"),
+        el("div",{class:"muted",style:{fontSize:"12px",lineHeight:"1.5"}},"Toutes les infos du jour J — horaires, checklist, stratégie de course.")
+      ),
+      el("div",{},
+        el("div",{style:{color:"#e2e8f0",fontSize:"13px",fontWeight:"700",marginBottom:"3px"}},"⚙️ Paramètres"),
+        el("div",{class:"muted",style:{fontSize:"12px",lineHeight:"1.5"}},"Ton profil, ton objectif et la sauvegarde automatique de tes données.")
+      )
+    )
+  );
+  guideToggle.addEventListener("click",()=>{
+    guideOpen = !guideOpen;
+    guideContent.style.display = guideOpen ? "block" : "none";
+    guideToggle.textContent = guideOpen ? "❓ Masquer le guide" : "❓ Comment utiliser Run by Léa ?";
+  });
+
   return el("div",{style:{padding:"0 16px 100px"}},
     el("div",{style:{marginTop:"8px"}}),
+    guideToggle, guideContent,
     infoCard, meteoRaceEl, splitsCard, horairesCard, checklistCard, strategieCard, parcoursCard
   );
 }
@@ -2557,10 +2640,12 @@ function renderSettings() {
 
   const versionSection = (function buildVersionSection() {
     const VERSIONS = [
-      { ver:"v1.9", title:"Refactoring & nettoyage", current:true, notes:[
+      { ver:"v1.9", title:"Refactoring & robustesse", current:true, notes:[
         "🔧 Fusion du code dupliqué (répétitions, cartes, calcul km)",
         "🗑️ Suppression du code mort",
-        "📦 Fonctions communes renderLapRow, card, weekKm",
+        "🛡️ Gestion d\'erreurs réseau renforcée (Coach, météo, Gist)",
+        "❓ Guide d\'utilisation dans l\'onglet Course",
+        "✅ Séances terminées mieux identifiées (opacité + badge, repliables)",
       ]},
       { ver:"v1.8.16", title:"Nouveau design & Inter", current:false, notes:[
         "🔤 Police Inter",
@@ -2856,7 +2941,9 @@ async function gistLoad() {
       save("lk_statuses",statuses); save("lk_notes",notesList);
       gistMsg="☁️ Données restaurées"; render(); setTimeout(()=>{gistMsg="";render();},4000);
     }
-  } catch(e) {}
+  } catch(e) {
+    console.warn("gistLoad échoué:", e.message);
+  }
 }
 
 async function gistForceRestore() {
