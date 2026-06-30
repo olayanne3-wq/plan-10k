@@ -2356,6 +2356,18 @@ function renderStats() {
         )
       )
     );
+  } else if (predHistory.length >= 3) {
+    // Moins de 21 jours de données — afficher la date de disponibilité
+    const availDate = new Date(new Date(projOldest).getTime() + 21*86400000);
+    const availStr = availDate.toLocaleDateString("fr-FR",{day:"numeric",month:"long"});
+    progressionEl = el("div",{style:{marginBottom:"16px"}},
+      el("div",{class:"label"},"🎯 Trajectoire au 6 septembre"),
+      el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"14px",textAlign:"center"}},
+        el("div",{style:{fontSize:"24px",marginBottom:"8px"}},"📊"),
+        el("div",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"600",marginBottom:"4px"}},"Données insuffisantes"),
+        el("div",{class:"muted",style:{fontSize:"13px"}},"Projection disponible à partir du "+availStr)
+      )
+    );
   }
 
   // ── Infos du plan ─────────────────────────────────────────────────────
