@@ -1052,15 +1052,15 @@ function renderLapRow(lap, i, sessionType) {
   const cadence = lap.average_cadence ? Math.round(lap.average_cadence*2)+" spm" : "";
   return el("div",{style:{marginBottom:"6px"}},
     el("div",{style:{display:"grid",gridTemplateColumns:"28px 1fr 64px 56px 20px",gap:"4px",alignItems:"center",marginBottom:"2px"}},
-      el("span",{style:{color:"#e2e8f0",fontSize:"11px"}},"R"+(i+1)),
+      el("span",{style:{color:"#e2e8f0",fontSize:"12px"}},"R"+(i+1)),
       el("div",{style:{height:"4px",background:"#232738",borderRadius:"2px"}},el("div",{style:{width:bw+"%",height:"100%",background:bc,borderRadius:"2px"}})),
-      el("span",{style:{color:"#f1f5f9",fontSize:"12px",fontWeight:"500",textAlign:"right"}},fmtPace(lap.average_speed)+"/km"),
-      lap.average_heartrate?el("span",{class:"muted",style:{fontSize:"11px",textAlign:"right"}},Math.round(lap.average_heartrate)+" bpm"):el("span",{},""),
-      el("span",{style:{fontSize:"12px",textAlign:"center"}},em)
+      el("span",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"500",textAlign:"right"}},fmtPace(lap.average_speed)+"/km"),
+      lap.average_heartrate?el("span",{class:"muted",style:{fontSize:"12px",textAlign:"right"}},Math.round(lap.average_heartrate)+" bpm"):el("span",{},""),
+      el("span",{style:{fontSize:"13px",textAlign:"center"}},em)
     ),
     (cadence||se)?el("div",{style:{display:"flex",gap:"8px",paddingLeft:"32px"}},
-      cadence?el("span",{class:"muted",style:{fontSize:"10px"}},cadence):null,
-      se?el("span",{style:{color:seColor,fontSize:"10px",fontWeight:"600"}},"IE "+se+(seLabel?" "+seLabel:"")):null
+      cadence?el("span",{class:"muted",style:{fontSize:"11px"}},cadence):null,
+      se?el("span",{style:{color:seColor,fontSize:"11px",fontWeight:"600"}},"IE "+se+(seLabel?" "+seLabel:"")):null
     ):null
   );
 }
@@ -1273,13 +1273,13 @@ function renderDashboard() {
       el("div",{},
         el("div",{class:"label"},"Objectif"),
         el("a",{href:RACE_URL,target:"_blank",style:{color:"#f97316",fontSize:"14px",fontWeight:"700",textDecoration:"none",display:"block",marginBottom:"2px"}},"🏁 "+RACE_NAME+" ↗"),
-        el("div",{class:"muted",style:{fontSize:"11px",marginBottom:"4px"}},new Date("2026-09-06T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})+" · "+RACE_LOCATION),
+        el("div",{class:"muted",style:{fontSize:"12px",marginBottom:"4px"}},new Date("2026-09-06T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})+" · "+RACE_LOCATION),
         el("div",{style:{color:"#f97316",fontSize:"32px",fontWeight:"800",letterSpacing:"-1px",lineHeight:"1"}},fmtTime(raceGoalTime)),
       ),
       svgCircle(gp,76,6,"#f97316",
         el("div",{style:{textAlign:"center"}},
           el("div",{style:{color:"#f97316",fontSize:"15px",fontWeight:"800"}},gp+"%"),
-          el("div",{class:"muted",style:{fontSize:"10px"}},"plan")
+          el("div",{class:"muted",style:{fontSize:"11px"}},"plan")
         )
       )
     ),
@@ -1289,24 +1289,24 @@ function renderDashboard() {
         el("div",{},
           el("div",{class:"label"},"Estimation actuelle"),
           el("div",{style:{color:"#f1f5f9",fontSize:"32px",fontWeight:"800",letterSpacing:"-1px",lineHeight:"1"}},pred.timeStr),
-          el("div",{class:"muted",style:{fontSize:"11px",marginTop:"2px"}},pred.timeLow+" – "+pred.timeHigh)
+          el("div",{class:"muted",style:{fontSize:"12px",marginTop:"2px"}},pred.timeLow+" – "+pred.timeHigh)
         ),
         el("div",{},
-          el("div",{style:{color:pred.gap<=0?"#22c55e":pred.gap<=30?"#eab308":"#ef4444",fontSize:"13px",fontWeight:"700"}},(pred.gap>0?"+":"")+pred.gapStr+" vs objectif"),
-          el("div",{class:"muted",style:{fontSize:"11px"}},"Confiance "+pred.confidence+"% ⓘ")
+          el("div",{style:{color:pred.gap<=0?"#22c55e":pred.gap<=30?"#eab308":"#ef4444",fontSize:"14px",fontWeight:"700"}},(pred.gap>0?"+":"")+pred.gapStr+" vs objectif"),
+          el("div",{class:"muted",style:{fontSize:"12px"}},"Confiance "+pred.confidence+"% ⓘ")
         )
       );
       // Panneau détail sources (caché par défaut)
       let detailOpen = false;
       const detailEl = el("div",{style:{display:"none",background:"#232738",borderRadius:"8px",padding:"10px 12px",marginBottom:"8px"}},
-        el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"8px"}},"Sources du prédicteur"),
+        el("div",{class:"muted",style:{fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"8px"}},"Sources du prédicteur"),
         ...pred.details.map(d => el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"4px"}},
-          el("span",{class:"muted",style:{fontSize:"11px"}},d.label),
-          el("span",{style:{color:"#f1f5f9",fontSize:"11px",fontWeight:"600"}},d.value)
+          el("span",{class:"muted",style:{fontSize:"12px"}},d.label),
+          el("span",{style:{color:"#f1f5f9",fontSize:"12px",fontWeight:"600"}},d.value)
         )),
         el("div",{style:{borderTop:"1px solid #2e3347",marginTop:"6px",paddingTop:"6px",display:"flex",justifyContent:"space-between"}},
-          el("span",{class:"muted",style:{fontSize:"11px"}},"Méthode"),
-          el("span",{style:{color:"#f1f5f9",fontSize:"11px"}},pred.method)
+          el("span",{class:"muted",style:{fontSize:"12px"}},"Méthode"),
+          el("span",{style:{color:"#f1f5f9",fontSize:"12px"}},pred.method)
         )
       );
       estimEl.addEventListener("click", () => {
@@ -1319,8 +1319,8 @@ function renderDashboard() {
       return wrap;
     })(),
     el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"4px"}},
-      el("span",{class:"muted",style:{fontSize:"10px"}},"50\'21\" (départ)"),
-      el("span",{class:"muted",style:{fontSize:"10px"}},"48\'30\" (objectif)")
+      el("span",{class:"muted",style:{fontSize:"11px"}},"50\'21\" (départ)"),
+      el("span",{class:"muted",style:{fontSize:"11px"}},"48\'30\" (objectif)")
     ),
     el("div",{style:{height:"7px",borderRadius:"4px",background:"linear-gradient(to right,#E24B4A,#EF9F27,#BA7517,#639922)",position:"relative",marginBottom:"12px"}},
       pred.time <= 2910
@@ -1337,13 +1337,13 @@ function renderDashboard() {
           }})
     ),
     pred.time <= 2910
-      ? el("div",{style:{color:"#22c55e",fontSize:"12px",fontWeight:"700",textAlign:"center",marginBottom:"10px"}},"🎉 Objectif dépassé !")
+      ? el("div",{style:{color:"#22c55e",fontSize:"13px",fontWeight:"700",textAlign:"center",marginBottom:"10px"}},"🎉 Objectif dépassé !")
       : null,
     (()=>{
       const phase = phaseOf(cw);
       const phaseSessions = ALL_SESSIONS.filter(s=>s.phase===phase.id&&s.type!=="REPOS"&&s.type!=="RACE");
       const phaseRemaining = phaseSessions.filter(s=>s.date>=today()&&!statuses[s.uid]).length;
-      return el("div",{style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",paddingTop:"10px",borderTop:"1px solid #2e3347",flexWrap:"wrap"}},
+      return el("div",{style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"13px",paddingTop:"10px",borderTop:"1px solid #2e3347",flexWrap:"wrap"}},
         el("span",{style:{color:"#22c55e",fontWeight:"700"}},"✅ "+done),
         el("span",{class:"muted"},"·"),
         el("span",{style:{color:"#eab308",fontWeight:"700"}},"⚠️ "+adapted),
@@ -1370,7 +1370,7 @@ function renderDashboard() {
     "Strava connecté";
   const stravaSection=el("div",{style:{display:"flex",alignItems:"center",gap:"8px",paddingBottom:"8px"}},
     el("div",{style:{width:"7px",height:"7px",borderRadius:"50%",background:stravaColor,flexShrink:"0"}}),
-    el("span",{class:"muted",style:{fontSize:"12px"}},stravaText)
+    el("span",{class:"muted",style:{fontSize:"13px"}},stravaText)
   );
 
   const isHot = weatherTemp !== null && weatherTemp > 28;
@@ -1381,10 +1381,10 @@ function renderDashboard() {
     borderRadius:"8px", marginBottom:"12px"
   }},
     el("span",{style:{fontSize:"14px"}}, weatherDesc||"🌡️"),
-    el("span",{style:{color:isHot?"#f97316":"#60a5fa",fontSize:"12px",fontWeight:"700"}}, weatherTemp+"°C · Toulon"),
-    el("span",{class:"muted",style:{fontSize:"12px"}},"·"),
-    isHot ? el("span",{style:{fontSize:"12px"}},"🔥") : null,
-    el("span",{style:{color:isHot?"#f97316":"#e2e8f0",fontSize:"12px",fontWeight:"600"}}, "Allure EF : "+(isHot?"6:40":"6:20")+"/km")
+    el("span",{style:{color:isHot?"#f97316":"#60a5fa",fontSize:"13px",fontWeight:"700"}}, weatherTemp+"°C · Toulon"),
+    el("span",{class:"muted",style:{fontSize:"13px"}},"·"),
+    isHot ? el("span",{style:{fontSize:"13px"}},"🔥") : null,
+    el("span",{style:{color:isHot?"#f97316":"#e2e8f0",fontSize:"13px",fontWeight:"600"}}, "Allure EF : "+(isHot?"6:40":"6:20")+"/km")
   ) : null;
 
   const todayStatus4Coach = statuses[ALL_SESSIONS.find(s=>s.date===today()&&s.type!=="REPOS")?.uid];
@@ -1397,11 +1397,11 @@ function renderDashboard() {
     el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"6px"}},
       el("div",{style:{display:"flex",alignItems:"center",gap:"7px"}},
         runByLeaIcon(20, 5),
-        el("span",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px"}},coachLabel)
+        el("span",{class:"muted",style:{fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px"}},coachLabel)
       ),
       refreshCoachBtn
     ),
-    el("div",{style:{color:"#f1f5f9",fontSize:"13px",fontStyle:"italic",lineHeight:"1.5"}},coachMsg||el("span",{class:"muted",style:{fontSize:"12px"}},"Chargement..."))
+    el("div",{style:{color:"#f1f5f9",fontSize:"14px",fontStyle:"italic",lineHeight:"1.5"}},coachMsg||el("span",{class:"muted",style:{fontSize:"13px"}},"Chargement..."))
   );
 
   const nextKey = nextKeySession();
@@ -1416,14 +1416,14 @@ function renderDashboard() {
     el("div",{style:{display:"flex",alignItems:"center",gap:"10px"}},
       el("span",{style:{fontSize:"18px"}},"🎯"),
       el("div",{},
-        el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"2px"}},"Prochaine séance clé"),
-        el("div",{style:{fontSize:"13px",fontWeight:"700"}},(STYPES[nextKey.type]?.short||nextKey.type)+" · "+new Date(nextKey.date+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})),
-        el("div",{class:"muted",style:{fontSize:"11px",marginTop:"2px"}},nextKey.session.length>40?nextKey.session.slice(0,38)+"...":nextKey.session)
+        el("div",{class:"muted",style:{fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"2px"}},"Prochaine séance clé"),
+        el("div",{style:{fontSize:"14px",fontWeight:"700"}},(STYPES[nextKey.type]?.short||nextKey.type)+" · "+new Date(nextKey.date+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})),
+        el("div",{class:"muted",style:{fontSize:"12px",marginTop:"2px"}},nextKey.session.length>40?nextKey.session.slice(0,38)+"...":nextKey.session)
       )
     ),
     el("div",{style:{textAlign:"right"}},
       el("div",{style:{color:STYPES[nextKey.type]?.color||"#f97316",fontSize:"22px",fontWeight:"800",lineHeight:"1"}},"J–"+daysNext),
-      el("div",{class:"muted",style:{fontSize:"10px"}},"dans "+daysNext+" jour"+(daysNext>1?"s":""))
+      el("div",{class:"muted",style:{fontSize:"11px"}},"dans "+daysNext+" jour"+(daysNext>1?"s":""))
     )
   ) : null;
 
@@ -1446,24 +1446,24 @@ function renderDashboard() {
         el("div",{class:"label"},"Aujourd\'hui"),
         el("div",{style:{background:"#1a1d27",border:"1px solid #60a5fa33",borderLeft:"3px solid #60a5fa",borderRadius:"10px",padding:"14px"}},
           el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"6px"}},
-            el("span",{style:{background:"#60a5fa22",color:"#60a5fa",border:"1px solid #60a5fa44",borderRadius:"4px",padding:"2px 7px",fontSize:"11px",fontWeight:"700"}},"REPOS"),
+            el("span",{style:{background:"#60a5fa22",color:"#60a5fa",border:"1px solid #60a5fa44",borderRadius:"4px",padding:"2px 7px",fontSize:"12px",fontWeight:"700"}},"REPOS"),
             el("span",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"600"}},todaySessions[0].session)
           ),
-          todaySessions[0].notes?el("div",{class:"muted",style:{fontSize:"12px",fontStyle:"italic",marginBottom:"10px"}},todaySessions[0].notes):null,
+          todaySessions[0].notes?el("div",{class:"muted",style:{fontSize:"13px",fontStyle:"italic",marginBottom:"10px"}},todaySessions[0].notes):null,
           bilanReport?el("div",{style:{marginBottom:"10px"}},
-            el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"6px"}},bilanLabel),
+            el("div",{class:"muted",style:{fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"6px"}},bilanLabel),
             el("div",{style:{display:"flex",gap:"8px"}},
               el("div",{style:{flex:"1",background:"#232738",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
-                el("div",{style:{color:"#22c55e",fontSize:"13px",fontWeight:"700"}},(bilanReport.done+bilanReport.adapted)+"/"+bilanReport.total),
-                el("div",{class:"muted",style:{fontSize:"10px"}},"séances ✅")
+                el("div",{style:{color:"#22c55e",fontSize:"14px",fontWeight:"700"}},(bilanReport.done+bilanReport.adapted)+"/"+bilanReport.total),
+                el("div",{class:"muted",style:{fontSize:"11px"}},"séances ✅")
               ),
               el("div",{style:{flex:"1",background:"#232738",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
-                el("div",{style:{color:"#f97316",fontSize:"13px",fontWeight:"700"}},bilanKm+" km"),
-                el("div",{class:"muted",style:{fontSize:"10px"}},"courus")
+                el("div",{style:{color:"#f97316",fontSize:"14px",fontWeight:"700"}},bilanKm+" km"),
+                el("div",{class:"muted",style:{fontSize:"11px"}},"courus")
               ),
               bilanReport.avgEfPace?el("div",{style:{flex:"1",background:"#232738",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
-                el("div",{style:{color:"#60a5fa",fontSize:"13px",fontWeight:"700"}},fmtPace(1000/bilanReport.avgEfPace)+"/km"),
-                el("div",{class:"muted",style:{fontSize:"10px"}},"allure EF")
+                el("div",{style:{color:"#60a5fa",fontSize:"14px",fontWeight:"700"}},fmtPace(1000/bilanReport.avgEfPace)+"/km"),
+                el("div",{class:"muted",style:{fontSize:"11px"}},"allure EF")
               ):null
             )
           ):null,
@@ -1471,8 +1471,8 @@ function renderDashboard() {
             onClick:()=>{ selectedWeek=tomorrowKey.week; setView("weekDetail"); }
           },
             el("div",{},
-              el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"3px"}},"⚡ Demain"),
-              el("div",{style:{color:STYPES[tomorrowKey.type]?.color||"#f97316",fontSize:"12px",fontWeight:"700"}},(STYPES[tomorrowKey.type]?.short||tomorrowKey.type)+" · "+tomorrowKey.session)
+              el("div",{class:"muted",style:{fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"3px"}},"⚡ Demain"),
+              el("div",{style:{color:STYPES[tomorrowKey.type]?.color||"#f97316",fontSize:"13px",fontWeight:"700"}},(STYPES[tomorrowKey.type]?.short||tomorrowKey.type)+" · "+tomorrowKey.session)
             ),
             el("span",{style:{color:"#e2e8f0",fontSize:"18px"}},"›")
           ):null
@@ -1510,74 +1510,74 @@ function renderDashboard() {
             isDone?el("span",{style:{
               background:statusColor+"22",color:statusColor,
               border:`1px solid ${statusColor}44`,
-              borderRadius:"6px",padding:"3px 8px",fontSize:"12px",fontWeight:"700"
+              borderRadius:"6px",padding:"3px 8px",fontSize:"13px",fontWeight:"700"
             }},status2==="✅"?"✅ Validée":status2==="⚠️"?"⚠️ Adaptée":"❌ Ratée"):null
           ),
           !isRest && (s.warmup||s.cooldown) ? el("div",{style:{background:"#232738",borderRadius:"8px",padding:"8px 10px",marginBottom:"8px"}},
             s.warmup ? el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:s.cooldown?"6px":"0"}},
-              el("span",{style:{color:"#e2e8f0",fontSize:"11px",minWidth:"24px"}},"▶"),
-              el("span",{style:{color:"#e2e8f0",fontSize:"12px"}},s.warmup)
+              el("span",{style:{color:"#e2e8f0",fontSize:"12px",minWidth:"24px"}},"▶"),
+              el("span",{style:{color:"#e2e8f0",fontSize:"13px"}},s.warmup)
             ) : null,
             s.cooldown ? el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
-              el("span",{style:{color:"#e2e8f0",fontSize:"11px",minWidth:"24px"}},"◀"),
-              el("span",{style:{color:"#e2e8f0",fontSize:"12px"}},s.cooldown)
+              el("span",{style:{color:"#e2e8f0",fontSize:"12px",minWidth:"24px"}},"◀"),
+              el("span",{style:{color:"#e2e8f0",fontSize:"13px"}},s.cooldown)
             ) : null
           ) : null,
-          s.notes ? el("div",{style:{color:"#60a5facc",fontSize:"12px",fontStyle:"italic",marginBottom:"8px"}},"💡 "+s.notes) : null,
-          isHot && (s.type==="EF"||s.type==="LONGUE") ? el("div",{style:{color:"#f97316",fontSize:"12px",fontWeight:"600"}},"🔥 Chaleur → allure 6:40/km") : null,
+          s.notes ? el("div",{style:{color:"#60a5facc",fontSize:"13px",fontStyle:"italic",marginBottom:"8px"}},"💡 "+s.notes) : null,
+          isHot && (s.type==="EF"||s.type==="LONGUE") ? el("div",{style:{color:"#f97316",fontSize:"13px",fontWeight:"600"}},"🔥 Chaleur → allure 6:40/km") : null,
           PACE_REFS[s.type] ? el("div",{style:{background:"#f9731611",border:"1px solid #f9731633",borderRadius:"8px",padding:"10px 12px",marginBottom:"8px"}},
-            el("div",{style:{color:"#f97316",fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"8px",fontWeight:"700"}},"⚡ Allures cibles"),
+            el("div",{style:{color:"#f97316",fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"8px",fontWeight:"700"}},"⚡ Allures cibles"),
             el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}},
-              el("span",{class:"muted",style:{fontSize:"12px"}},"Effort"),
+              el("span",{class:"muted",style:{fontSize:"13px"}},"Effort"),
               el("div",{style:{textAlign:"right"}},
-                el("span",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"700"}},PACE_REFS[s.type].effort),
-                el("span",{class:"muted",style:{fontSize:"11px",marginLeft:"6px"}},PACE_REFS[s.type].tolerance)
+                el("span",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"700"}},PACE_REFS[s.type].effort),
+                el("span",{class:"muted",style:{fontSize:"12px",marginLeft:"6px"}},PACE_REFS[s.type].tolerance)
               )
             ),
             el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},
-              el("span",{class:"muted",style:{fontSize:"12px"}},"Récupération"),
-              el("span",{class:"muted",style:{fontSize:"13px",fontWeight:"700"}},PACE_REFS[s.type].recup)
+              el("span",{class:"muted",style:{fontSize:"13px"}},"Récupération"),
+              el("span",{class:"muted",style:{fontSize:"14px",fontWeight:"700"}},PACE_REFS[s.type].recup)
             )
           ) : null,
           FC_ZONES[s.type] ? el("div",{style:{background:FC_ZONES[s.type].color+"11",border:"1px solid "+FC_ZONES[s.type].color+"33",borderRadius:"8px",padding:"8px 10px",marginBottom:"8px"}},
-            el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"4px"}},"FC cible"),
+            el("div",{class:"muted",style:{fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"4px"}},"FC cible"),
             el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
               el("div",{style:{color:FC_ZONES[s.type].color,fontSize:"14px",fontWeight:"700"}},FC_ZONES[s.type].min+"–"+FC_ZONES[s.type].max+" bpm"),
-              el("div",{class:"muted",style:{fontSize:"11px"}},FC_ZONES[s.type].label+" · FC max "+FC_MAX)
+              el("div",{class:"muted",style:{fontSize:"12px"}},FC_ZONES[s.type].label+" · FC max "+FC_MAX)
             )
           ) : null,
           // Données Strava enrichies si séance terminée
           isDone && stravaRun2 ? el("div",{style:{background:"#fc4c0211",border:"1px solid #fc4c0233",borderRadius:"8px",padding:"8px 10px",marginBottom:"8px"}},
             el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}},
-              el("span",{class:"muted",style:{fontSize:"11px"}},(stravaRun2.start_date_local||"").slice(11,16)+" · départ"),
-              el("a",{href:"https://www.strava.com/activities/"+stravaRun2.id_str,target:"_blank",style:{color:"#fc4c02",fontSize:"11px",fontWeight:"700",textDecoration:"none"}},"Voir sur Strava 🔗")
+              el("span",{class:"muted",style:{fontSize:"12px"}},(stravaRun2.start_date_local||"").slice(11,16)+" · départ"),
+              el("a",{href:"https://www.strava.com/activities/"+stravaRun2.id_str,target:"_blank",style:{color:"#fc4c02",fontSize:"12px",fontWeight:"700",textDecoration:"none"}},"Voir sur Strava 🔗")
             ),
             el("div",{style:{display:"flex",gap:"14px",flexWrap:"wrap",marginBottom:effortLaps2.length>0?"8px":"0"}},
-              el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"13px",fontWeight:"700"}},(stravaRun2.distance/1000).toFixed(2)+"km"),el("div",{class:"muted",style:{fontSize:"11px"}},"distance")),
-              el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"13px",fontWeight:"700"}},fmtTime(stravaRun2.moving_time)),el("div",{class:"muted",style:{fontSize:"11px"}},"durée")),
+              el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"14px",fontWeight:"700"}},(stravaRun2.distance/1000).toFixed(2)+"km"),el("div",{class:"muted",style:{fontSize:"12px"}},"distance")),
+              el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"14px",fontWeight:"700"}},fmtTime(stravaRun2.moving_time)),el("div",{class:"muted",style:{fontSize:"12px"}},"durée")),
               (()=>{
                 const isIntensive2 = effortLaps2.length > 0;
                 const dispPace2 = isIntensive2 ? effortLaps2.reduce((s,l)=>s+l.average_speed,0)/effortLaps2.length : stravaRun2.average_speed;
                 const paceLabel2 = isIntensive2 ? "allure intervalles" : "allure moy.";
-                return el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"13px",fontWeight:"700"}},fmtPace(dispPace2)+"/km"),el("div",{class:"muted",style:{fontSize:"11px"}},paceLabel2));
+                return el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"14px",fontWeight:"700"}},fmtPace(dispPace2)+"/km"),el("div",{class:"muted",style:{fontSize:"12px"}},paceLabel2));
               })(),
               (()=>{
                 const isIntensive2 = effortLaps2.length > 0;
                 const hrVals2 = isIntensive2 ? effortLaps2.filter(l=>l.average_heartrate) : null;
                 const dispHr2 = isIntensive2 ? (hrVals2.length ? hrVals2.reduce((s,l)=>s+l.average_heartrate,0)/hrVals2.length : null) : stravaRun2.average_heartrate;
                 const hrLabel2 = isIntensive2 ? "FC intervalles" : "FC moy.";
-                return dispHr2 ? el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"13px",fontWeight:"700"}},Math.round(dispHr2)+" bpm"),el("div",{class:"muted",style:{fontSize:"11px"}},hrLabel2)) : null;
+                return dispHr2 ? el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"14px",fontWeight:"700"}},Math.round(dispHr2)+" bpm"),el("div",{class:"muted",style:{fontSize:"12px"}},hrLabel2)) : null;
               })(),
-              stravaRun2.max_heartrate?el("div",{},el("div",{style:{color:"#ef4444",fontSize:"13px",fontWeight:"700"}},Math.round(stravaRun2.max_heartrate)+" bpm"),el("div",{class:"muted",style:{fontSize:"11px"}},"FC max")):null
+              stravaRun2.max_heartrate?el("div",{},el("div",{style:{color:"#ef4444",fontSize:"14px",fontWeight:"700"}},Math.round(stravaRun2.max_heartrate)+" bpm"),el("div",{class:"muted",style:{fontSize:"12px"}},"FC max")):null
             ),
             effortLaps2.length>0?el("div",{style:{borderTop:"1px solid #fc4c0222",paddingTop:"8px"}},
               el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}},
-                el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px"}},"Répétitions ("+effortLaps2.length+") · cible "+(SESSION_TARGETS[s.type]?.effort||"—")),
+                el("div",{class:"muted",style:{fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px"}},"Répétitions ("+effortLaps2.length+") · cible "+(SESSION_TARGETS[s.type]?.effort||"—")),
                 (()=>{
                   const tgt=SESSION_TARGETS[s.type];
                   if(!tgt) return null;
                   const nb=effortLaps2.filter(l=>(1000/l.average_speed)<=tgt.okPace).length;
-                  return el("span",{style:{color:nb===effortLaps2.length?"#22c55e":nb>0?"#eab308":"#ef4444",fontSize:"11px",fontWeight:"700"}},nb+"/"+effortLaps2.length+" dans la cible");
+                  return el("span",{style:{color:nb===effortLaps2.length?"#22c55e":nb>0?"#eab308":"#ef4444",fontSize:"12px",fontWeight:"700"}},nb+"/"+effortLaps2.length+" dans la cible");
                 })()
               ),
               ...effortLaps2.map((lap,i)=>renderLapRow(lap,i,s.type))
@@ -1588,12 +1588,12 @@ function renderDashboard() {
             onClick:()=>{ selectedWeek=nextSess.week; setView("weekDetail"); }
           },
             el("div",{},
-              el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"3px"}},"Prochaine séance · "+new Date(nextSess.date+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})),
-              el("div",{style:{color:"#e2e8f0",fontSize:"12px"}},(STYPES[nextSess.type]?.short||nextSess.type)+" · "+nextSess.session)
+              el("div",{class:"muted",style:{fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"3px"}},"Prochaine séance · "+new Date(nextSess.date+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})),
+              el("div",{style:{color:"#e2e8f0",fontSize:"13px"}},(STYPES[nextSess.type]?.short||nextSess.type)+" · "+nextSess.session)
             ),
             el("span",{style:{color:"#e2e8f0",fontSize:"18px"}},"›")
           ):null,
-          !isRest && !isDone ? el("button",{style:{width:"100%",marginTop:"8px",background:"#f9731611",border:"1px solid #f9731633",borderRadius:"8px",padding:"8px",color:"#f97316",fontSize:"12px",fontWeight:"700",cursor:"pointer"},
+          !isRest && !isDone ? el("button",{style:{width:"100%",marginTop:"8px",background:"#f9731611",border:"1px solid #f9731633",borderRadius:"8px",padding:"8px",color:"#f97316",fontSize:"13px",fontWeight:"700",cursor:"pointer"},
             onClick:()=>{ selectedWeek=s.week; setView("weekDetail"); }
           },"Voir la semaine →") : null
         );
@@ -1614,57 +1614,57 @@ function renderDashboard() {
       el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"14px"}},
         el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}},
           el("div",{style:{display:"flex",gap:"16px"}},
-            el("div",{},el("div",{style:{color:"#22c55e",fontSize:"20px",fontWeight:"800"}},report.done+""),el("div",{class:"muted",style:{fontSize:"11px"}},"✅ faites")),
-            el("div",{},el("div",{style:{color:"#eab308",fontSize:"20px",fontWeight:"800"}},report.adapted+""),el("div",{class:"muted",style:{fontSize:"11px"}},"⚠️ adaptées")),
-            el("div",{},el("div",{style:{color:"#ef4444",fontSize:"20px",fontWeight:"800"}},report.missed+""),el("div",{class:"muted",style:{fontSize:"11px"}},"❌ manquées"))
+            el("div",{},el("div",{style:{color:"#22c55e",fontSize:"20px",fontWeight:"800"}},report.done+""),el("div",{class:"muted",style:{fontSize:"12px"}},"✅ faites")),
+            el("div",{},el("div",{style:{color:"#eab308",fontSize:"20px",fontWeight:"800"}},report.adapted+""),el("div",{class:"muted",style:{fontSize:"12px"}},"⚠️ adaptées")),
+            el("div",{},el("div",{style:{color:"#ef4444",fontSize:"20px",fontWeight:"800"}},report.missed+""),el("div",{class:"muted",style:{fontSize:"12px"}},"❌ manquées"))
           ),
           el("div",{style:{textAlign:"right"}},
             el("div",{style:{color:pctColor,fontSize:"22px",fontWeight:"800"}},pct+"%"),
-            el("div",{class:"muted",style:{fontSize:"11px"}},"complétées")
+            el("div",{class:"muted",style:{fontSize:"12px"}},"complétées")
           )
         ),
         el("div",{style:{display:"flex",gap:"16px",flexWrap:"wrap",paddingTop:"10px",borderTop:"1px solid #2e3347"}},
           report.plannedMin>0?el("div",{},
-            el("div",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"700"}},
+            el("div",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"700"}},
               (report.realMin>0?report.realMin+"'":"-")+" / "+report.plannedMin+"'"
             ),
-            el("div",{class:"muted",style:{fontSize:"11px"}},"min réelles / prévues")
+            el("div",{class:"muted",style:{fontSize:"12px"}},"min réelles / prévues")
           ):null,
           (()=>{
             const ws = weekStats(cw2);
             if (!ws || !ws.hasReal) return null;
             return el("div",{},
-              el("div",{style:{color:"#fc4c02",fontSize:"13px",fontWeight:"700"}},ws.realKm+" / ~"+ws.plannedKm+" km"),
-              el("div",{class:"muted",style:{fontSize:"11px"}},"km réels / prévus")
+              el("div",{style:{color:"#fc4c02",fontSize:"14px",fontWeight:"700"}},ws.realKm+" / ~"+ws.plannedKm+" km"),
+              el("div",{class:"muted",style:{fontSize:"12px"}},"km réels / prévus")
             );
           })(),
           report.avgEfPace?el("div",{},
             el("div",{style:{display:"flex",alignItems:"center",gap:"4px"}},
-              el("div",{style:{color:"#60a5fa",fontSize:"13px",fontWeight:"700"}},fmtPace(1000/report.avgEfPace)+"/km"),
+              el("div",{style:{color:"#60a5fa",fontSize:"14px",fontWeight:"700"}},fmtPace(1000/report.avgEfPace)+"/km"),
               report.prevEfPace ? el("span",{style:{
-                fontSize:"11px",
+                fontSize:"12px",
                 color: report.avgEfPace < report.prevEfPace ? "#22c55e" : report.avgEfPace > report.prevEfPace+10 ? "#ef4444" : "#e2e8f0"
               }}, report.avgEfPace < report.prevEfPace ? "📈" : report.avgEfPace > report.prevEfPace+10 ? "📉" : "➡️") : null
             ),
-            el("div",{class:"muted",style:{fontSize:"11px"}},"allure moy. EF"+(report.prevEfPace?(" · "+(report.avgEfPace<report.prevEfPace?"-":"+")+(Math.abs(Math.round(report.avgEfPace-report.prevEfPace)))+"\" vs S"+(cw2-1)):""))
+            el("div",{class:"muted",style:{fontSize:"12px"}},"allure moy. EF"+(report.prevEfPace?(" · "+(report.avgEfPace<report.prevEfPace?"-":"+")+(Math.abs(Math.round(report.avgEfPace-report.prevEfPace)))+"\" vs S"+(cw2-1)):""))
           ):null,
           report.avgEfHr?el("div",{},
             el("div",{style:{display:"flex",alignItems:"center",gap:"4px"}},
-              el("div",{style:{color:"#f97316",fontSize:"13px",fontWeight:"700"}},report.avgEfHr+" bpm"),
+              el("div",{style:{color:"#f97316",fontSize:"14px",fontWeight:"700"}},report.avgEfHr+" bpm"),
               report.prevEfHr ? el("span",{style:{
-                fontSize:"11px",
+                fontSize:"12px",
                 color: report.avgEfHr < report.prevEfHr ? "#22c55e" : report.avgEfHr > report.prevEfHr+3 ? "#ef4444" : "#e2e8f0"
               }}, report.avgEfHr < report.prevEfHr ? "📈" : report.avgEfHr > report.prevEfHr+3 ? "📉" : "➡️") : null
             ),
-            el("div",{class:"muted",style:{fontSize:"11px"}},"FC moy. EF"+(report.prevEfHr?(" · "+(report.avgEfHr<report.prevEfHr?"-":"+")+(Math.abs(report.avgEfHr-report.prevEfHr))+" bpm vs S"+(cw2-1)):""))
+            el("div",{class:"muted",style:{fontSize:"12px"}},"FC moy. EF"+(report.prevEfHr?(" · "+(report.avgEfHr<report.prevEfHr?"-":"+")+(Math.abs(report.avgEfHr-report.prevEfHr))+" bpm vs S"+(cw2-1)):""))
           ):null,
           (()=>{
             const efSessions = ALL_SESSIONS.filter(s=>(s.type==="EF"||s.type==="LONGUE")&&s.week===cw2&&historicalWeatherCache[s.date]!=null);
             if (!efSessions.length) return null;
             const avgTemp = Math.round(efSessions.reduce((s,e)=>s+historicalWeatherCache[e.date],0)/efSessions.length);
             return el("div",{},
-              el("div",{style:{color:avgTemp>28?"#f97316":"#e2e8f0",fontSize:"13px",fontWeight:"700"}},avgTemp+"°C"),
-              el("div",{class:"muted",style:{fontSize:"11px"}},"temp. moy. séances")
+              el("div",{style:{color:avgTemp>28?"#f97316":"#e2e8f0",fontSize:"14px",fontWeight:"700"}},avgTemp+"°C"),
+              el("div",{class:"muted",style:{fontSize:"12px"}},"temp. moy. séances")
             );
           })()
         )
@@ -1680,8 +1680,8 @@ function renderDashboard() {
   }},
     el("span",{style:{fontSize:"22px"}},"😴"),
     el("div",{},
-      el("div",{style:{color:"#ef4444",fontSize:"13px",fontWeight:"700"}},"Signes de fatigue détectés"),
-      el("div",{class:"muted",style:{fontSize:"12px"}},
+      el("div",{style:{color:"#ef4444",fontSize:"14px",fontWeight:"700"}},"Signes de fatigue détectés"),
+      el("div",{class:"muted",style:{fontSize:"13px"}},
         fatigue==="consecutive"
           ? "2 séances difficiles consécutives — pense à réduire l\'intensité"
           : "Allure EF en baisse vs semaine précédente — récupère bien"
@@ -1711,20 +1711,20 @@ function renderDashboard() {
   const progressEl = stravaActivities.length>0 ? el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"10px 14px",marginBottom:"12px"}},
     el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}},
       el("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
-        el("span",{style:{fontSize:"13px"}},"🏃"),
-        el("span",{class:"muted",style:{fontSize:"12px"}},totalKm+" km / ~"+Math.round(plannedKmTotal)+" km")
+        el("span",{style:{fontSize:"14px"}},"🏃"),
+        el("span",{class:"muted",style:{fontSize:"13px"}},totalKm+" km / ~"+Math.round(plannedKmTotal)+" km")
       ),
-      el("span",{style:{color:"#22c55e",fontSize:"12px",fontWeight:"700"}},pctKm+"%")
+      el("span",{style:{color:"#22c55e",fontSize:"13px",fontWeight:"700"}},pctKm+"%")
     ),
     el("div",{style:{height:"4px",background:"#232738",borderRadius:"2px",marginBottom:"8px"}},
       el("div",{style:{width:pctKm+"%",height:"100%",background:"#22c55e",borderRadius:"2px"}})
     ),
     el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}},
       el("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
-        el("span",{style:{fontSize:"13px"}},"⏱️"),
-        el("span",{class:"muted",style:{fontSize:"12px"}},totalH+"h"+(totalMmin).toString().padStart(2,"0")+"' / ~"+plannedH+"h prévues")
+        el("span",{style:{fontSize:"14px"}},"⏱️"),
+        el("span",{class:"muted",style:{fontSize:"13px"}},totalH+"h"+(totalMmin).toString().padStart(2,"0")+"' / ~"+plannedH+"h prévues")
       ),
-      el("span",{style:{color:"#22c55e",fontSize:"12px",fontWeight:"700"}},pctMin+"%")
+      el("span",{style:{color:"#22c55e",fontSize:"13px",fontWeight:"700"}},pctMin+"%")
     ),
     el("div",{style:{height:"4px",background:"#232738",borderRadius:"2px"}},
       el("div",{style:{width:pctMin+"%",height:"100%",background:"#22c55e",borderRadius:"2px"}})
@@ -1734,7 +1734,7 @@ function renderDashboard() {
   const helpBtn = el("button",{style:{
     background:"#232738",border:"1px solid #2e3347",borderRadius:"50%",
     width:"26px",height:"26px",display:"flex",alignItems:"center",justifyContent:"center",
-    color:"#94a3b8",fontSize:"13px",fontWeight:"700",cursor:"pointer",flexShrink:"0"
+    color:"#94a3b8",fontSize:"14px",fontWeight:"700",cursor:"pointer",flexShrink:"0"
   }}, "?");
   helpBtn.addEventListener("click",()=>{ setView("help"); });
 
@@ -1746,7 +1746,7 @@ function renderDashboard() {
     runByLeaIcon(24, 6),
     el("div",{style:{color:"#f1f5f9",fontSize:"16px",fontWeight:"800"}},"Run by Léa"),
     el("div",{style:{flex:"1"}}),
-    el("div",{style:{background:"#232738",borderRadius:"8px",padding:"4px 10px",color:"#f97316",fontSize:"12px",fontWeight:"700"}},"J–"+countdown()),
+    el("div",{style:{background:"#232738",borderRadius:"8px",padding:"4px 10px",color:"#f97316",fontSize:"13px",fontWeight:"700"}},"J–"+countdown()),
     helpBtn
   );
 
@@ -1759,17 +1759,17 @@ function renderDashboard() {
 function renderWeeks() {
   const cw=currentWeek();
   return el("div",{style:{padding:"0 16px 100px"}},
-    el("div",{style:{marginTop:"8px",marginBottom:"12px",color:"#e2e8f0",fontSize:"12px"}},"Semaine actuelle : ",el("span",{style:{color:"#f97316",fontWeight:"700"}},"S"+cw)),
+    el("div",{style:{marginTop:"8px",marginBottom:"12px",color:"#e2e8f0",fontSize:"13px"}},"Semaine actuelle : ",el("span",{style:{color:"#f97316",fontWeight:"700"}},"S"+cw)),
     ...PLAN.map(week=>{
       const pct=weekPct(week), isActive=week.week===cw, color=phaseOf(week.week).color;
       const b=el("button",{style:{width:"100%",background:isActive?"#232738":"#1a1d27",border:`1px solid ${isActive?"#f9731655":"#2e3347"}`,borderLeft:`3px solid ${color}`,borderRadius:"10px",padding:"12px 14px",marginBottom:"8px",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"12px"}},
         el("div",{style:{textAlign:"center",minWidth:"36px"}},
           el("div",{style:{color,fontSize:"18px",fontWeight:"800",lineHeight:"1"}},"S"+week.week),
-          isActive?el("div",{style:{color:"#f97316",fontSize:"11px",fontWeight:"700"}},"NOW"):null
+          isActive?el("div",{style:{color:"#f97316",fontSize:"12px",fontWeight:"700"}},"NOW"):null
         ),
         el("div",{style:{flex:"1"}},
-          el("div",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"600"}},phaseOf(week.week).label),
-          el("div",{class:"muted",style:{fontSize:"11px",marginTop:"2px"}},fmtDate(week.sessions[0].date)+" → "+fmtDate(week.sessions[6].date)),
+          el("div",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"600"}},phaseOf(week.week).label),
+          el("div",{class:"muted",style:{fontSize:"12px",marginTop:"2px"}},fmtDate(week.sessions[0].date)+" → "+fmtDate(week.sessions[6].date)),
           el("div",{style:{height:"3px",background:"#232738",borderRadius:"2px",marginTop:"6px",marginBottom:"6px"}},
             el("div",{style:{height:"100%",width:pct+"%",background:color,borderRadius:"2px"}})
           ),
@@ -1778,15 +1778,15 @@ function renderWeeks() {
             if (!ws) return null;
             if (ws.hasReal) return el("div",{},
               el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"2px"}},
-                el("span",{class:"muted",style:{fontSize:"10px"}},"Distance"),
-                el("span",{style:{fontSize:"10px"}},
+                el("span",{class:"muted",style:{fontSize:"11px"}},"Distance"),
+                el("span",{style:{fontSize:"11px"}},
                   el("span",{style:{color:"#fc4c02",fontWeight:"700"}},ws.realKm+" km"),
                   el("span",{class:"muted"}," / ~"+ws.plannedKm+" km")
                 )
               ),
               el("div",{style:{display:"flex",justifyContent:"space-between"}},
-                el("span",{class:"muted",style:{fontSize:"10px"}},"Durée"),
-                el("span",{style:{fontSize:"10px"}},
+                el("span",{class:"muted",style:{fontSize:"11px"}},"Durée"),
+                el("span",{style:{fontSize:"11px"}},
                   el("span",{style:{color:"#fc4c02",fontWeight:"700"}},
                     Math.floor(ws.realMin/60)+"h"+(ws.realMin%60).toString().padStart(2,"0")+"'"
                   ),
@@ -1794,12 +1794,12 @@ function renderWeeks() {
                 )
               )
             );
-            return el("div",{class:"muted",style:{fontSize:"10px",fontStyle:"italic"}},
+            return el("div",{class:"muted",style:{fontSize:"11px",fontStyle:"italic"}},
               "~"+ws.plannedKm+" km · ~"+Math.floor(ws.plannedMin/60)+"h"+(ws.plannedMin%60).toString().padStart(2,"0")+"' prévus"
             );
           })()
         ),
-        el("div",{class:"muted",style:{fontSize:"12px"}},pct+"%")
+        el("div",{class:"muted",style:{fontSize:"13px"}},pct+"%")
       );
       b.addEventListener("click",()=>{ selectedWeek=week.week; setView("weekDetail"); });
       return b;
@@ -1841,8 +1841,8 @@ function renderWeekDetail(weekNum) {
       transition:"opacity 0.2s ease"
     }},
       el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"6px"}},
-        el("div",{style:{color:isPast?"#475569":"#e2e8f0",fontSize:"11px",fontWeight:"700",minWidth:"60px"}},s.day+" "+s.date.slice(8)),
-        isToday?el("span",{style:{background:"#f9731633",color:"#f97316",fontSize:"11px",fontWeight:"700",padding:"1px 5px",borderRadius:"3px"}},"AUJOURD\'HUI"):null,
+        el("div",{style:{color:isPast?"#475569":"#e2e8f0",fontSize:"12px",fontWeight:"700",minWidth:"60px"}},s.day+" "+s.date.slice(8)),
+        isToday?el("span",{style:{background:"#f9731633",color:"#f97316",fontSize:"12px",fontWeight:"700",padding:"1px 5px",borderRadius:"3px"}},"AUJOURD\'HUI"):null,
         badge(s.type),
         el("div",{style:{flex:"1"}}),
         isDoneSession?el("span",{style:{
@@ -1850,40 +1850,40 @@ function renderWeekDetail(weekNum) {
           color:uidStatus==="✅"?"#fff":"#1a1d27",
           borderRadius:"50%",width:"20px",height:"20px",
           display:"flex",alignItems:"center",justifyContent:"center",
-          fontSize:"12px",fontWeight:"900",flexShrink:"0"
+          fontSize:"13px",fontWeight:"900",flexShrink:"0"
         }}, uidStatus==="✅"?"✓":"!") : null
       ),
       el("div",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"600",marginBottom:"4px"}},s.session),
       (s.warmup||s.cooldown)?el("div",{style:{display:"flex",gap:"12px",marginBottom:"6px",flexWrap:"wrap"}},
-        s.warmup?el("div",{class:"muted",style:{fontSize:"11px"}},"▶ "+s.warmup):null,
-        s.cooldown?el("div",{class:"muted",style:{fontSize:"11px"}},"◀ "+s.cooldown):null
+        s.warmup?el("div",{class:"muted",style:{fontSize:"12px"}},"▶ "+s.warmup):null,
+        s.cooldown?el("div",{class:"muted",style:{fontSize:"12px"}},"◀ "+s.cooldown):null
       ):null,
-      s.notes?el("div",{style:{color:"#60a5facc",fontSize:"12px",marginBottom:"8px",fontStyle:"italic"}},"💡 "+s.notes):null,
+      s.notes?el("div",{style:{color:"#60a5facc",fontSize:"13px",marginBottom:"8px",fontStyle:"italic"}},"💡 "+s.notes):null,
       stravaRun?el("div",{style:{background:"#fc4c0211",border:"1px solid #fc4c0233",borderRadius:"8px",padding:"8px 10px",marginBottom:"8px"}},
         el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}},
-          el("span",{class:"muted",style:{fontSize:"11px"}},
+          el("span",{class:"muted",style:{fontSize:"12px"}},
             (stravaRun.start_date_local||"").slice(11,16)+" · départ"
           ),
-          el("a",{href:"https://www.strava.com/activities/"+stravaRun.id_str,target:"_blank",style:{color:"#fc4c02",fontSize:"11px",fontWeight:"700",textDecoration:"none"}},"Voir sur Strava 🔗")
+          el("a",{href:"https://www.strava.com/activities/"+stravaRun.id_str,target:"_blank",style:{color:"#fc4c02",fontSize:"12px",fontWeight:"700",textDecoration:"none"}},"Voir sur Strava 🔗")
         ),
         el("div",{style:{display:"flex",gap:"16px",flexWrap:"wrap",marginBottom:effortLaps.length>0?"8px":"0"}},
-          el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"13px",fontWeight:"700"}},(stravaRun.distance/1000).toFixed(2)+"km"),el("div",{class:"muted",style:{fontSize:"12px"}},"distance")),
-          el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"13px",fontWeight:"700"}},fmtTime(stravaRun.moving_time)),el("div",{class:"muted",style:{fontSize:"12px"}},"durée")),
+          el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"14px",fontWeight:"700"}},(stravaRun.distance/1000).toFixed(2)+"km"),el("div",{class:"muted",style:{fontSize:"13px"}},"distance")),
+          el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"14px",fontWeight:"700"}},fmtTime(stravaRun.moving_time)),el("div",{class:"muted",style:{fontSize:"13px"}},"durée")),
           (()=>{
             // Si séance intensive avec laps d\'effort : afficher l\'allure/FC de l\'effort seul (hors échauffement/récup)
             const isIntensive = effortLaps.length > 0;
             const dispPace = isIntensive ? effortLaps.reduce((s,l)=>s+l.average_speed,0)/effortLaps.length : stravaRun.average_speed;
             const dispHr = isIntensive ? (effortLaps.filter(l=>l.average_heartrate).length ? effortLaps.filter(l=>l.average_heartrate).reduce((s,l)=>s+l.average_heartrate,0)/effortLaps.filter(l=>l.average_heartrate).length : null) : stravaRun.average_heartrate;
             const paceLabel = isIntensive ? "allure intervalles" : "allure moy.";
-            return el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"13px",fontWeight:"700"}},fmtPace(dispPace)+"/km"),el("div",{class:"muted",style:{fontSize:"12px"}},paceLabel));
+            return el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"14px",fontWeight:"700"}},fmtPace(dispPace)+"/km"),el("div",{class:"muted",style:{fontSize:"13px"}},paceLabel));
           })(),
           (()=>{
             const isIntensive = effortLaps.length > 0;
             const dispHr = isIntensive ? (effortLaps.filter(l=>l.average_heartrate).length ? effortLaps.filter(l=>l.average_heartrate).reduce((s,l)=>s+l.average_heartrate,0)/effortLaps.filter(l=>l.average_heartrate).length : null) : stravaRun.average_heartrate;
             const hrLabel = isIntensive ? "FC intervalles" : "FC moy.";
-            return dispHr ? el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"13px",fontWeight:"700"}},Math.round(dispHr)+" bpm"),el("div",{class:"muted",style:{fontSize:"12px"}},hrLabel)) : null;
+            return dispHr ? el("div",{},el("div",{style:{color:"#fc4c02",fontSize:"14px",fontWeight:"700"}},Math.round(dispHr)+" bpm"),el("div",{class:"muted",style:{fontSize:"13px"}},hrLabel)) : null;
           })(),
-          stravaRun.max_heartrate?el("div",{},el("div",{style:{color:"#ef4444",fontSize:"13px",fontWeight:"700"}},Math.round(stravaRun.max_heartrate)+" bpm"),el("div",{class:"muted",style:{fontSize:"12px"}},"FC max")):null
+          stravaRun.max_heartrate?el("div",{},el("div",{style:{color:"#ef4444",fontSize:"14px",fontWeight:"700"}},Math.round(stravaRun.max_heartrate)+" bpm"),el("div",{class:"muted",style:{fontSize:"13px"}},"FC max")):null
         ),
         (()=>{
           const isIntensiveFc = effortLaps.length > 0;
@@ -1895,27 +1895,27 @@ function renderWeekDetail(weekNum) {
           if (!FC_ZONES[s.type] || !fcDispHr) return null;
           return el("div",{style:{display:"flex",alignItems:"center",gap:"8px",padding:"6px 0",borderTop:"1px solid #fc4c0222",marginBottom:effortLaps.length>0?"8px":"0"}},
             el("span",{style:{fontSize:"14px"}},fcStatus(s.type,fcDispHr)||""),
-            el("span",{class:"muted",style:{fontSize:"11px"}},fcLabel+fcDispHr+" bpm · cible "+FC_ZONES[s.type].min+"–"+FC_ZONES[s.type].max+" bpm")
+            el("span",{class:"muted",style:{fontSize:"12px"}},fcLabel+fcDispHr+" bpm · cible "+FC_ZONES[s.type].min+"–"+FC_ZONES[s.type].max+" bpm")
           );
         })(),
         stravaRun&&stravaRun.start_latlng?.length===2&&s.date?
-          el("div",{style:{fontSize:"11px",color:"#e2e8f0",paddingTop:"4px",paddingBottom:"4px"}},
+          el("div",{style:{fontSize:"12px",color:"#e2e8f0",paddingTop:"4px",paddingBottom:"4px"}},
             historicalWeatherCache[s.date]!=null
               ? "🌡️ "+historicalWeatherCache[s.date]+"°C au départ"+(historicalWeatherCache[s.date]>28?" 🔥":"")
               : el("span",{style:{color:"#475569",fontStyle:"italic"}},"🌡️ Chargement météo...")
           ):null,
         effortLaps.length>0?el("div",{style:{borderTop:"1px solid #fc4c0222",paddingTop:"8px"}},
           el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}},
-            el("div",{class:"muted",style:{fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.5px"}},"Répétitions ("+effortLaps.length+")"),
+            el("div",{class:"muted",style:{fontSize:"13px",textTransform:"uppercase",letterSpacing:"0.5px"}},"Répétitions ("+effortLaps.length+")"),
             (()=>{
               const target = SESSION_TARGETS[s.type];
               if (!target) return null;
               const inTarget = effortLaps.filter(l=>(1000/l.average_speed)<=target.okPace).length;
               const color = inTarget===effortLaps.length?"#22c55e":inTarget>0?"#eab308":"#ef4444";
-              return el("span",{style:{color,fontSize:"11px",fontWeight:"700"}},inTarget+"/"+effortLaps.length+" dans la cible");
+              return el("span",{style:{color,fontSize:"12px",fontWeight:"700"}},inTarget+"/"+effortLaps.length+" dans la cible");
             })()
           ),
-          el("div",{class:"muted",style:{fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"6px"}},
+          el("div",{class:"muted",style:{fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"6px"}},
             SESSION_TARGETS[s.type] ? "cible "+SESSION_TARGETS[s.type].effort+" "+SESSION_TARGETS[s.type].tolerance : ""
           ),
           ...effortLaps.map((lap,i)=>renderLapRow(lap,i,s.type))
@@ -1926,7 +1926,7 @@ function renderWeekDetail(weekNum) {
     if (s.type==="RACE") {
       card.appendChild(el("div",{style:{background:"#f9731622",border:"1px solid #f9731644",borderRadius:"8px",padding:"10px 12px",marginTop:"4px"}},
         el("div",{style:{color:"#f97316",fontWeight:"700",fontSize:"14px"}},"🏁 Jour J — Objectif 48\'30\""),
-        el("div",{class:"text2",style:{fontSize:"12px",marginTop:"4px"}},"Km 1-3 : prudent · Km 4-7 : contrôle · Km 8-10 : tout donner !")
+        el("div",{class:"text2",style:{fontSize:"13px",marginTop:"4px"}},"Km 1-3 : prudent · Km 4-7 : contrôle · Km 8-10 : tout donner !")
       ));
     } else if (s.type!=="REPOS") {
       // Raison du statut ❌ ou ⚠️
@@ -1937,25 +1937,25 @@ function renderWeekDetail(weekNum) {
           border: `1px solid ${statuses[uid]==="❌" ? "#ef444433" : "#eab30833"}`,
           borderRadius:"6px", padding:"6px 10px", marginTop:"4px", marginBottom:"4px",
           color: statuses[uid]==="❌" ? "#ef4444" : "#eab308",
-          fontSize:"11px"
+          fontSize:"12px"
         }}, (statuses[uid]==="❌"?"❌ ":"⚠️ ")+reason));
       }
       const statusRow=el("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap",marginTop:"4px"}});
       SOPTS.forEach(opt=>{
         const cur=statuses[uid]||"—";
-        const b=el("button",{style:{background:cur===opt?SCOLORS[opt]+"33":"#232738",border:`1px solid ${cur===opt?SCOLORS[opt]:"#2e3347"}`,borderRadius:"6px",padding:"5px 10px",cursor:"pointer",color:cur===opt?SCOLORS[opt]:"#475569",fontSize:"13px",fontWeight:cur===opt?"700":"400"}},opt==="—"?"–":opt);
+        const b=el("button",{style:{background:cur===opt?SCOLORS[opt]+"33":"#232738",border:`1px solid ${cur===opt?SCOLORS[opt]:"#2e3347"}`,borderRadius:"6px",padding:"5px 10px",cursor:"pointer",color:cur===opt?SCOLORS[opt]:"#475569",fontSize:"14px",fontWeight:cur===opt?"700":"400"}},opt==="—"?"–":opt);
         b.addEventListener("click",()=>{ statuses[uid]=opt; save("lk_statuses",statuses); gistSave(true); render(); });
         statusRow.appendChild(b);
       });
       card.appendChild(statusRow);
-      const noteInput=el("input",{type:"text",placeholder:"💬 Note sur cette séance...",style:{marginTop:"8px",background:"#0f1117",border:"1px solid #2e3347",borderRadius:"8px",padding:"7px 10px",color:"#f1f5f9",fontSize:"12px",outline:"none",width:"100%"}});
+      const noteInput=el("input",{type:"text",placeholder:"💬 Note sur cette séance...",style:{marginTop:"8px",background:"#0f1117",border:"1px solid #2e3347",borderRadius:"8px",padding:"7px 10px",color:"#f1f5f9",fontSize:"13px",outline:"none",width:"100%"}});
       noteInput.value=sessionNotes[uid]||"";
       noteInput.addEventListener("change",()=>{
         if(noteInput.value.trim()){sessionNotes[uid]=noteInput.value.trim();}
         else{delete sessionNotes[uid];}
         save("lk_session_notes",sessionNotes); scheduleSave();
       });
-      if(sessionNotes[uid]){card.appendChild(el("div",{style:{color:"#e2e8f0",fontSize:"12px",fontStyle:"italic",marginTop:"4px"}},"💬 "+sessionNotes[uid]));}
+      if(sessionNotes[uid]){card.appendChild(el("div",{style:{color:"#e2e8f0",fontSize:"13px",fontStyle:"italic",marginTop:"4px"}},"💬 "+sessionNotes[uid]));}
       card.appendChild(noteInput);
     }
 
@@ -1974,11 +1974,11 @@ function renderWeekDetail(weekNum) {
           ? (summaryHrVals.length ? summaryHrVals.reduce((s,l)=>s+l.average_heartrate,0)/summaryHrVals.length : null)
           : stravaRun.average_heartrate;
         const summaryRow = el("div",{style:{display:"flex",alignItems:"center",gap:"14px",paddingTop:"6px",borderTop:"1px solid #2e334766"}},
-          el("span",{style:{color:"#f97316",fontSize:"12px",fontWeight:"700"}},(stravaRun.distance/1000).toFixed(1)+" km"),
-          el("span",{style:{color:"#f97316",fontSize:"12px",fontWeight:"700"}},fmtPace(summaryPace)+"/km"),
-          summaryHr?el("span",{style:{color:"#f97316",fontSize:"12px",fontWeight:"700"}},Math.round(summaryHr)+" bpm"):null,
+          el("span",{style:{color:"#f97316",fontSize:"13px",fontWeight:"700"}},(stravaRun.distance/1000).toFixed(1)+" km"),
+          el("span",{style:{color:"#f97316",fontSize:"13px",fontWeight:"700"}},fmtPace(summaryPace)+"/km"),
+          summaryHr?el("span",{style:{color:"#f97316",fontSize:"13px",fontWeight:"700"}},Math.round(summaryHr)+" bpm"):null,
           el("div",{style:{flex:"1"}}),
-          el("span",{class:"muted",style:{fontSize:"11px"}},"détails ›")
+          el("span",{class:"muted",style:{fontSize:"12px"}},"détails ›")
         );
         summaryRow.dataset.summaryRow = "1";
         card.appendChild(summaryRow);
@@ -2002,13 +2002,13 @@ function renderWeekDetail(weekNum) {
   return el("div",{style:{padding:"0 16px 100px"}},
     el("div",{style:{display:"flex",alignItems:"center",gap:"12px",marginTop:"8px",marginBottom:"16px"}},
       el("div",{style:{flex:"1"}},
-        el("div",{class:"muted",style:{fontSize:"11px",textTransform:"uppercase",letterSpacing:"1px"}},phaseOf(weekNum).label),
+        el("div",{class:"muted",style:{fontSize:"12px",textTransform:"uppercase",letterSpacing:"1px"}},phaseOf(weekNum).label),
         el("div",{style:{color:"#f1f5f9",fontSize:"20px",fontWeight:"800"}},"Semaine "+weekNum),
-        el("div",{class:"muted",style:{fontSize:"12px"}},fmtDate(week.sessions[0].date)+" – "+fmtDate(week.sessions[6].date))
+        el("div",{class:"muted",style:{fontSize:"13px"}},fmtDate(week.sessions[0].date)+" – "+fmtDate(week.sessions[6].date))
       ),
       weekRuns.length>0?el("div",{style:{background:"#fc4c0111",border:"1px solid #fc4c0133",borderRadius:"8px",padding:"6px 10px",textAlign:"center"}},
         el("div",{style:{color:"#fc4c02",fontSize:"14px",fontWeight:"700"}},weekRuns.length+""),
-        el("div",{class:"muted",style:{fontSize:"12px"}},"Strava")
+        el("div",{class:"muted",style:{fontSize:"13px"}},"Strava")
       ):null
     ),
     ...cards
@@ -2026,7 +2026,7 @@ function renderStats() {
   let graphEl = null;
   if (isRebuilding) {
     graphEl = el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"16px",marginBottom:"16px",textAlign:"center"}},
-      el("div",{class:"muted",style:{fontSize:"12px",fontStyle:"italic"}},"⏳ Recalcul de l\'historique...")
+      el("div",{class:"muted",style:{fontSize:"13px",fontStyle:"italic"}},"⏳ Recalcul de l\'historique...")
     );
   } else if (predHistory.length >= 2) {
     const TARGET = 48.5*60, BASE = 3021;
@@ -2141,13 +2141,13 @@ function renderStats() {
       el("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}},
         ...riegelProjections(pred.time).map(p=>
           el("div",{style:{background:p.target?"#f9731622":"#232738",border:p.target?"1px solid #f9731644":"none",borderRadius:"8px",padding:"10px 12px"}},
-            el("div",{style:{color:p.target?"#f97316":"#e2e8f0",fontSize:"11px",marginBottom:"4px"}},p.label+(p.target?" 🎯":"")),
+            el("div",{style:{color:p.target?"#f97316":"#e2e8f0",fontSize:"12px",marginBottom:"4px"}},p.label+(p.target?" 🎯":"")),
             el("div",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"700"}},p.timeStr),
-            el("div",{class:"muted",style:{fontSize:"11px"}},p.paceStr)
+            el("div",{class:"muted",style:{fontSize:"12px"}},p.paceStr)
           )
         )
       ),
-      el("div",{class:"muted",style:{fontSize:"10px",marginTop:"10px",fontStyle:"italic"}},"📊 "+pred.method)
+      el("div",{class:"muted",style:{fontSize:"11px",marginTop:"10px",fontStyle:"italic"}},"📊 "+pred.method)
     )
   );
 
@@ -2285,12 +2285,12 @@ function renderStats() {
       ...paceRows.map((r,i)=>el("div",{style:{padding:"10px 14px",borderBottom:i<paceRows.length-1?"1px solid #2e3347":"none",display:"flex",alignItems:"center",gap:"12px"}},
         el("div",{style:{width:"4px",height:"32px",borderRadius:"2px",background:r.color,flexShrink:"0"}}),
         el("div",{style:{flex:"1"}},
-          el("div",{style:{color:"#f1f5f9",fontSize:"12px",fontWeight:"600",marginBottom:"2px"}},r.label),
-          el("div",{class:"muted",style:{fontSize:"11px"}},r.heat?"Chaud : "+r.heat:SESSION_TARGETS[r.type]?"Tolérance "+SESSION_TARGETS[r.type].tolerance:"—")
+          el("div",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"600",marginBottom:"2px"}},r.label),
+          el("div",{class:"muted",style:{fontSize:"12px"}},r.heat?"Chaud : "+r.heat:SESSION_TARGETS[r.type]?"Tolérance "+SESSION_TARGETS[r.type].tolerance:"—")
         ),
         el("div",{style:{textAlign:"right"}},
-          el("div",{style:{color:r.color,fontSize:"13px",fontWeight:"700"}},r.pace+"/km"),
-          el("div",{class:"muted",style:{fontSize:"11px"}},r.fc+" bpm")
+          el("div",{style:{color:r.color,fontSize:"14px",fontWeight:"700"}},r.pace+"/km"),
+          el("div",{class:"muted",style:{fontSize:"12px"}},r.fc+" bpm")
         )
       ))
     )
@@ -2329,25 +2329,25 @@ function renderStats() {
       el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"14px"}},
         el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}},
           el("div",{},
-            el("div",{class:"muted",style:{fontSize:"11px",marginBottom:"2px"}},"Projection"),
+            el("div",{class:"muted",style:{fontSize:"12px",marginBottom:"2px"}},"Projection"),
             el("div",{style:{color:"#f1f5f9",fontSize:"22px",fontWeight:"800",letterSpacing:"-0.5px"}},projLow+" – "+projHigh)
           ),
           el("div",{style:{textAlign:"right"}},
-            el("div",{class:"muted",style:{fontSize:"10px",marginBottom:"4px"}},"Fiabilité"),
+            el("div",{class:"muted",style:{fontSize:"11px",marginBottom:"4px"}},"Fiabilité"),
             el("div",{style:{
               color:daySpan>=21?"#22c55e":daySpan>=14?"#eab308":"#e2e8f0",
-              fontSize:"12px",fontWeight:"700"
+              fontSize:"13px",fontWeight:"700"
             }},daySpan>=21?"Bonne":"Faible — peu de données")
           )
         ),
         hasVerdict ? el("div",{style:{display:"flex",justifyContent:"space-between",paddingTop:"8px",borderTop:"1px solid #2e3347"}},
-          el("span",{class:"muted",style:{fontSize:"11px"}},"vs objectif "+fmtTime(raceGoalTime)),
+          el("span",{class:"muted",style:{fontSize:"12px"}},"vs objectif "+fmtTime(raceGoalTime)),
           el("span",{style:{
             color:projectedTime<=raceGoalTime?"#22c55e":projectedTime<=raceGoalTime+30?"#eab308":"#ef4444",
-            fontSize:"12px",fontWeight:"700"
+            fontSize:"13px",fontWeight:"700"
           }},projectedTime<=raceGoalTime?"✅ Atteignable !":projectedTime<=raceGoalTime+30?"⚠️ Serré":"❌ À risque")
         ) : el("div",{style:{paddingTop:"8px",borderTop:"1px solid #2e3347"}},
-          el("span",{class:"muted",style:{fontSize:"11px",fontStyle:"italic"}},"Verdict disponible à partir de 3 semaines de données")
+          el("span",{class:"muted",style:{fontSize:"12px",fontStyle:"italic"}},"Verdict disponible à partir de 3 semaines de données")
         )
       )
     );
@@ -2366,15 +2366,15 @@ function renderStats() {
         ["FC max",runnerFcMax+" bpm","#f1f5f9"],
         ["Km courus",Math.round(stravaActivities.reduce((s,a)=>s+a.distance,0)/100)/10+" km","#22c55e"],
       ].map(([label,val,color])=>el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"6px"}},
-        el("span",{class:"muted",style:{fontSize:"12px"}},label),
-        el("span",{style:{color,fontSize:"12px",fontWeight:color==="#f1f5f9"?"400":"700"}},val)
+        el("span",{class:"muted",style:{fontSize:"13px"}},label),
+        el("span",{style:{color,fontSize:"13px",fontWeight:color==="#f1f5f9"?"400":"700"}},val)
       ))
     )
   );
 
   return el("div",{style:{padding:"0 16px 100px"}},
     el("div",{style:{marginTop:"8px"}}),
-    graphEl||el("div",{class:"muted",style:{textAlign:"center",padding:"24px 0",fontSize:"12px",fontStyle:"italic"}},"📊 Le graphique apparaîtra après quelques jours de données"),
+    graphEl||el("div",{class:"muted",style:{textAlign:"center",padding:"24px 0",fontSize:"13px",fontStyle:"italic"}},"📊 Le graphique apparaîtra après quelques jours de données"),
     progressionEl,
     ieCurveEl,
     cadCurveEl,
@@ -2395,23 +2395,23 @@ function renderCourse() {
       runByLeaIcon(52, 12),
       el("div",{},
         el("div",{style:{color:"#f97316",fontSize:"17px",fontWeight:"800",marginBottom:"2px"}},"🏁 "+RACE_NAME),
-        el("div",{class:"muted",style:{fontSize:"12px",marginBottom:"2px"}},new Date("2026-09-06T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})+" · "+RACE_LOCATION),
-        el("div",{style:{color:"#475569",fontSize:"11px"}},"Run by Léa")
+        el("div",{class:"muted",style:{fontSize:"13px",marginBottom:"2px"}},new Date("2026-09-06T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})+" · "+RACE_LOCATION),
+        el("div",{style:{color:"#475569",fontSize:"12px"}},"Run by Léa")
       )
     ),
-    el("a",{href:RACE_URL,target:"_blank",style:{display:"block",background:"#f9731622",border:"1px solid #f9731644",borderRadius:"8px",padding:"10px 14px",color:"#f97316",fontSize:"13px",fontWeight:"700",textDecoration:"none",textAlign:"center",marginBottom:"12px"}},"🔗 Organisateur"),
+    el("a",{href:RACE_URL,target:"_blank",style:{display:"block",background:"#f9731622",border:"1px solid #f9731644",borderRadius:"8px",padding:"10px 14px",color:"#f97316",fontSize:"14px",fontWeight:"700",textDecoration:"none",textAlign:"center",marginBottom:"12px"}},"🔗 Organisateur"),
     el("div",{style:{display:"flex",gap:"8px"}},
       el("div",{style:{flex:"1",background:"#232738",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
         el("div",{style:{color:"#f97316",fontSize:"14px",fontWeight:"700"}},fmtTime(raceGoalTime)),
-        el("div",{class:"muted",style:{fontSize:"10px"}},"Objectif")
+        el("div",{class:"muted",style:{fontSize:"11px"}},"Objectif")
       ),
       el("div",{style:{flex:"1",background:"#232738",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
         el("div",{style:{color:"#f97316",fontSize:"14px",fontWeight:"700"}},"J–"+cd),
-        el("div",{class:"muted",style:{fontSize:"10px"}},"Avant la course")
+        el("div",{class:"muted",style:{fontSize:"11px"}},"Avant la course")
       ),
       el("div",{style:{flex:"1",background:"#232738",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
         el("div",{style:{color:"#f97316",fontSize:"14px",fontWeight:"700"}},fmtPace(10000/raceGoalTime)+"/km"),
-        el("div",{class:"muted",style:{fontSize:"10px"}},"Allure cible")
+        el("div",{class:"muted",style:{fontSize:"11px"}},"Allure cible")
       )
     )
   );
@@ -2420,7 +2420,7 @@ function renderCourse() {
     el("div",{class:"label"},"⏰ Horaires"),
     el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",display:"flex",flexDirection:"column",gap:"10px"}},
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
-        el("span",{class:"muted",style:{fontSize:"13px"}},"Retrait dossards"),
+        el("span",{class:"muted",style:{fontSize:"14px"}},"Retrait dossards"),
         (()=>{
           const inp = document.createElement("input");
           inp.type = "text"; inp.placeholder = "ex. 7h00"; inp.id = "horaire-dossard-input";
@@ -2431,7 +2431,7 @@ function renderCourse() {
         })()
       ),
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
-        el("span",{class:"muted",style:{fontSize:"13px"}},"Départ course"),
+        el("span",{class:"muted",style:{fontSize:"14px"}},"Départ course"),
         (()=>{
           const inp = document.createElement("input");
           inp.type = "text"; inp.placeholder = "ex. 9h30"; inp.id = "horaire-depart-input";
@@ -2464,8 +2464,8 @@ function renderCourse() {
             background:checked?"#f97316":"#232738",
             border:checked?"1px solid #f97316":"1px solid #2e3347",
             display:"flex",alignItems:"center",justifyContent:"center"
-          }}, checked?el("span",{style:{color:"#fff",fontSize:"12px",fontWeight:"700"}},"✓"):null),
-          el("span",{style:{color:checked?"#e2e8f0":"#f1f5f9",fontSize:"13px",textDecoration:checked?"line-through":"none"}},item.label)
+          }}, checked?el("span",{style:{color:"#fff",fontSize:"13px",fontWeight:"700"}},"✓"):null),
+          el("span",{style:{color:checked?"#e2e8f0":"#f1f5f9",fontSize:"14px",textDecoration:checked?"line-through":"none"}},item.label)
         );
         row.addEventListener("click",()=>{
           checklistItems[item.key]=!checked;
@@ -2481,16 +2481,16 @@ function renderCourse() {
     el("div",{class:"label"},"📋 Stratégie de course"),
     el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",display:"flex",flexDirection:"column",gap:"10px"}},
       el("div",{style:{display:"flex",gap:"12px",alignItems:"center"}},
-        el("div",{style:{background:"#60a5fa22",border:"1px solid #60a5fa44",borderRadius:"6px",padding:"4px 8px",color:"#60a5fa",fontSize:"11px",fontWeight:"700",whiteSpace:"nowrap"}},"Km 1–3"),
-        el("span",{class:"muted",style:{fontSize:"12px"}},"Prudent · 4:55–5:00/km · laisser partir")
+        el("div",{style:{background:"#60a5fa22",border:"1px solid #60a5fa44",borderRadius:"6px",padding:"4px 8px",color:"#60a5fa",fontSize:"12px",fontWeight:"700",whiteSpace:"nowrap"}},"Km 1–3"),
+        el("span",{class:"muted",style:{fontSize:"13px"}},"Prudent · 4:55–5:00/km · laisser partir")
       ),
       el("div",{style:{display:"flex",gap:"12px",alignItems:"center"}},
-        el("div",{style:{background:"#f9731622",border:"1px solid #f9731644",borderRadius:"6px",padding:"4px 8px",color:"#f97316",fontSize:"11px",fontWeight:"700",whiteSpace:"nowrap"}},"Km 4–7"),
-        el("span",{class:"muted",style:{fontSize:"12px"}},"Allure cible · 4:51/km · contrôle")
+        el("div",{style:{background:"#f9731622",border:"1px solid #f9731644",borderRadius:"6px",padding:"4px 8px",color:"#f97316",fontSize:"12px",fontWeight:"700",whiteSpace:"nowrap"}},"Km 4–7"),
+        el("span",{class:"muted",style:{fontSize:"13px"}},"Allure cible · 4:51/km · contrôle")
       ),
       el("div",{style:{display:"flex",gap:"12px",alignItems:"center"}},
-        el("div",{style:{background:"#22c55e22",border:"1px solid #22c55e44",borderRadius:"6px",padding:"4px 8px",color:"#22c55e",fontSize:"11px",fontWeight:"700",whiteSpace:"nowrap"}},"Km 8–10"),
-        el("span",{class:"muted",style:{fontSize:"12px"}},"Tout donner · accélération finale")
+        el("div",{style:{background:"#22c55e22",border:"1px solid #22c55e44",borderRadius:"6px",padding:"4px 8px",color:"#22c55e",fontSize:"12px",fontWeight:"700",whiteSpace:"nowrap"}},"Km 8–10"),
+        el("span",{class:"muted",style:{fontSize:"13px"}},"Tout donner · accélération finale")
       )
     )
   );
@@ -2506,7 +2506,7 @@ function renderCourse() {
         inp.addEventListener("input", (e)=>{ raceParcoursUrl=e.target.value; save("lk_race_parcours",raceParcoursUrl); scheduleSave(); });
         return inp;
       })(),
-      raceParcoursUrl?el("a",{href:raceParcoursUrl,target:"_blank",style:{display:"block",marginTop:"8px",color:"#60a5fa",fontSize:"12px"}},"→ Voir le parcours"):null
+      raceParcoursUrl?el("a",{href:raceParcoursUrl,target:"_blank",style:{display:"block",marginTop:"8px",color:"#60a5fa",fontSize:"13px"}},"→ Voir le parcours"):null
     )
   );
 
@@ -2519,14 +2519,14 @@ function renderCourse() {
     meteoRaceEl = el("div",{style:{marginBottom:"16px"}},
       el("div",{class:"label"},"🌡️ Météo prévue le 6 septembre"),
       el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",textAlign:"center"}},
-        el("div",{class:"muted",style:{fontSize:"12px",fontStyle:"italic"}},"Disponible dans les 16 jours avant la course")
+        el("div",{class:"muted",style:{fontSize:"13px",fontStyle:"italic"}},"Disponible dans les 16 jours avant la course")
       )
     );
   } else {
     meteoRaceEl = el("div",{style:{marginBottom:"16px"}},
       el("div",{class:"label"},"🌡️ Météo prévue le 6 septembre"),
       el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",textAlign:"center"}},
-        el("div",{class:"muted",style:{fontSize:"12px",fontStyle:"italic"}},"Disponible à partir du 21 août · J–"+daysToRace+" actuellement")
+        el("div",{class:"muted",style:{fontSize:"13px",fontStyle:"italic"}},"Disponible à partir du 21 août · J–"+daysToRace+" actuellement")
       )
     );
   }
@@ -2556,10 +2556,10 @@ function renderCourse() {
     el("div",{class:"label"},"🏃 Allures de passage"),
     el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",overflow:"hidden"}},
       el("div",{style:{display:"grid",gridTemplateColumns:"40px 1fr 70px 70px",gap:"0",padding:"8px 12px",borderBottom:"1px solid #2e3347"}},
-        el("span",{class:"muted",style:{fontSize:"10px",fontWeight:"700"}},"KM"),
-        el("span",{class:"muted",style:{fontSize:"10px",fontWeight:"700"}},"STRATÉGIE"),
-        el("span",{class:"muted",style:{fontSize:"10px",fontWeight:"700",textAlign:"right"}},"ALLURE"),
-        el("span",{class:"muted",style:{fontSize:"10px",fontWeight:"700",textAlign:"right"}},"PASSAGE")
+        el("span",{class:"muted",style:{fontSize:"11px",fontWeight:"700"}},"KM"),
+        el("span",{class:"muted",style:{fontSize:"11px",fontWeight:"700"}},"STRATÉGIE"),
+        el("span",{class:"muted",style:{fontSize:"11px",fontWeight:"700",textAlign:"right"}},"ALLURE"),
+        el("span",{class:"muted",style:{fontSize:"11px",fontWeight:"700",textAlign:"right"}},"PASSAGE")
       ),
       ...splits.map((s,i)=>{
         const effectivePace = s.pace || paceSecKm;
@@ -2568,9 +2568,9 @@ function renderCourse() {
         const color = i===0||i===1?"#60a5fa":i===2||i===3?"#f97316":"#22c55e";
         return el("div",{style:{display:"grid",gridTemplateColumns:"40px 1fr 70px 70px",gap:"0",padding:"10px 12px",borderBottom:i<splits.length-1?"1px solid #2e3347":"none",alignItems:"center"}},
           el("span",{style:{color,fontSize:"14px",fontWeight:"800"}},""+s.km),
-          el("span",{class:"muted",style:{fontSize:"12px"}},s.note),
-          el("span",{style:{color:"#f1f5f9",fontSize:"12px",fontWeight:"600",textAlign:"right"}},paceStr),
-          el("span",{style:{color,fontSize:"12px",fontWeight:"700",textAlign:"right"}},passageStr)
+          el("span",{class:"muted",style:{fontSize:"13px"}},s.note),
+          el("span",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"600",textAlign:"right"}},paceStr),
+          el("span",{style:{color,fontSize:"13px",fontWeight:"700",textAlign:"right"}},passageStr)
         );
       })
     )
@@ -2607,7 +2607,7 @@ function renderHelp() {
       el("span",{style:{fontSize:"16px"}},s.icon),
       el("span",{style:{color:s.color,fontSize:"14px",fontWeight:"700"}},s.title)
     ),
-    el("div",{class:"muted",style:{fontSize:"12px",lineHeight:"1.6",paddingLeft:"24px"}},s.text)
+    el("div",{class:"muted",style:{fontSize:"13px",lineHeight:"1.6",paddingLeft:"24px"}},s.text)
   ));
 
   const faqItems = [
@@ -2622,8 +2622,8 @@ function renderHelp() {
   ];
 
   const faqCards = faqItems.map(f => el("div",{style:{marginBottom:"12px",paddingBottom:"12px",borderBottom:"1px solid #2e3347"}},
-    el("div",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"600",marginBottom:"4px"}},f.q),
-    el("div",{class:"muted",style:{fontSize:"12px",lineHeight:"1.6"}},f.a)
+    el("div",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"600",marginBottom:"4px"}},f.q),
+    el("div",{class:"muted",style:{fontSize:"13px",lineHeight:"1.6"}},f.a)
   ));
 
   return el("div",{style:{padding:"0 16px 100px"}},
@@ -2641,10 +2641,10 @@ function renderSettings() {
     el("div",{class:"label"},"☁️ Sauvegarde cloud"),
     !githubToken
       ? card(
-          el("div",{class:"muted",style:{fontSize:"12px",marginBottom:"10px",lineHeight:"1.6"}},"Scanne le QR code depuis un appareil configuré, ou entre ton token GitHub."),
+          el("div",{class:"muted",style:{fontSize:"13px",marginBottom:"10px",lineHeight:"1.6"}},"Scanne le QR code depuis un appareil configuré, ou entre ton token GitHub."),
           el("div",{style:{display:"flex",gap:"8px"}},
-            el("input",{type:"password",placeholder:"ghp_...",id:"github-token-input",style:{flex:"1",background:"#232738",border:"1px solid #2e3347",borderRadius:"8px",padding:"8px",color:"#f1f5f9",fontSize:"13px"}}),
-            el("button",{style:{background:"#60a5fa22",border:"1px solid #60a5fa55",borderRadius:"8px",padding:"8px 14px",color:"#60a5fa",fontWeight:"700",fontSize:"13px",cursor:"pointer"},
+            el("input",{type:"password",placeholder:"ghp_...",id:"github-token-input",style:{flex:"1",background:"#232738",border:"1px solid #2e3347",borderRadius:"8px",padding:"8px",color:"#f1f5f9",fontSize:"14px"}}),
+            el("button",{style:{background:"#60a5fa22",border:"1px solid #60a5fa55",borderRadius:"8px",padding:"8px 14px",color:"#60a5fa",fontWeight:"700",fontSize:"14px",cursor:"pointer"},
               onClick:()=>{ const t=document.getElementById("github-token-input").value.trim(); if(t){githubToken=t;save("lk_github_token",t);render();} }
             },"OK")
           )
@@ -2653,13 +2653,13 @@ function renderSettings() {
           el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
             el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
               el("div",{style:{width:"8px",height:"8px",borderRadius:"50%",background:"#22c55e",flexShrink:"0"}}),
-              el("div",{style:{color:"#22c55e",fontSize:"13px",fontWeight:"600"}},"Sync automatique activée")
+              el("div",{style:{color:"#22c55e",fontSize:"14px",fontWeight:"600"}},"Sync automatique activée")
             ),
-            el("button",{style:{background:"none",border:"none",color:"#64748b",fontSize:"11px",cursor:"pointer"},
+            el("button",{style:{background:"none",border:"none",color:"#64748b",fontSize:"12px",cursor:"pointer"},
               onClick:()=>{ githubToken="";gistId="";save("lk_github_token","");save("lk_gist_id","");render(); }
             },"Déconnecter")
           ),
-          gistMsg?el("div",{style:{fontSize:"12px",color:gistMsg.startsWith("✅")||gistMsg.startsWith("☁️")?"#22c55e":"#ef4444",marginTop:"8px",padding:"6px 10px",background:"#232738",borderRadius:"6px"}},gistMsg):null
+          gistMsg?el("div",{style:{fontSize:"13px",color:gistMsg.startsWith("✅")||gistMsg.startsWith("☁️")?"#22c55e":"#ef4444",marginTop:"8px",padding:"6px 10px",background:"#232738",borderRadius:"6px"}},gistMsg):null
         )
   );
 
@@ -2668,37 +2668,37 @@ function renderSettings() {
     el("div",{class:"label"},"👤 Profil & objectif"),
     el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",display:"flex",flexDirection:"column",gap:"12px"}},
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
-        el("span",{class:"muted",style:{fontSize:"13px"}},"Poids"),
+        el("span",{class:"muted",style:{fontSize:"14px"}},"Poids"),
         el("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
-          el("input",{type:"number",id:"inp-poids",placeholder:"kg",style:{width:"60px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"4px 8px",color:"#f1f5f9",fontSize:"13px",textAlign:"right"},value:runnerWeight||""}),
-          el("span",{class:"muted",style:{fontSize:"12px"}},"kg")
+          el("input",{type:"number",id:"inp-poids",placeholder:"kg",style:{width:"60px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"4px 8px",color:"#f1f5f9",fontSize:"14px",textAlign:"right"},value:runnerWeight||""}),
+          el("span",{class:"muted",style:{fontSize:"13px"}},"kg")
         )
       ),
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
-        el("span",{class:"muted",style:{fontSize:"13px"}},"Taille"),
+        el("span",{class:"muted",style:{fontSize:"14px"}},"Taille"),
         el("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
-          el("input",{type:"number",id:"inp-taille",placeholder:"cm",style:{width:"60px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"4px 8px",color:"#f1f5f9",fontSize:"13px",textAlign:"right"},value:runnerHeight||""}),
-          el("span",{class:"muted",style:{fontSize:"12px"}},"cm")
+          el("input",{type:"number",id:"inp-taille",placeholder:"cm",style:{width:"60px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"4px 8px",color:"#f1f5f9",fontSize:"14px",textAlign:"right"},value:runnerHeight||""}),
+          el("span",{class:"muted",style:{fontSize:"13px"}},"cm")
         )
       ),
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
-        el("span",{class:"muted",style:{fontSize:"13px"}},"FC max"),
+        el("span",{class:"muted",style:{fontSize:"14px"}},"FC max"),
         el("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
-          el("input",{type:"number",id:"inp-fcmax",style:{width:"60px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"4px 8px",color:"#f1f5f9",fontSize:"13px",textAlign:"right"},value:runnerFcMax||181}),
-          el("span",{class:"muted",style:{fontSize:"12px"}},"bpm")
-        )
-      ),
-      el("div",{style:{height:"1px",background:"#2e3347"}}),
-      el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
-        el("span",{class:"muted",style:{fontSize:"13px"}},"Objectif"),
-        el("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
-          el("input",{type:"text",id:"inp-goal",placeholder:"48:30",style:{width:"70px",background:"#232738",border:"1px solid #f9731644",borderRadius:"6px",padding:"4px 8px",color:"#f97316",fontSize:"13px",fontWeight:"700",textAlign:"right"},value:Math.floor(raceGoalTime/60)+":"+(raceGoalTime%60).toString().padStart(2,"0")}),
-          el("span",{class:"muted",style:{fontSize:"12px"}},fmtPace(10000/raceGoalTime)+"/km")
+          el("input",{type:"number",id:"inp-fcmax",style:{width:"60px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"4px 8px",color:"#f1f5f9",fontSize:"14px",textAlign:"right"},value:runnerFcMax||181}),
+          el("span",{class:"muted",style:{fontSize:"13px"}},"bpm")
         )
       ),
       el("div",{style:{height:"1px",background:"#2e3347"}}),
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
-        el("span",{class:"muted",style:{fontSize:"13px"}},"PPS"),
+        el("span",{class:"muted",style:{fontSize:"14px"}},"Objectif"),
+        el("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
+          el("input",{type:"text",id:"inp-goal",placeholder:"48:30",style:{width:"70px",background:"#232738",border:"1px solid #f9731644",borderRadius:"6px",padding:"4px 8px",color:"#f97316",fontSize:"14px",fontWeight:"700",textAlign:"right"},value:Math.floor(raceGoalTime/60)+":"+(raceGoalTime%60).toString().padStart(2,"0")}),
+          el("span",{class:"muted",style:{fontSize:"13px"}},fmtPace(10000/raceGoalTime)+"/km")
+        )
+      ),
+      el("div",{style:{height:"1px",background:"#2e3347"}}),
+      el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
+        el("span",{class:"muted",style:{fontSize:"14px"}},"PPS"),
         (()=>{
           const inp = document.createElement("input");
           inp.type = "text"; inp.id = "pps-input"; inp.placeholder = "Code PPS...";
@@ -2716,21 +2716,21 @@ function renderSettings() {
       ?card(
           el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"12px"}},
             el("div",{style:{width:"8px",height:"8px",borderRadius:"50%",background:"#fc4c02",flexShrink:"0"}}),
-            el("div",{style:{color:"#fc4c02",fontSize:"13px",fontWeight:"600"}},"Connecté · "+stravaActivities.length+" activité"+(stravaActivities.length!==1?"s":""))
+            el("div",{style:{color:"#fc4c02",fontSize:"14px",fontWeight:"600"}},"Connecté · "+stravaActivities.length+" activité"+(stravaActivities.length!==1?"s":""))
           ),
-          syncMsg?el("div",{style:{fontSize:"12px",color:syncMsg.startsWith("✅")?"#22c55e":"#e2e8f0",marginBottom:"10px",padding:"8px 10px",background:"#232738",borderRadius:"8px"}},syncMsg):null,
+          syncMsg?el("div",{style:{fontSize:"13px",color:syncMsg.startsWith("✅")?"#22c55e":"#e2e8f0",marginBottom:"10px",padding:"8px 10px",background:"#232738",borderRadius:"8px"}},syncMsg):null,
           el("button",{
-            style:{width:"100%",background:syncing?"#1a1d27":"#fc4c0222",border:"1px solid #fc4c0255",borderRadius:"10px",padding:"11px",cursor:"pointer",color:"#fc4c02",fontWeight:"700",fontSize:"13px",marginBottom:"8px"},
+            style:{width:"100%",background:syncing?"#1a1d27":"#fc4c0222",border:"1px solid #fc4c0255",borderRadius:"10px",padding:"11px",cursor:"pointer",color:"#fc4c02",fontWeight:"700",fontSize:"14px",marginBottom:"8px"},
             onClick:()=>{ if(!syncing) syncStrava(); }
           },syncing?"⏳ "+syncMsg:"🔄 Synchroniser avec Strava"),
           el("div",{style:{marginTop:"12px",paddingTop:"12px",borderTop:"1px solid #2e3347",display:"flex",flexDirection:"column",gap:"8px"}},
-            el("button",{style:{background:"#60a5fa11",border:"1px solid #60a5fa33",borderRadius:"8px",padding:"8px",color:"#60a5fa",fontSize:"12px",cursor:"pointer",fontWeight:"600"},
+            el("button",{style:{background:"#60a5fa11",border:"1px solid #60a5fa33",borderRadius:"8px",padding:"8px",color:"#60a5fa",fontSize:"13px",cursor:"pointer",fontWeight:"600"},
               onClick:()=>{ localStorage.removeItem("lk_strava_activities"); localStorage.removeItem("lk_last_sync"); stravaActivities=[]; lastSyncTime=0; syncStrava(); }
             },"🗑️ Vider cache & forcer synchro complète"),
-            el("button",{style:{background:"#a855f711",border:"1px solid #a855f733",borderRadius:"8px",padding:"8px",color:"#a855f7",fontSize:"12px",cursor:"pointer",fontWeight:"600"},
+            el("button",{style:{background:"#a855f711",border:"1px solid #a855f733",borderRadius:"8px",padding:"8px",color:"#a855f7",fontSize:"13px",cursor:"pointer",fontWeight:"600"},
               onClick:()=>{ localStorage.removeItem("lk_pred_history"); predHistory=[]; rebuildPredHistory(); render(); }
             },"🔄 Forcer recalcul de l\'historique"+(lastRebuildDate?" · dernier : "+lastRebuildDate:"")),
-            el("button",{style:{background:"none",border:"none",color:"#e2e8f0",fontSize:"12px",cursor:"pointer",padding:"0"},
+            el("button",{style:{background:"none",border:"none",color:"#e2e8f0",fontSize:"13px",cursor:"pointer",padding:"0"},
               onClick:()=>{ stravaToken=null;stravaRefresh=null;stravaExpires=0;stravaActivities=[];save("lk_strava_token",null);save("lk_strava_refresh",null);save("lk_strava_expires",0);save("lk_strava_activities",[]);render(); }
             },"🔓 Déconnecter Strava")
           )
@@ -2852,11 +2852,11 @@ function renderSettings() {
     function buildBloc(v, isLast) {
       return el("div",{style:{padding:"10px",background:v.current?"#f9731622":"transparent",border:v.current?"1px solid #f9731633":"none",borderRadius:"8px",marginBottom:isLast?"0":"8px"}},
         el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}},
-          el("span",{style:{color:v.current?"#f97316":"#e2e8f0",fontSize:"13px",fontWeight:"700"}},v.current?"🟠 "+v.ver:v.ver),
-          el("span",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"600"}},v.title),
-          v.current?el("span",{style:{background:"#f9731633",color:"#f97316",fontSize:"10px",fontWeight:"700",padding:"2px 6px",borderRadius:"10px"}},"actuelle"):null
+          el("span",{style:{color:v.current?"#f97316":"#e2e8f0",fontSize:"14px",fontWeight:"700"}},v.current?"🟠 "+v.ver:v.ver),
+          el("span",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"600"}},v.title),
+          v.current?el("span",{style:{background:"#f9731633",color:"#f97316",fontSize:"11px",fontWeight:"700",padding:"2px 6px",borderRadius:"10px"}},"actuelle"):null
         ),
-        ...v.notes.map(n=>el("div",{style:{color:"#e2e8f0",fontSize:"12px",marginTop:"3px"}},"• "+n))
+        ...v.notes.map(n=>el("div",{style:{color:"#e2e8f0",fontSize:"13px",marginTop:"3px"}},"• "+n))
       );
     }
 
@@ -2867,7 +2867,7 @@ function renderSettings() {
 
     const toggleBtn = el("button",{style:{
       width:"100%",background:"none",border:"1px solid #2e3347",borderRadius:"8px",
-      padding:"8px",color:"#e2e8f0",fontSize:"12px",cursor:"pointer",marginTop:"8px"
+      padding:"8px",color:"#e2e8f0",fontSize:"13px",cursor:"pointer",marginTop:"8px"
     }}, changelogExpanded ? "▲ Réduire" : "▼ Voir tout l\'historique ("+VERSIONS.length+" versions)");
     toggleBtn.addEventListener("click", () => {
       changelogExpanded = !changelogExpanded;
@@ -2889,7 +2889,7 @@ function renderSettings() {
   let advancedOpen = false;
   const advancedToggle = el("button",{style:{
     width:"100%",background:"none",border:"1px solid #2e3347",borderRadius:"8px",
-    padding:"10px",color:"#e2e8f0",fontSize:"12px",cursor:"pointer",marginBottom:"8px"
+    padding:"10px",color:"#e2e8f0",fontSize:"13px",cursor:"pointer",marginBottom:"8px"
   }}, "⚙️ Options avancées");
   const advancedContent = el("div",{style:{display:"none"}}, cloudSection, stravaSection);
   advancedToggle.addEventListener("click",()=>{
@@ -2902,9 +2902,9 @@ function renderSettings() {
   const qrSection = el("div",{style:{marginBottom:"16px"}},
     el("div",{class:"label"},"📱 Configurer sur un autre appareil"),
     card(
-      el("div",{class:"muted",style:{fontSize:"12px",marginBottom:"10px"}},"Scanne ce QR code depuis ton smartphone pour transférer la configuration automatiquement."),
+      el("div",{class:"muted",style:{fontSize:"13px",marginBottom:"10px"}},"Scanne ce QR code depuis ton smartphone pour transférer la configuration automatiquement."),
       el("div",{id:"qr-container",style:{display:"flex",justifyContent:"center",marginBottom:"10px"}}),
-      el("button",{style:{width:"100%",background:"#f9731611",border:"1px solid #f9731633",borderRadius:"8px",padding:"8px",color:"#f97316",fontSize:"12px",fontWeight:"700",cursor:"pointer"},
+      el("button",{style:{width:"100%",background:"#f9731611",border:"1px solid #f9731633",borderRadius:"8px",padding:"8px",color:"#f97316",fontSize:"13px",fontWeight:"700",cursor:"pointer"},
         onClick:()=>{
           const url = window.location.origin + "/?token=" + encodeURIComponent(githubToken) + "&gist=" + encodeURIComponent(gistId);
           const qrDiv = document.getElementById("qr-container");
@@ -2923,7 +2923,7 @@ function renderSettings() {
     runByLeaIcon(40, 10),
     el("div",{},
       el("div",{style:{color:"#f1f5f9",fontSize:"16px",fontWeight:"800"}},"Run by Léa"),
-      el("div",{class:"muted",style:{fontSize:"12px"}},"v1.8.15 · plan-10k-alpha.vercel.app")
+      el("div",{class:"muted",style:{fontSize:"13px"}},"v1.8.15 · plan-10k-alpha.vercel.app")
     )
   );
 
@@ -3308,7 +3308,7 @@ function svgCircle(pct, size, strokeW, color, inner) {
 
 function badge(type) {
   const st = STYPES[type]||STYPES.REPOS;
-  return el("span",{style:{background:st.color+"22",color:st.color,border:`1px solid ${st.color}44`,borderRadius:"4px",padding:"2px 7px",fontSize:"11px",fontWeight:"700"}},st.short||type);
+  return el("span",{style:{background:st.color+"22",color:st.color,border:`1px solid ${st.color}44`,borderRadius:"4px",padding:"2px 7px",fontSize:"12px",fontWeight:"700"}},st.short||type);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3354,9 +3354,9 @@ function render() {
     runByLeaIcon(24, 6),
     el("div",{style:{flex:"1"}},
       el("div",{style:{color:"#f1f5f9",fontSize:"17px",fontWeight:"700",lineHeight:"1"}},titles[view]||""),
-      view==="weekDetail"?el("div",{class:"muted",style:{fontSize:"11px",marginTop:"1px"}},phaseOf(selectedWeek).label):null
+      view==="weekDetail"?el("div",{class:"muted",style:{fontSize:"12px",marginTop:"1px"}},phaseOf(selectedWeek).label):null
     ),
-    el("div",{style:{background:"#232738",borderRadius:"8px",padding:"4px 10px",color:"#f97316",fontSize:"13px",fontWeight:"700"}},"J–"+countdown())
+    el("div",{style:{background:"#232738",borderRadius:"8px",padding:"4px 10px",color:"#f97316",fontSize:"14px",fontWeight:"700"}},"J–"+countdown())
   );
 
   // Calculer predict10K une seule fois — synchronise dashboard et graphique
@@ -3392,7 +3392,7 @@ function render() {
       );
       const b=el("button",{style:{flex:"1",background:"none",border:"none",cursor:"pointer",padding:"10px 0 14px",display:"flex",flexDirection:"column",alignItems:"center",gap:"3px",opacity:activeNav===n.id?"1":"0.45"}},
         iconWrap,
-        el("span",{style:{fontSize:"12px",fontWeight:"700",letterSpacing:"0.3px",color:activeNav===n.id?"#f97316":"#e2e8f0"}},n.label)
+        el("span",{style:{fontSize:"13px",fontWeight:"700",letterSpacing:"0.3px",color:activeNav===n.id?"#f97316":"#e2e8f0"}},n.label)
       );
       b.addEventListener("click",()=>{ if(n.id==="weeks") selectedWeek=currentWeek(); setView(n.id); });
       return b;
