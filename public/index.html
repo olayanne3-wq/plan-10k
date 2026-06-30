@@ -2299,7 +2299,12 @@ function renderStats() {
   // ── Prédiction de progression ────────────────────────────────────────────
   let progressionEl = null;
   // Prédiction de progression — modèle logarithmique avec fourchette
-  if (predHistory.length >= 3) {
+  const projOldest = predHistory[0]?.date;
+  const projNewest = predHistory[predHistory.length-1]?.date;
+  const projDaySpan = projOldest && projNewest
+    ? Math.round((new Date(projNewest) - new Date(projOldest)) / 86400000) : 0;
+
+  if (predHistory.length >= 3 && projDaySpan >= 21) {
     const currentTime = pred.time;
     const BASE_TIME_START = 3021; // 50'21" Lavandou
     const gainMax = BASE_TIME_START - raceGoalTime; // gain théorique max
@@ -2671,21 +2676,21 @@ function renderSettings() {
         el("span",{class:"muted",style:{fontSize:"15px"}},"Poids"),
         el("div",{style:{display:"flex",alignItems:"center",gap:"6px",width:"110px",justifyContent:"flex-end"}},
           el("input",{type:"number",id:"inp-poids",placeholder:"kg",style:{width:"72px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"5px 8px",color:"#f1f5f9",fontSize:"15px",textAlign:"right"},value:runnerWeight||""}),
-          el("span",{class:"muted",style:{fontSize:"14px",width:"36px",display:"inline-block"}},"kg")
+          el("span",{class:"muted",style:{fontSize:"14px",minWidth:"36px",display:"inline-block",textAlign:"left"}},"kg")
         )
       ),
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
         el("span",{class:"muted",style:{fontSize:"15px"}},"Taille"),
         el("div",{style:{display:"flex",alignItems:"center",gap:"6px",width:"110px",justifyContent:"flex-end"}},
           el("input",{type:"number",id:"inp-taille",placeholder:"cm",style:{width:"72px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"5px 8px",color:"#f1f5f9",fontSize:"15px",textAlign:"right"},value:runnerHeight||""}),
-          el("span",{class:"muted",style:{fontSize:"14px",width:"36px",display:"inline-block"}},"cm")
+          el("span",{class:"muted",style:{fontSize:"14px",minWidth:"36px",display:"inline-block",textAlign:"left"}},"cm")
         )
       ),
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
         el("span",{class:"muted",style:{fontSize:"15px"}},"FC max"),
         el("div",{style:{display:"flex",alignItems:"center",gap:"6px",width:"110px",justifyContent:"flex-end"}},
           el("input",{type:"number",id:"inp-fcmax",style:{width:"72px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"5px 8px",color:"#f1f5f9",fontSize:"15px",textAlign:"right"},value:runnerFcMax||181}),
-          el("span",{class:"muted",style:{fontSize:"14px",width:"36px",display:"inline-block"}},"bpm")
+          el("span",{class:"muted",style:{fontSize:"14px",minWidth:"36px",display:"inline-block",textAlign:"left"}},"bpm")
         )
       ),
       el("div",{style:{height:"1px",background:"#2e3347"}}),
