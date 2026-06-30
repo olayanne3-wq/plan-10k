@@ -2423,10 +2423,10 @@ function renderCourse() {
         el("span",{class:"muted",style:{fontSize:"15px"}},"Retrait dossards"),
         (()=>{
           const inp = document.createElement("input");
-          inp.type = "text"; inp.placeholder = "ex. 7h00"; inp.id = "horaire-dossard-input";
-          inp.style.cssText = "width:80px;background:#232738;border:1px solid #2e3347;border-radius:6px;padding:4px 8px;color:#f1f5f9;font-size:13px;text-align:right;box-sizing:border-box;";
+          inp.type = "time"; inp.id = "horaire-dossard-input";
+          inp.style.cssText = "width:110px;background:#232738;border:1px solid #2e3347;border-radius:6px;padding:4px 8px;color:#f1f5f9;font-size:13px;text-align:right;box-sizing:border-box;";
           inp.value = raceHoraires.dossard || "";
-          inp.addEventListener("input", (e)=>{ raceHoraires.dossard=e.target.value; save("lk_race_horaires",raceHoraires); scheduleSave(); });
+          inp.addEventListener("change", (e)=>{ raceHoraires.dossard=e.target.value; save("lk_race_horaires",raceHoraires); scheduleSave(); });
           return inp;
         })()
       ),
@@ -2434,10 +2434,10 @@ function renderCourse() {
         el("span",{class:"muted",style:{fontSize:"15px"}},"Départ course"),
         (()=>{
           const inp = document.createElement("input");
-          inp.type = "text"; inp.placeholder = "ex. 9h30"; inp.id = "horaire-depart-input";
-          inp.style.cssText = "width:80px;background:#232738;border:1px solid #2e3347;border-radius:6px;padding:4px 8px;color:#f1f5f9;font-size:13px;text-align:right;box-sizing:border-box;";
+          inp.type = "time"; inp.id = "horaire-depart-input";
+          inp.style.cssText = "width:110px;background:#232738;border:1px solid #2e3347;border-radius:6px;padding:4px 8px;color:#f1f5f9;font-size:13px;text-align:right;box-sizing:border-box;";
           inp.value = raceHoraires.depart || "";
-          inp.addEventListener("input", (e)=>{ raceHoraires.depart=e.target.value; save("lk_race_horaires",raceHoraires); scheduleSave(); });
+          inp.addEventListener("change", (e)=>{ raceHoraires.depart=e.target.value; save("lk_race_horaires",raceHoraires); scheduleSave(); });
           return inp;
         })()
       )
@@ -2669,23 +2669,23 @@ function renderSettings() {
     el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",display:"flex",flexDirection:"column",gap:"12px"}},
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
         el("span",{class:"muted",style:{fontSize:"15px"}},"Poids"),
-        el("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
+        el("div",{style:{display:"flex",alignItems:"center",gap:"6px",minWidth:"96px",justifyContent:"flex-end"}},
           el("input",{type:"number",id:"inp-poids",placeholder:"kg",style:{width:"72px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"5px 8px",color:"#f1f5f9",fontSize:"15px",textAlign:"right"},value:runnerWeight||""}),
-          el("span",{class:"muted",style:{fontSize:"14px"}},"kg")
+          el("span",{class:"muted",style:{fontSize:"14px",width:"32px"}},"kg")
         )
       ),
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
         el("span",{class:"muted",style:{fontSize:"15px"}},"Taille"),
-        el("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
+        el("div",{style:{display:"flex",alignItems:"center",gap:"6px",minWidth:"96px",justifyContent:"flex-end"}},
           el("input",{type:"number",id:"inp-taille",placeholder:"cm",style:{width:"72px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"5px 8px",color:"#f1f5f9",fontSize:"15px",textAlign:"right"},value:runnerHeight||""}),
-          el("span",{class:"muted",style:{fontSize:"14px"}},"cm")
+          el("span",{class:"muted",style:{fontSize:"14px",width:"32px"}},"cm")
         )
       ),
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
         el("span",{class:"muted",style:{fontSize:"15px"}},"FC max"),
-        el("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
+        el("div",{style:{display:"flex",alignItems:"center",gap:"6px",minWidth:"96px",justifyContent:"flex-end"}},
           el("input",{type:"number",id:"inp-fcmax",style:{width:"72px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"5px 8px",color:"#f1f5f9",fontSize:"15px",textAlign:"right"},value:runnerFcMax||181}),
-          el("span",{class:"muted",style:{fontSize:"14px"}},"bpm")
+          el("span",{class:"muted",style:{fontSize:"14px",width:"32px"}},"bpm")
         )
       ),
       el("div",{style:{height:"1px",background:"#2e3347"}}),
