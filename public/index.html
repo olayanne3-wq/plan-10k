@@ -2669,23 +2669,23 @@ function renderSettings() {
     el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",display:"flex",flexDirection:"column",gap:"12px"}},
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
         el("span",{class:"muted",style:{fontSize:"15px"}},"Poids"),
-        el("div",{style:{display:"flex",alignItems:"center",gap:"6px",minWidth:"96px",justifyContent:"flex-end"}},
+        el("div",{style:{display:"flex",alignItems:"center",gap:"6px",width:"110px",justifyContent:"flex-end"}},
           el("input",{type:"number",id:"inp-poids",placeholder:"kg",style:{width:"72px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"5px 8px",color:"#f1f5f9",fontSize:"15px",textAlign:"right"},value:runnerWeight||""}),
-          el("span",{class:"muted",style:{fontSize:"14px",width:"32px"}},"kg")
+          el("span",{class:"muted",style:{fontSize:"14px",width:"36px",display:"inline-block"}},"kg")
         )
       ),
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
         el("span",{class:"muted",style:{fontSize:"15px"}},"Taille"),
-        el("div",{style:{display:"flex",alignItems:"center",gap:"6px",minWidth:"96px",justifyContent:"flex-end"}},
+        el("div",{style:{display:"flex",alignItems:"center",gap:"6px",width:"110px",justifyContent:"flex-end"}},
           el("input",{type:"number",id:"inp-taille",placeholder:"cm",style:{width:"72px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"5px 8px",color:"#f1f5f9",fontSize:"15px",textAlign:"right"},value:runnerHeight||""}),
-          el("span",{class:"muted",style:{fontSize:"14px",width:"32px"}},"cm")
+          el("span",{class:"muted",style:{fontSize:"14px",width:"36px",display:"inline-block"}},"cm")
         )
       ),
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
         el("span",{class:"muted",style:{fontSize:"15px"}},"FC max"),
-        el("div",{style:{display:"flex",alignItems:"center",gap:"6px",minWidth:"96px",justifyContent:"flex-end"}},
+        el("div",{style:{display:"flex",alignItems:"center",gap:"6px",width:"110px",justifyContent:"flex-end"}},
           el("input",{type:"number",id:"inp-fcmax",style:{width:"72px",background:"#232738",border:"1px solid #2e3347",borderRadius:"6px",padding:"5px 8px",color:"#f1f5f9",fontSize:"15px",textAlign:"right"},value:runnerFcMax||181}),
-          el("span",{class:"muted",style:{fontSize:"14px",width:"32px"}},"bpm")
+          el("span",{class:"muted",style:{fontSize:"14px",width:"36px",display:"inline-block"}},"bpm")
         )
       ),
       el("div",{style:{height:"1px",background:"#2e3347"}}),
