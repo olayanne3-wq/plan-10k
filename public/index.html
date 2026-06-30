@@ -869,6 +869,17 @@ async function fetchCoachMsg() {
   const todayInTarget = todayEffortLaps.length > 0 && SESSION_TARGETS[sessType]
     ? todayEffortLaps.filter(l=>(1000/l.average_speed)<=SESSION_TARGETS[sessType].okPace).length+"/"+todayEffortLaps.length+" reps dans la cible"
     : null;
+  // IE moyen et cadence moyenne de la séance terminée (si assez de données — min 3 séances du même type)
+  const todayNSameType = stravaActivities.filter(a=>{
+    const d = a.start_date_local?.slice(0,10);
+    return ALL_SESSIONS.find(ss=>ss.date===d&&ss.type===sessType);
+  }).length;
+  const todayIEVals = todayEffortLaps.length > 0 ? todayEffortLaps.map(l=>economyScore(l,sessType)).filter(v=>v!==null) : [];
+  const todayAvgIE = (todayIEVals.length > 0 && todayNSameType >= 3)
+    ? Math.round(todayIEVals.reduce((a,b)=>a+b,0)/todayIEVals.length)
+    : null;
+  const todayCadVals = todayEffortLaps.length > 0 ? todayEffortLaps.map(l=>l.average_cadence?Math.round(l.average_cadence*2):null).filter(v=>v!==null) : [];
+  const todayAvgCad = todayCadVals.length > 0 ? Math.round(todayCadVals.reduce((a,b)=>a+b,0)/todayCadVals.length) : null;
 
   // Variables lundi matin
   const isMonday = new Date().getDay() === 1;
@@ -883,7 +894,7 @@ async function fetchCoachMsg() {
   const prompt = `Tu es Léa, coach running pour Laurent qui prépare le ${RACE_NAME} le 6 septembre 2026 à ${RACE_LOCATION} (objectif ${fmtTime(raceGoalTime)}).
 Estimation actuelle : ${predNow.timeStr} (${gapStr}).
 ${isMonday && prevWeekReport ? `Semaine ${prevWeekNum} terminée : ${prevWeekReport.done}/${prevWeekReport.total} séances validées, ${prevWeekKm} km courus.` : ''}
-${sessionDone ? `Séance ${sessType} terminée ce soir — statut ${todaySessionStatus}.${todayAvgPace ? ' Allure effort : '+todayAvgPace+'.' : ''}${todayInTarget ? ' '+todayInTarget+'.' : ''}` : `Aujourd'hui : ${sessType} — ${sessDesc}.`}
+${sessionDone ? `Séance ${sessType} terminée ce soir — statut ${todaySessionStatus}.${todayAvgPace ? ' Allure intervalles : '+todayAvgPace+'.' : ''}${todayInTarget ? ' '+todayInTarget+'.' : ''}${todayAvgIE ? ' Indice d\'économie (IE) : '+todayAvgIE+' (100=normal, >100=meilleur qu\'attendu).' : ''}${todayAvgCad ? ' Cadence moy. : '+todayAvgCad+' spm.' : ''}` : `Aujourd'hui : ${sessType} — ${sessDesc}.`}
 ${isEveOfKeySession ? `Demain séance clé : ${tomorrowKeySess.type} — ${tomorrowKeySess.session}.` : ''}
 ${weatherTemp ? 'Température : '+weatherTemp+'°C.' : ''}
 ${isLastTwoWeeks ? `J–${cd} avant la course.` : ""}
@@ -893,7 +904,7 @@ ${isMonday
   : sessionDone
     ? (sessType==='EF'||sessType==='LONGUE')
       ? 'Commente brièvement la sortie EF (sensations, récupération). Pas de conseil technique intensif. 2-3 phrases max.'
-      : 'Fais une courte analyse de la séance terminée (qualité, points positifs, axes d\'amélioration). 2-3 phrases max.'
+      : 'Fais une analyse de la séance terminée (qualité, points positifs, axes d\'amélioration). Mentionne l\'IE ou la cadence si disponibles dans le contexte. 3-4 phrases max.'
     : isEveOfKeySession
       ? 'Donne un conseil pour bien préparer la séance clé de demain (récupération, sommeil, hydratation). 2-3 phrases max.'
       : (sessType==='EF'||sessType==='LONGUE'||sessType==='REPOS')
@@ -2704,6 +2715,7 @@ function renderSettings() {
         "❓ Guide d\'utilisation dans l\'onglet Course",
         "✅ Séances terminées mieux identifiées (opacité + badge, repliables)",
         "🎯 Allure/FC affichées sur l\'effort seul (hors échauffement) pour les séances intensives",
+        "🤖 Coach mentionne l\'IE et la cadence après une séance intensive",
       ]},
       { ver:"v1.8.16", title:"Nouveau design & Inter", current:false, notes:[
         "🔤 Police Inter",
