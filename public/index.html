@@ -1740,6 +1740,119 @@ function renderDashboard() {
     )
   ) : null;
 
+  // ── Bilan de phase (tap pour révéler) ────────────────────────────────────
+  const phase = phaseOf(cw);
+  const phaseWeeks = phase.weeks || [];
+  const phaseStart = phaseWeeks[0], phaseEnd = phaseWeeks[phaseWeeks.length-1];
+  const phasePos = phaseWeeks.indexOf(cw) + 1;
+  const phasePct = Math.round((phasePos / phaseWeeks.length) * 100);
+
+  // Stats de la phase
+  const phaseSessions = ALL_SESSIONS.filter(s => phaseWeeks.includes(s.week) && s.type !== "REPOS");
+  const phaseValidated = phaseSessions.filter(s => statuses[s.uid]==="✅"||statuses[s.uid]==="⚠️");
+  const phaseKm = Math.round(phaseWeeks.reduce((acc, w) => acc + weekKm(w), 0) * 10) / 10;
+
+  // Stats par type de séance dans la phase
+  const phaseTypes = ["VMA","SPEC","SEUIL","EF","LONGUE"];
+  const phaseTypeStats = phaseTypes.map(type => {
+    const total = phaseSessions.filter(s => s.type===type).length;
+    const done = phaseValidated.filter(s => s.type===type).length;
+    return { type, total, done };
+  }).filter(t => t.total > 0);
+
+  // Allure EF moyenne
+  const efRuns = stravaActivities.filter(a => {
+    const d = a.start_date_local?.slice(0,10);
+    const s = ALL_SESSIONS.find(ss => ss.date===d && ss.type==="EF");
+    return s && phaseWeeks.includes(s.week);
+  });
+  const efAvgPace = efRuns.length > 0
+    ? fmtPace(efRuns.reduce((s,a)=>s+a.average_speed,0)/efRuns.length)
+    : null;
+
+  // Allure intensive moyenne (VMA/SPEC)
+  const intensiveRuns = stravaActivities.filter(a => {
+    const d = a.start_date_local?.slice(0,10);
+    const s = ALL_SESSIONS.find(ss => ss.date===d && (ss.type==="VMA"||ss.type==="SPEC"));
+    return s && phaseWeeks.includes(s.week);
+  });
+  const intensiveLaps = intensiveRuns.flatMap(r => getEffortLaps(r));
+  const intensiveAvgPace = intensiveLaps.length > 0
+    ? fmtPace(intensiveLaps.reduce((s,l)=>s+l.average_speed,0)/intensiveLaps.length)
+    : null;
+
+  // Verdict
+  const validationRate = phaseSessions.length > 0 ? phaseValidated.length / phaseSessions.length : 0;
+  const verdictColor = validationRate >= 0.8 ? "#22c55e" : validationRate >= 0.6 ? "#eab308" : "#ef4444";
+  const verdictIcon = validationRate >= 0.8 ? "🟢" : validationRate >= 0.6 ? "🟡" : "🔴";
+  const verdictText = validationRate >= 0.8 ? "Bonne progression" : validationRate >= 0.6 ? "Progression correcte" : "Attention à la régularité";
+
+  // Contenu détaillé (caché par défaut)
+  const phaseDetailEl = el("div",{style:{display:"none",marginTop:"12px",borderTop:"1px solid #2e3347",paddingTop:"12px"}},
+    // Stats clés
+    el("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginBottom:"12px"}},
+      el("div",{style:{background:"#232738",borderRadius:"8px",padding:"10px",textAlign:"center"}},
+        el("div",{style:{color:"#f1f5f9",fontSize:"16px",fontWeight:"700"}},phaseKm+" km"),
+        el("div",{class:"muted",style:{fontSize:"12px"}},"courus")
+      ),
+      efAvgPace ? el("div",{style:{background:"#232738",borderRadius:"8px",padding:"10px",textAlign:"center"}},
+        el("div",{style:{color:"#60a5fa",fontSize:"16px",fontWeight:"700"}},efAvgPace),
+        el("div",{class:"muted",style:{fontSize:"12px"}},"allure EF")
+      ) : null,
+      intensiveAvgPace ? el("div",{style:{background:"#232738",borderRadius:"8px",padding:"10px",textAlign:"center"}},
+        el("div",{style:{color:"#f97316",fontSize:"16px",fontWeight:"700"}},intensiveAvgPace),
+        el("div",{class:"muted",style:{fontSize:"12px"}},"allure int.")
+      ) : null
+    ),
+    // Séances par type
+    el("div",{style:{display:"flex",flexDirection:"column",gap:"6px",marginBottom:"12px"}},
+      ...phaseTypeStats.map(t => {
+        const st = STYPES[t.type]||STYPES.EF;
+        const pct = t.total > 0 ? Math.round(t.done/t.total*100) : 0;
+        return el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
+          el("span",{style:{background:st.color+"22",color:st.color,border:"1px solid "+st.color+"44",borderRadius:"4px",padding:"2px 7px",fontSize:"12px",fontWeight:"700",minWidth:"50px",textAlign:"center"}},t.type),
+          el("div",{style:{flex:"1",height:"4px",background:"#232738",borderRadius:"2px"}},
+            el("div",{style:{width:pct+"%",height:"100%",background:st.color,borderRadius:"2px"}})
+          ),
+          el("span",{style:{color:"#f1f5f9",fontSize:"13px"}},t.done+" / "+t.total)
+        );
+      })
+    ),
+    // Verdict
+    el("div",{style:{background:verdictColor+"11",border:"1px solid "+verdictColor+"33",borderRadius:"8px",padding:"10px",display:"flex",alignItems:"center",gap:"8px"}},
+      el("span",{style:{fontSize:"16px"}},verdictIcon),
+      el("div",{},
+        el("div",{style:{color:verdictColor,fontSize:"14px",fontWeight:"700"}},verdictText),
+        el("div",{class:"muted",style:{fontSize:"12px"}},phaseValidated.length+" / "+phaseSessions.length+" séances validées")
+      )
+    )
+  );
+
+  // Header cliquable
+  let phaseOpen = false;
+  const phaseEl = el("div",{style:{background:"#1a1d27",border:"1px solid "+phase.color+"33",borderTop:"3px solid "+phase.color,borderRadius:"12px",padding:"12px 14px",marginBottom:"12px",cursor:"pointer"}},
+    el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}},
+      el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
+        el("span",{style:{color:phase.color,fontSize:"15px",fontWeight:"700"}},phase.label),
+        el("span",{class:"muted",style:{fontSize:"13px"}},"S"+phaseStart+"–S"+phaseEnd)
+      ),
+      el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
+        el("span",{style:{color:phase.color,fontSize:"14px",fontWeight:"700"}},"S"+cw+" · "+phasePct+"%"),
+        el("span",{class:"muted",style:{fontSize:"14px"}},"›")
+      )
+    ),
+    el("div",{style:{height:"4px",background:"#232738",borderRadius:"2px"}},
+      el("div",{style:{width:phasePct+"%",height:"100%",background:phase.color,borderRadius:"2px"}})
+    ),
+    phaseDetailEl
+  );
+  phaseEl.addEventListener("click", ()=>{
+    phaseOpen = !phaseOpen;
+    phaseDetailEl.style.display = phaseOpen ? "block" : "none";
+    phaseEl.querySelector("span:last-child").textContent = phaseOpen ? "›" : "›";
+    phaseEl.querySelector("span:last-child").style.transform = phaseOpen ? "rotate(90deg)" : "rotate(0deg)";
+  });
+
   const helpBtn = el("button",{style:{
     background:"#232738",border:"1px solid #2e3347",borderRadius:"50%",
     width:"26px",height:"26px",display:"flex",alignItems:"center",justifyContent:"center",
@@ -1759,7 +1872,7 @@ function renderDashboard() {
     helpBtn
   );
 
-  return el("div",{style:{padding:"0 16px 100px"}},dashHeaderEl,weatherEl,fatigueEl,heroPred,progressEl,coachEl,nextKeyEl,todayEl||"",bilanEl,stravaSection);
+  return el("div",{style:{padding:"0 16px 100px"}},dashHeaderEl,weatherEl,fatigueEl,heroPred,phaseEl,progressEl,coachEl,nextKeyEl,todayEl||"",bilanEl,stravaSection);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2769,7 +2882,14 @@ function renderSettings() {
 
   const versionSection = (function buildVersionSection() {
     const VERSIONS = [
-      { ver:"v1.9", title:"Refactoring & robustesse", current:true, notes:[
+      { ver:"v1.9.1", title:"Bilan de phase & améliorations", current:true, notes:[
+        "🏁 Bilan de phase cliquable dans le dashboard",
+        "🎯 Date de la dernière séance à la ligne dans le prédicteur",
+        "🗣️ Coach moins coupé (max_tokens augmenté)",
+        "📊 Projection masquée avant 21 jours avec date de disponibilité",
+        "📐 Alignement parfait des champs dans Paramètres",
+      ]},
+      { ver:"v1.9", title:"Refactoring & robustesse", current:false, notes:[
         "🔧 Fusion du code dupliqué (répétitions, cartes, calcul km)",
         "🗑️ Suppression du code mort",
         "🛡️ Gestion d\'erreurs réseau renforcée (Coach, météo, Gist)",
