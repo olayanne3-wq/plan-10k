@@ -1537,7 +1537,15 @@ function renderDashboard() {
               badge(s.type),
               el("div",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"700"}},s.session)
             ),
-            weatherBadge,
+            (()=>{
+              const histTemp = historicalWeatherCache[s.date];
+              if (isDone && histTemp != null) {
+                const hot = histTemp > 28;
+                return el("span",{style:{color:hot?"#f97316":"#94a3b8",fontSize:"13px",fontWeight:hot?"700":"400"}},
+                  (hot?"🔥":"🌡️")+" "+histTemp+"°C");
+              }
+              return weatherBadge;
+            })(),
             isDone?el("span",{style:{
               background:statusColor+"22",color:statusColor,
               border:`1px solid ${statusColor}44`,
