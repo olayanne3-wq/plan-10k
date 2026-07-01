@@ -795,34 +795,7 @@ function weeklyReport(weekNum) {
   return { done, adapted, missed, total:sessions.length, plannedMin:Math.round(plannedMin), realMin, avgEfPace, avgEfHr, prevEfPace, prevEfHr };
 }
 
-// ── Alerte de fatigue ─────────────────────────────────────────────────────
-function fatigueAlert() {
-  const cw = currentWeek();
-  const week = PLAN.find(w=>w.week===cw);
-  if (!week) return null;
-  const sessions = week.sessions.filter(s=>s.type!=="REPOS"&&s.type!=="RACE"&&s.date<=today());
-  const recentSt = sessions.map(s=>statuses[`${cw}-${week.sessions.indexOf(s)}`]||"—");
-  let consec = 0;
-  for (const st of recentSt) {
-    if (st==="❌"||st==="⚠️") consec++;
-    else consec=0;
-    if (consec>=2) return "consecutive";
-  }
-  if (cw>1) {
-    const getAvgPace = (w) => {
-      const dates = w.sessions.filter(s=>s.type==="EF"||s.type==="LONGUE").map(s=>s.date);
-      const runs = stravaActivities.filter(a=>a.type==="Run"&&dates.includes(a.start_date_local?.slice(0,10)));
-      if (!runs.length) return null;
-      const avgSpeed = runs.reduce((s,r)=>s+r.average_speed,0)/runs.length;
-      return avgSpeed>0 ? 1000/avgSpeed : null;
-    };
-    const prevWeek = PLAN.find(w=>w.week===cw-1);
-    const curPace = getAvgPace(week);
-    const prevPace = prevWeek ? getAvgPace(prevWeek) : null;
-    if (curPace&&prevPace&&curPace-prevPace>15) return "pace";
-  }
-  return null;
-}
+
 
 // ── Prochaine séance clé ─────────────────────────────────────────────────
 function nextKeySession() {
@@ -1310,103 +1283,100 @@ function renderDashboard() {
   const todaySessions=ALL_SESSIONS.filter(s=>s.date===today());
   const pred=currentPred||predict10K();
 
-  const heroPred=el("div",{style:{background:"linear-gradient(135deg,#1a1d27 0%,#1e1030 100%)",borderRadius:"16px",padding:"20px",marginBottom:"12px",border:"1px solid #f9731633",marginTop:"8px"}},
-    el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"16px"}},
-      el("div",{},
-        el("div",{class:"label"},"Objectif"),
-        el("a",{href:RACE_URL,target:"_blank",style:{color:"#f97316",fontSize:"15px",fontWeight:"700",textDecoration:"none",display:"block",marginBottom:"2px"}},"🏁 "+RACE_NAME+" ↗"),
-        el("div",{class:"muted",style:{fontSize:"13px",marginBottom:"4px"}},new Date("2026-09-06T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})+" · "+RACE_LOCATION),
-        el("div",{style:{color:"#f97316",fontSize:"32px",fontWeight:"800",letterSpacing:"-1px",lineHeight:"1"}},fmtTime(raceGoalTime)),
+  const heroPred = el("div",{style:{background:"linear-gradient(135deg,#1a1d27 0%,#1e1030 100%)",borderRadius:"16px",padding:"16px",marginBottom:"12px",border:"1px solid #f9731633",marginTop:"8px"}},
+    // ── Header : course ──────────────────────────────────────────────────────
+    el("div",{style:{marginBottom:"14px"}},
+      el("a",{href:RACE_URL,target:"_blank",style:{color:"#f97316",fontSize:"15px",fontWeight:"700",textDecoration:"none",display:"block",marginBottom:"2px"}},"🏁 "+RACE_NAME+" ↗"),
+      el("div",{class:"muted",style:{fontSize:"13px"}},new Date("2026-09-06T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})+" · "+RACE_LOCATION)
+    ),
+    // ── Objectif vs Estimation ────────────────────────────────────────────
+    el("div",{style:{display:"grid",gridTemplateColumns:"1fr 1px 1fr",gap:"12px",marginBottom:"14px"}},
+      el("div",{style:{textAlign:"center"}},
+        el("div",{class:"label",style:{marginBottom:"4px"}},"Objectif"),
+        el("div",{style:{color:"#f97316",fontSize:"32px",fontWeight:"900",letterSpacing:"-1px",lineHeight:"1"}},fmtTime(raceGoalTime)),
+        el("div",{class:"muted",style:{fontSize:"13px",marginTop:"2px"}},fmtPace(10000/raceGoalTime)+"/km")
       ),
-      svgCircle(gp,76,6,"#f97316",
-        el("div",{style:{textAlign:"center"}},
-          el("div",{style:{color:"#f97316",fontSize:"15px",fontWeight:"800"}},gp+"%"),
-          el("div",{class:"muted",style:{fontSize:"12px"}},"plan")
-        )
+      el("div",{style:{background:"#2e3347"}}),
+      (()=>{
+        const estimEl = el("div",{style:{textAlign:"center",cursor:"pointer"}},
+          el("div",{class:"label",style:{marginBottom:"4px"}},"Estimation"),
+          el("div",{style:{color:"#f1f5f9",fontSize:"32px",fontWeight:"900",letterSpacing:"-1px",lineHeight:"1"}},pred.time ? fmtTime(pred.time) : "—"),
+          el("div",{style:{color:pred.gap<=0?"#22c55e":pred.gap<=30?"#eab308":"#ef4444",fontSize:"13px",marginTop:"2px",fontWeight:"700"}},
+            pred.gap<=0 ? "−"+fmtTime(Math.abs(pred.gap))+" ✅" : "+"+fmtTime(pred.gap)+" ⚠️"
+          )
+        );
+        // Panneau détail sources (caché par défaut)
+        let detailOpen = false;
+        const detailEl = el("div",{style:{display:"none",background:"#232738",borderRadius:"8px",padding:"10px 12px",marginTop:"8px"}},
+          el("div",{class:"muted",style:{fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"8px"}},"Sources"),
+          ...pred.details.map(d => {
+            const parts = d.label.split(" · dernier ");
+            const mainLabel = parts[0];
+            const dateLabel = parts[1] ? "dernier " + parts[1] : null;
+            return el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"6px"}},
+              el("div",{},
+                el("div",{class:"muted",style:{fontSize:"13px"}},mainLabel),
+                dateLabel ? el("div",{class:"muted",style:{fontSize:"12px",opacity:"0.7"}},dateLabel) : null
+              ),
+              el("span",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"600",whiteSpace:"nowrap",marginLeft:"8px"}},d.value)
+            );
+          }),
+          el("div",{style:{borderTop:"1px solid #2e3347",marginTop:"6px",paddingTop:"6px",display:"flex",justifyContent:"space-between"}},
+            el("span",{class:"muted",style:{fontSize:"13px"}},"Méthode"),
+            el("span",{style:{color:"#f1f5f9",fontSize:"13px"}},pred.method)
+          )
+        );
+        estimEl.addEventListener("click", () => {
+          detailOpen = !detailOpen;
+          detailEl.style.display = detailOpen ? "block" : "none";
+        });
+        const wrap = document.createElement("div");
+        wrap.appendChild(estimEl);
+        wrap.appendChild(detailEl);
+        return wrap;
+      })()
+    ),
+    // ── Fourchette + barre progression ────────────────────────────────────
+    el("div",{style:{background:"#ffffff0a",borderRadius:"8px",padding:"10px 12px",marginBottom:"10px"}},
+      el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"4px"}},
+        el("span",{class:"muted",style:{fontSize:"13px"}},"Fourchette"),
+        el("span",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"600"}},pred.timeLow+" – "+pred.timeHigh)
+      ),
+      el("div",{style:{display:"flex",justifyContent:"space-between"}},
+        el("span",{class:"muted",style:{fontSize:"13px"}},"Confiance"),
+        el("span",{class:"muted",style:{fontSize:"13px"}},pred.confidence+"% · "+pred.details.length+" source"+(pred.details.length>1?"s":"")+" ›")
       )
     ),
-    el("div",{style:{height:"1px",background:"#2e3347",marginBottom:"16px"}}),
-    (()=>{
-      const estimEl = el("div",{style:{display:"flex",alignItems:"baseline",gap:"12px",marginBottom:"12px",cursor:"pointer"}},
-        el("div",{},
-          el("div",{class:"label"},"Estimation actuelle"),
-          el("div",{style:{color:"#f1f5f9",fontSize:"32px",fontWeight:"800",letterSpacing:"-1px",lineHeight:"1"}},pred.timeStr),
-          el("div",{class:"muted",style:{fontSize:"13px",marginTop:"2px"}},pred.timeLow+" – "+pred.timeHigh)
-        ),
-        el("div",{},
-          el("div",{style:{color:pred.gap<=0?"#22c55e":pred.gap<=30?"#eab308":"#ef4444",fontSize:"15px",fontWeight:"700"}},(pred.gap>0?"+":"")+pred.gapStr+" vs objectif"),
-          el("div",{class:"muted",style:{fontSize:"13px"}},"Confiance "+pred.confidence+"% ⓘ")
-        )
-      );
-      // Panneau détail sources (caché par défaut)
-      let detailOpen = false;
-      const detailEl = el("div",{style:{display:"none",background:"#232738",borderRadius:"8px",padding:"10px 12px",marginBottom:"8px"}},
-        el("div",{class:"muted",style:{fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"8px"}},"Sources du prédicteur"),
-        ...pred.details.map(d => {
-          // Séparer "TYPE · N séances · dernier DATE" en deux lignes
-          const parts = d.label.split(" · dernier ");
-          const mainLabel = parts[0];
-          const dateLabel = parts[1] ? "dernier " + parts[1] : null;
-          return el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"6px"}},
-            el("div",{},
-              el("div",{class:"muted",style:{fontSize:"13px"}},mainLabel),
-              dateLabel ? el("div",{class:"muted",style:{fontSize:"12px",opacity:"0.7"}},dateLabel) : null
-            ),
-            el("span",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"600",whiteSpace:"nowrap",marginLeft:"8px"}},d.value)
-          );
-        }),
-        el("div",{style:{borderTop:"1px solid #2e3347",marginTop:"6px",paddingTop:"6px",display:"flex",justifyContent:"space-between"}},
-          el("span",{class:"muted",style:{fontSize:"13px"}},"Méthode"),
-          el("span",{style:{color:"#f1f5f9",fontSize:"13px"}},pred.method)
-        )
-      );
-      estimEl.addEventListener("click", () => {
-        detailOpen = !detailOpen;
-        detailEl.style.display = detailOpen ? "block" : "none";
-      });
-      const wrap = document.createElement("div");
-      wrap.appendChild(estimEl);
-      wrap.appendChild(detailEl);
-      return wrap;
-    })(),
+    // ── Barre gradient ────────────────────────────────────────────────────
     el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"4px"}},
-      el("span",{class:"muted",style:{fontSize:"12px"}},"50\'21\" (départ)"),
-      el("span",{class:"muted",style:{fontSize:"12px"}},"48\'30\" (objectif)")
+      el("span",{class:"muted",style:{fontSize:"12px"}},"50'21\" (départ)"),
+      el("span",{class:"muted",style:{fontSize:"12px"}},"48'30\" (objectif)")
     ),
-    el("div",{style:{height:"7px",borderRadius:"4px",background:"linear-gradient(to right,#E24B4A,#EF9F27,#BA7517,#639922)",position:"relative",marginBottom:"12px"}},
+    el("div",{style:{height:"7px",borderRadius:"4px",background:"linear-gradient(to right,#E24B4A,#EF9F27,#BA7517,#639922)",position:"relative"}},
       pred.time <= 2910
-        ? el("div",{style:{position:"absolute",right:"-4px",top:"50%",transform:"translateY(-50%)",fontSize:"15px",lineHeight:"1"}},"🎯")
+        ? el("div",{style:{color:"#22c55e",fontSize:"14px",fontWeight:"700",textAlign:"center"}}, "🎯 Objectif atteint !")
         : el("div",{style:{
-            position:"absolute",
-            top:"50%",
+            position:"absolute",top:"50%",
             transform:"translate(-50%,-50%)",
             left:Math.min(Math.max((3021-pred.time)/(3021-2910)*100,2),98)+"%",
             width:"13px",height:"13px",borderRadius:"50%",
-            background: pred.time<=2910?"#639922":pred.time<=2940?"#BA7517":pred.time<=2970?"#EF9F27":"#E24B4A",
+            background:pred.time<=2910?"#639922":pred.time<=2940?"#BA7517":pred.time<=2970?"#EF9F27":"#E24B4A",
             border:"2px solid #1a1d27",
-            boxShadow:"0 0 0 2px "+(pred.time<=2910?"#639922":pred.time<=2940?"#BA7517":pred.time<=2970?"#EF9F27":"#E24B4A")
+            boxShadow:"0 0 0 2px "+(pred.time<=2910?"#639922":pred.time<=2940?"#BA7517":pred.time<=2970?"#EF9F27":"#E24B4A")+"44"
           }})
     ),
-    pred.time <= 2910
-      ? el("div",{style:{color:"#22c55e",fontSize:"14px",fontWeight:"700",textAlign:"center",marginBottom:"10px"}},"🎉 Objectif dépassé !")
-      : null,
-    (()=>{
-      const phase = phaseOf(cw);
-      const phaseSessions = ALL_SESSIONS.filter(s=>s.phase===phase.id&&s.type!=="REPOS"&&s.type!=="RACE");
-      const phaseRemaining = phaseSessions.filter(s=>s.date>=today()&&!statuses[s.uid]).length;
-      return el("div",{style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"14px",paddingTop:"10px",borderTop:"1px solid #2e3347",flexWrap:"wrap"}},
-        el("span",{style:{color:"#22c55e",fontWeight:"700"}},"✅ "+done),
-        el("span",{class:"muted"},"·"),
-        el("span",{style:{color:"#eab308",fontWeight:"700"}},"⚠️ "+adapted),
-        el("span",{class:"muted"},"·"),
-        el("span",{style:{color:"#ef4444",fontWeight:"700"}},"❌ "+missed),
-        el("span",{class:"muted"},"·"),
-        el("span",{class:"muted"},"J–"+cd+" · S"+cw),
-        el("span",{class:"muted"},"·"),
-        el("span",{style:{color:phase.color,fontWeight:"600"}},phase.label+" · "+phaseRemaining+" séance"+(phaseRemaining>1?"s":"")+" restante"+(phaseRemaining>1?"s":""))
-      );
-    })()
+    // ── Stats séances ─────────────────────────────────────────────────────
+    el("div",{style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"14px",paddingTop:"10px",borderTop:"1px solid #2e334722",marginTop:"10px"}},
+      el("span",{style:{color:"#22c55e",fontWeight:"700"}},"✅ "+done),
+      el("span",{class:"muted"},"·"),
+      el("span",{style:{color:"#eab308",fontWeight:"700"}},"⚠️ "+adapted),
+      el("span",{class:"muted"},"·"),
+      el("span",{style:{color:"#ef4444",fontWeight:"700"}},"❌ "+missed),
+      el("span",{class:"muted"},"·"),
+      el("span",{class:"muted"},"J–"+cd+" · S"+cw)
+    )
   );
+
 
   const syncAgo = lastSyncTime > 0 ? Math.round((Date.now()-lastSyncTime)/60000) : null;
   const syncAgoStr = syncAgo === null ? "" :
@@ -1425,18 +1395,12 @@ function renderDashboard() {
   );
 
   const isHot = weatherTemp !== null && weatherTemp > 28;
-  const weatherEl = weatherTemp !== null ? el("div",{style:{
-    display:"flex", alignItems:"center", gap:"6px",
-    padding:"6px 10px",
-    background: isHot ? "#f9731611" : "#60a5fa11",
-    borderRadius:"8px", marginBottom:"12px"
-  }},
-    el("span",{style:{fontSize:"15px"}}, weatherDesc||"🌡️"),
-    el("span",{style:{color:isHot?"#f97316":"#60a5fa",fontSize:"14px",fontWeight:"700"}}, weatherTemp+"°C · Toulon"),
-    el("span",{class:"muted",style:{fontSize:"14px"}},"·"),
-    isHot ? el("span",{style:{fontSize:"14px"}},"🔥") : null,
-    el("span",{style:{color:isHot?"#f97316":"#e2e8f0",fontSize:"14px",fontWeight:"600"}}, "Allure EF : "+(isHot?"6:40":"6:20")+"/km")
-  ) : null;
+  // Badge météo discret pour intégration dans la carte séance
+  const weatherBadge = weatherTemp !== null
+    ? el("span",{style:{color:isHot?"#f97316":"#94a3b8",fontSize:"13px",fontWeight:isHot?"700":"400"}},
+        (weatherDesc||"🌡️")+" "+weatherTemp+"°C"+(isHot?" 🔥":""))
+    : null;
+  const weatherEl = null; // Supprimé — météo intégrée dans la carte séance
 
   const todayStatus4Coach = statuses[ALL_SESSIONS.find(s=>s.date===today()&&s.type!=="REPOS")?.uid];
   const coachBorderColor = todayStatus4Coach==="✅"?"#22c55e33":todayStatus4Coach==="⚠️"?"#eab30833":todayStatus4Coach==="❌"?"#ef444433":"#2e3347";
@@ -1498,7 +1462,9 @@ function renderDashboard() {
         el("div",{style:{background:"#1a1d27",border:"1px solid #60a5fa33",borderLeft:"3px solid #60a5fa",borderRadius:"10px",padding:"14px"}},
           el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"6px"}},
             el("span",{style:{background:"#60a5fa22",color:"#60a5fa",border:"1px solid #60a5fa44",borderRadius:"4px",padding:"2px 7px",fontSize:"13px",fontWeight:"700"}},"REPOS"),
-            el("span",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"600"}},todaySessions[0].session)
+            el("span",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"600"}},todaySessions[0].session),
+            el("div",{style:{flex:"1"}}),
+            weatherBadge
           ),
           todaySessions[0].notes?el("div",{class:"muted",style:{fontSize:"14px",fontStyle:"italic",marginBottom:"10px"}},todaySessions[0].notes):null,
           bilanReport?el("div",{style:{marginBottom:"10px"}},
@@ -1558,6 +1524,7 @@ function renderDashboard() {
               badge(s.type),
               el("div",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"700"}},s.session)
             ),
+            weatherBadge,
             isDone?el("span",{style:{
               background:statusColor+"22",color:statusColor,
               border:`1px solid ${statusColor}44`,
@@ -1726,23 +1693,6 @@ function renderDashboard() {
       )
     );
   }
-
-  const fatigue = fatigueAlert();
-  const fatigueEl = fatigue ? el("div",{style:{
-    background:"#ef444411",border:"1px solid #ef444433",
-    borderRadius:"10px",padding:"12px 14px",marginBottom:"16px",
-    display:"flex",alignItems:"center",gap:"10px"
-  }},
-    el("span",{style:{fontSize:"22px"}},"😴"),
-    el("div",{},
-      el("div",{style:{color:"#ef4444",fontSize:"15px",fontWeight:"700"}},"Signes de fatigue détectés"),
-      el("div",{class:"muted",style:{fontSize:"14px"}},
-        fatigue==="consecutive"
-          ? "2 séances difficiles consécutives — pense à réduire l\'intensité"
-          : "Allure EF en baisse vs semaine précédente — récupère bien"
-      )
-    )
-  ) : null;
 
     // ── Barres de progression km + temps ─────────────────────────────────────
   const totalKm = Math.round(stravaActivities.reduce((s,a)=>s+a.distance,0)/100)/10;
@@ -1921,7 +1871,7 @@ function renderDashboard() {
     helpBtn
   );
 
-  return el("div",{style:{padding:"0 16px 100px"}},dashHeaderEl,weatherEl,fatigueEl,heroPred,phaseEl,progressEl,coachEl,nextKeyEl,todayEl||"",bilanEl,stravaSection);
+  return el("div",{style:{padding:"0 16px 100px"}},dashHeaderEl,heroPred,todayEl||"",coachEl,phaseEl,progressEl,nextKeyEl,bilanEl,stravaSection);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3084,6 +3034,7 @@ function renderSettings() {
         "📉 Courbes FC intervalles par type de séance dans Stats",
         "🔁 Dérive FC affichée sur les répétitions",
         "💬 Raison du verdict sur chaque répétition",
+        "🎨 Dashboard réorganisé (objectif+estimation fusionnés, météo intégrée)",
         "🎯 Date de la dernière séance à la ligne dans le prédicteur",
         "🗣️ Coach moins coupé (max_tokens augmenté)",
         "📊 Projection masquée avant 21 jours avec date de disponibilité",
