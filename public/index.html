@@ -552,8 +552,12 @@ function applyMovedSessions() {
   });
   // Ensuite appliquer les deplacements
   ALL_SESSIONS.forEach(s => {
-    if (movedSessions[s.uid]) s.date = movedSessions[s.uid];
+    if (movedSessions[s.uid]) {
+      console.log("APPLY: uid="+s.uid+" date="+s.date+" -> "+movedSessions[s.uid]);
+      s.date = movedSessions[s.uid];
+    }
   });
+  console.log("APPLY: ALL_SESSIONS uids="+ALL_SESSIONS.slice(0,5).map(s=>s.uid+"="+s.date).join(", "));
 }
 
 const INTERVAL_SESSION_DATES = new Set(
