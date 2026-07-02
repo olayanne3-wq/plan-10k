@@ -542,6 +542,15 @@ const PLAN = [
 const ALL_SESSIONS = PLAN.flatMap(w => w.sessions.map((s,i) => ({...s, week:w.week, phase:w.phase, uid:`${w.week}-${i}`})));
 // Appliquer les déplacements sauvegardés
 function applyMovedSessions() {
+  // D'abord remettre toutes les dates depuis PLAN (reset)
+  PLAN.forEach(w => {
+    w.sessions.forEach((ps, i) => {
+      const uid = w.week+"-"+i;
+      const sess = ALL_SESSIONS.find(s => s.uid === uid);
+      if (sess) sess.date = ps.date;
+    });
+  });
+  // Ensuite appliquer les deplacements
   ALL_SESSIONS.forEach(s => {
     if (movedSessions[s.uid]) s.date = movedSessions[s.uid];
   });
@@ -3380,17 +3389,22 @@ function showMoveMenu(s, week) {
     const dayLabel = new Date(target.date+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
     btn.textContent = dayLabel+" ("+(target.type==="REPOS" ? "Repos" : target.type+" - masquee")+")";
     btn.addEventListener("click", () => {
-      const origDate = s.date;
-      // Mettre a jour la date dans ALL_SESSIONS
-      const sessToMove = ALL_SESSIONS.find(ss => ss.uid === s.uid);
-      if (sessToMove) sessToMove.date = target.date;
-      // Si la cible etait masquee, la remettre a sa date d'origine
+      // Trouver la date originale depuis PLAN (pas depuis s.date qui peut etre deja deplace)
+      const origUidParts = s.uid.split("-");
+      const origWeekNum = parseInt(origUidParts[0]);
+      const origIdx = parseInt(origUidParts[1]);
+      const planWeek = PLAN.find(w => w.week === origWeekNum);
+      const origDate = planWeek ? planWeek.sessions[origIdx].date : s.date;
+
+      // Sauvegarder le deplacement
+      movedSessions[s.uid] = target.date;
+
+      // Si la cible etait masquee, la restaurer a la date d'origine de s
       if (target.type !== "REPOS") {
-        const targetSess = ALL_SESSIONS.find(ss => ss.uid === target.uid);
-        if (targetSess) targetSess.date = origDate;
+        movedSessions[target.uid] = origDate;
         delete hiddenSessions[target.uid];
       }
-      movedSessions[s.uid] = target.date;
+
       save("lk_moved_sessions", movedSessions);
       save("lk_hidden_sessions", hiddenSessions);
       gistSave(true);
