@@ -3137,6 +3137,24 @@ function showSessionMenu(week, slotIdx) {
   const btnStyle = "width:100%;padding:13px;border-radius:10px;border:none;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;text-align:left;display:block;";
 
   if (!isHidden) {
+    // Si ce slot est swappé, proposer d'annuler le swap
+    const isSwapped = !!swappedSessions[uid];
+    if (isSwapped) {
+      const undoBtn = document.createElement("button");
+      undoBtn.style.cssText = btnStyle+"background:#eab30822;color:#eab308;";
+      undoBtn.textContent = "Annuler le deplacement";
+      undoBtn.addEventListener("click", () => {
+        const swapUid = swappedSessions[uid];
+        delete swappedSessions[uid];
+        delete swappedSessions[swapUid];
+        save("lk_swapped_sessions", swappedSessions);
+        gistSave(true);
+        overlay.remove();
+        render();
+      });
+      panel.appendChild(undoBtn);
+    }
+
     const moveBtn = document.createElement("button");
     moveBtn.style.cssText = btnStyle+"background:#60a5fa22;color:#60a5fa;";
     moveBtn.textContent = "Deplacer cette seance";
@@ -3210,9 +3228,16 @@ function showMoveMenu(week, slotIdx) {
     const dayLabel = new Date(slot.date+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
     btn.textContent = dayLabel+" ("+slot.label+")";
     btn.addEventListener("click", () => {
-      // Swap entre les deux slots
       const uidA = week.week+"-"+slotIdx;
       const uidB = slot.uid;
+      // Annuler les anciens swaps impliquant ces slots
+      Object.keys(swappedSessions).forEach(k => {
+        if (swappedSessions[k]===uidA || k===uidA ||
+            swappedSessions[k]===uidB || k===uidB) {
+          delete swappedSessions[k];
+        }
+      });
+      // Nouveau swap si les deux slots ne sont pas leur original
       swappedSessions[uidA] = uidB;
       swappedSessions[uidB] = uidA;
       save("lk_swapped_sessions", swappedSessions);
