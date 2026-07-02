@@ -3235,6 +3235,7 @@ function showMoveMenu(week, slotIdx) {
     btn.addEventListener("click", () => {
       const uidA = week.week+"-"+slotIdx;
       const uidB = slot.uid;
+      console.log("CLICK SWAP: uidA="+uidA+" uidB="+uidB);
       // Annuler les anciens swaps impliquant ces slots
       Object.keys(swappedSessions).forEach(k => {
         if (swappedSessions[k]===uidA || k===uidA ||
@@ -3242,9 +3243,11 @@ function showMoveMenu(week, slotIdx) {
           delete swappedSessions[k];
         }
       });
-      // Nouveau swap si les deux slots ne sont pas leur original
+      console.log("AFTER CLEAR: swapped="+JSON.stringify(swappedSessions));
+      // Nouveau swap
       swappedSessions[uidA] = uidB;
       swappedSessions[uidB] = uidA;
+      console.log("AFTER SWAP: swapped="+JSON.stringify(swappedSessions));
       save("lk_swapped_sessions", swappedSessions);
       gistSave(true);
       overlay.remove();
