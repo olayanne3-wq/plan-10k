@@ -557,6 +557,8 @@ function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); 
 let view = "dashboard";
 let selectedWeek = 1;
 let statuses = load("lk_statuses", {});
+let hiddenSessions = load("lk_hidden_sessions", {});
+let movedSessions = load("lk_moved_sessions", {});
 let notesList = load("lk_notes", []);
 let sessionNotes = load("lk_session_notes", {}); // {uid: "texte"}
 let stravaToken = load("lk_strava_token", null);
@@ -2074,6 +2076,21 @@ function renderWeekDetail(weekNum) {
   const weekRuns=stravaActivities.filter(a=>a.type==="Run"&&weekDates.includes(a.start_date_local?.slice(0,10)));
 
   const cards=week.sessions.map((s,i)=>{
+     // Annoter l'uid sur la session
+     s.uid = weekNum+"-"+i;
+     // Seance masquee : afficher en grise avec option restaurer
+     if (hiddenSessions[s.uid]) {
+       const hCard = el("div",{style:{background:"#1a1d2766",border:"1px dashed #2e3347",borderRadius:"12px",padding:"10px 14px",marginBottom:"8px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",opacity:"0.6"}},
+         el("span",{class:"muted",style:{fontSize:"13px"}},"[masquee] "+s.type+" - "+s.session.slice(0,30)),
+         el("span",{class:"muted",style:{fontSize:"11px"}},s.date)
+       );
+       let lpHidden = null;
+       hCard.addEventListener("touchstart", () => { lpHidden = setTimeout(() => { lpHidden=null; showSessionMenu(s, week); }, 600); }, {passive:true});
+       hCard.addEventListener("touchend", () => { if(lpHidden){clearTimeout(lpHidden);lpHidden=null;} });
+       hCard.addEventListener("touchmove", () => { if(lpHidden){clearTimeout(lpHidden);lpHidden=null;} });
+       hCard.addEventListener("contextmenu", e => { e.preventDefault(); showSessionMenu(s, week); });
+       return hCard;
+     }
     const uid=`${weekNum}-${i}`, isToday=s.date===t, isPast=s.date<t;
     const st=STYPES[s.type]||STYPES.REPOS;
     const stravaRun=weekRuns.find(r=>r.start_date_local?.slice(0,10)===s.date);
@@ -2253,6 +2270,16 @@ function renderWeekDetail(weekNum) {
       });
     }
 
+    // Appui long pour menu gestion (hors REPOS et RACE)
+    if (s.type !== "REPOS" && s.type !== "RACE") {
+      let lpTimer = null;
+      card.addEventListener("touchstart", () => {
+        lpTimer = setTimeout(() => { lpTimer=null; showSessionMenu(s, week); }, 600);
+      }, {passive:true});
+      card.addEventListener("touchend", () => { if(lpTimer){clearTimeout(lpTimer);lpTimer=null;} });
+      card.addEventListener("touchmove", () => { if(lpTimer){clearTimeout(lpTimer);lpTimer=null;} });
+      card.addEventListener("contextmenu", e => { e.preventDefault(); showSessionMenu(s, week); });
+    }
     return card;
   });
 
@@ -3237,6 +3264,200 @@ function exportPdfResultats() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// GESTION DES SEANCES
+// ══════════════════════════════════════════════════════════════════════════════
+
+function getAvailableDays(week, excludeUid) {
+  return week.sessions.filter(s => {
+    if (s.uid === excludeUid) return false;
+    if (s.type === "REPOS") return true;
+    if (hiddenSessions[s.uid]) return true;
+    return false;
+  });
+}
+
+function showSessionMenu(s, week) {
+  document.querySelectorAll(".session-menu-overlay").forEach(m => m.remove());
+  const isHidden = !!hiddenSessions[s.uid];
+
+  const overlay = document.createElement("div");
+  overlay.className = "session-menu-overlay";
+  overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center;";
+
+  const panel = document.createElement("div");
+  panel.style.cssText = "background:#1a1d27;border-radius:16px 16px 0 0;padding:20px 16px 32px;width:100%;max-width:430px;";
+
+  const titleEl = document.createElement("div");
+  titleEl.style.cssText = "color:#f1f5f9;font-size:15px;font-weight:700;margin-bottom:2px;";
+  titleEl.textContent = s.type+" - "+s.session.slice(0,40);
+  const subEl = document.createElement("div");
+  subEl.style.cssText = "color:#94a3b8;font-size:13px;margin-bottom:16px;";
+  subEl.textContent = s.date;
+  panel.appendChild(titleEl);
+  panel.appendChild(subEl);
+
+  const btnBase = "width:100%;padding:13px;border-radius:10px;border:none;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;text-align:left;display:block;";
+
+  if (!isHidden) {
+    const moveBtn = document.createElement("button");
+    moveBtn.style.cssText = btnBase+"background:#60a5fa22;color:#60a5fa;";
+    moveBtn.textContent = "Deplacer cette seance";
+    moveBtn.addEventListener("click", () => { overlay.remove(); showMoveMenu(s, week); });
+    panel.appendChild(moveBtn);
+
+    const hideBtn = document.createElement("button");
+    hideBtn.style.cssText = btnBase+"background:#ef444422;color:#ef4444;";
+    hideBtn.textContent = "Supprimer cette seance";
+    hideBtn.addEventListener("click", () => {
+      hiddenSessions[s.uid] = true;
+      save("lk_hidden_sessions", hiddenSessions);
+      gistSave(true);
+      overlay.remove();
+      render();
+    });
+    panel.appendChild(hideBtn);
+  } else {
+    const restoreBtn = document.createElement("button");
+    restoreBtn.style.cssText = btnBase+"background:#22c55e22;color:#22c55e;";
+    restoreBtn.textContent = "Restaurer cette seance";
+    restoreBtn.addEventListener("click", () => {
+      overlay.remove();
+      const conflict = week.sessions.find(ss =>
+        ss.uid !== s.uid && ss.date === s.date && !hiddenSessions[ss.uid] && ss.type !== "REPOS"
+      );
+      if (!conflict) {
+        delete hiddenSessions[s.uid];
+        save("lk_hidden_sessions", hiddenSessions);
+        gistSave(true);
+        render();
+      } else {
+        showRestoreMenu(s, week);
+      }
+    });
+    panel.appendChild(restoreBtn);
+  }
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.style.cssText = btnBase+"background:#232738;color:#94a3b8;";
+  cancelBtn.textContent = "Annuler";
+  cancelBtn.addEventListener("click", () => overlay.remove());
+  panel.appendChild(cancelBtn);
+
+  overlay.appendChild(panel);
+  overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+function showMoveMenu(s, week) {
+  const available = getAvailableDays(week, s.uid);
+  if (!available.length) { alert("Aucun jour disponible cette semaine."); return; }
+
+  document.querySelectorAll(".session-menu-overlay").forEach(m => m.remove());
+  const overlay = document.createElement("div");
+  overlay.className = "session-menu-overlay";
+  overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center;";
+
+  const panel = document.createElement("div");
+  panel.style.cssText = "background:#1a1d27;border-radius:16px 16px 0 0;padding:20px 16px 32px;width:100%;max-width:430px;";
+
+  const titleEl = document.createElement("div");
+  titleEl.style.cssText = "color:#f1f5f9;font-size:15px;font-weight:700;margin-bottom:16px;";
+  titleEl.textContent = "Deplacer vers...";
+  panel.appendChild(titleEl);
+
+  const btnBase = "width:100%;padding:13px;border-radius:10px;border:1px solid #2e3347;background:#232738;color:#f1f5f9;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px;text-align:left;display:block;";
+
+  available.forEach(target => {
+    const btn = document.createElement("button");
+    btn.style.cssText = btnBase;
+    const dayLabel = new Date(target.date+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+    btn.textContent = dayLabel+" ("+(target.type==="REPOS" ? "Repos" : target.type+" - masquee")+")";
+    btn.addEventListener("click", () => {
+      const origDate = s.date;
+      // Mettre a jour la date dans ALL_SESSIONS
+      const sessToMove = ALL_SESSIONS.find(ss => ss.uid === s.uid);
+      if (sessToMove) sessToMove.date = target.date;
+      // Si la cible etait masquee, la remettre a sa date d'origine
+      if (target.type !== "REPOS") {
+        const targetSess = ALL_SESSIONS.find(ss => ss.uid === target.uid);
+        if (targetSess) targetSess.date = origDate;
+        delete hiddenSessions[target.uid];
+      }
+      movedSessions[s.uid] = target.date;
+      save("lk_moved_sessions", movedSessions);
+      save("lk_hidden_sessions", hiddenSessions);
+      gistSave(true);
+      overlay.remove();
+      render();
+    });
+    panel.appendChild(btn);
+  });
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.style.cssText = "width:100%;padding:13px;border-radius:10px;border:none;background:#ef444422;color:#ef4444;font-size:14px;font-weight:700;cursor:pointer;display:block;";
+  cancelBtn.textContent = "Annuler";
+  cancelBtn.addEventListener("click", () => overlay.remove());
+  panel.appendChild(cancelBtn);
+
+  overlay.appendChild(panel);
+  overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+function showRestoreMenu(s, week) {
+  const available = getAvailableDays(week, s.uid);
+  if (!available.length) { alert("Aucun jour disponible pour restaurer."); return; }
+
+  document.querySelectorAll(".session-menu-overlay").forEach(m => m.remove());
+  const overlay = document.createElement("div");
+  overlay.className = "session-menu-overlay";
+  overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center;";
+
+  const panel = document.createElement("div");
+  panel.style.cssText = "background:#1a1d27;border-radius:16px 16px 0 0;padding:20px 16px 32px;width:100%;max-width:430px;";
+
+  const titleEl = document.createElement("div");
+  titleEl.style.cssText = "color:#f1f5f9;font-size:15px;font-weight:700;margin-bottom:4px;";
+  titleEl.textContent = "Choisir un autre jour";
+  const subEl = document.createElement("div");
+  subEl.style.cssText = "color:#94a3b8;font-size:13px;margin-bottom:16px;";
+  subEl.textContent = "Le jour d'origine est occupe. Vers quel jour restaurer ?";
+  panel.appendChild(titleEl);
+  panel.appendChild(subEl);
+
+  const btnBase = "width:100%;padding:13px;border-radius:10px;border:1px solid #2e3347;background:#232738;color:#f1f5f9;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px;text-align:left;display:block;";
+
+  available.forEach(target => {
+    const btn = document.createElement("button");
+    btn.style.cssText = btnBase;
+    const dayLabel = new Date(target.date+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+    btn.textContent = dayLabel;
+    btn.addEventListener("click", () => {
+      const sessToRestore = ALL_SESSIONS.find(ss => ss.uid === s.uid);
+      if (sessToRestore) sessToRestore.date = target.date;
+      delete hiddenSessions[s.uid];
+      movedSessions[s.uid] = target.date;
+      save("lk_hidden_sessions", hiddenSessions);
+      save("lk_moved_sessions", movedSessions);
+      gistSave(true);
+      overlay.remove();
+      render();
+    });
+    panel.appendChild(btn);
+  });
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.style.cssText = "width:100%;padding:13px;border-radius:10px;border:none;background:#232738;color:#94a3b8;font-size:14px;font-weight:700;cursor:pointer;display:block;";
+  cancelBtn.textContent = "Annuler";
+  cancelBtn.addEventListener("click", () => overlay.remove());
+  panel.appendChild(cancelBtn);
+
+  overlay.appendChild(panel);
+  overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // AIDE
 // ══════════════════════════════════════════════════════════════════════════════
 function renderHelp() {
@@ -3398,6 +3619,8 @@ function renderSettings() {
         "🏅 Banniere post-course (objectif atteint / proche / progression)",
         "📝 Saisie du resultat officiel dans onglet Course",
         "📄 Export PDF (recap, plan vierge, fiche resultats)",
+        "🔀 Deplacer une seance (appui long dans Semaines)",
+        "🗑️ Supprimer / restaurer une seance (appui long dans Semaines)",
       ]},
       { ver:"v1.9.2", title:"Dashboard condense & Course enrichie", current:false, notes:[
         "🎨 Dashboard condensé — Coach intégré dans la carte séance",
@@ -3690,6 +3913,8 @@ function getBackupData() {
     raceHoraires,
     raceParcoursUrl,
     checklistItems,
+    hiddenSessions,
+    movedSessions,
     version: 3,
     savedAt: new Date().toISOString()
   });
