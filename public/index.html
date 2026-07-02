@@ -3157,11 +3157,14 @@ function showSessionMenu(week, slotIdx) {
       panel.appendChild(undoBtn);
     }
 
-    const moveBtn = document.createElement("button");
-    moveBtn.style.cssText = btnStyle+"background:#60a5fa22;color:#60a5fa;";
-    moveBtn.textContent = "Deplacer cette seance";
-    moveBtn.addEventListener("click", () => { overlay.remove(); showMoveMenu(week, slotIdx); });
-    panel.appendChild(moveBtn);
+    const isDone = ["✅","⚠️","❌"].includes(statuses[uid]);
+    if (!isDone) {
+      const moveBtn = document.createElement("button");
+      moveBtn.style.cssText = btnStyle+"background:#60a5fa22;color:#60a5fa;";
+      moveBtn.textContent = "Deplacer cette seance";
+      moveBtn.addEventListener("click", () => { overlay.remove(); showMoveMenu(week, slotIdx); });
+      panel.appendChild(moveBtn);
+    }
 
     const hideBtn = document.createElement("button");
     hideBtn.style.cssText = btnStyle+"background:#ef444422;color:#ef4444;";
