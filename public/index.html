@@ -28,6 +28,7 @@ input[type=text], input[type=number], input[type=password] {
 #app > div { animation: fadeIn 0.2s ease; }
 @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -1291,14 +1292,14 @@ function renderDashboard() {
     const title = achieved ? "Objectif atteint !" : close ? "Tres belle course !" : "Belle progression !";
     const diffVsStart = 3021 - raceResult;
     const subtitle = achieved
-      ? (Math.abs(diff) > 0 ? "-"+fmtTime(Math.abs(diff))+" sous l'objectif" : "Exactement dans les temps")
+      ? (Math.abs(diff) > 0 ? "-"+fmtTime(Math.abs(diff))+" sous objectif" : "Exactement dans les temps")
       : close
-        ? "+"+fmtTime(Math.abs(diff))+" au-dessus de l'objectif"
+        ? "+"+fmtTime(Math.abs(diff))+" au-dessus objectif"
         : "-"+fmtTime(Math.abs(diffVsStart))+" par rapport au depart";
     const coachMsg2 = achieved
       ? "Bravo Laurent ! 11 semaines de travail, tu as merite ce resultat. Lea est fiere de toi !"
       : close
-        ? fmtTime(Math.abs(diff))+" ! C'etait si proche. Belle progression en 11 semaines. La prochaine fois sera la bonne."
+        ? fmtTime(Math.abs(diff))+" ! Si proche. Belle progression en 11 semaines."
         : "Belle progression de "+fmtTime(Math.abs(diffVsStart))+" en 11 semaines. On continue !";
 
     // Input pour corriger le resultat
@@ -3090,6 +3091,152 @@ function renderCourse() {
 // PARAMÈTRES
 // ══════════════════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════════════════
+// EXPORT PDF
+// ══════════════════════════════════════════════════════════════════════════════
+
+function fmtTimeShort(secs) {
+  const m = Math.floor(secs/60), s2 = secs%60;
+  return m+"min"+s2.toString().padStart(2,"0")+"s";
+}
+
+// PDF A : Recap de preparation
+function exportPdfRecap() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
+  const W=210, M=15;
+  let y=20;
+
+  doc.setFillColor(249,115,22);
+  doc.rect(0,0,W,30,"F");
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(20); doc.setFont("helvetica","bold");
+  doc.text("Run by Lea - Recap de preparation", M, 14);
+  doc.setFontSize(11); doc.setFont("helvetica","normal");
+  doc.text("10 km Gem Aubagne - 6 septembre 2026", M, 23);
+  y=40;
+
+  doc.setTextColor(30,30,30);
+  doc.setFontSize(13); doc.setFont("helvetica","bold");
+  doc.text("Bilan global", M, y); y+=7;
+  doc.setFontSize(10); doc.setFont("helvetica","normal");
+  const nbDone = ALL_SESSIONS.filter(s=>statuses[s.uid]==="✅").length;
+  const nbAdapted = ALL_SESSIONS.filter(s=>statuses[s.uid]==="⚠️").length;
+  const nbMissed = ALL_SESSIONS.filter(s=>statuses[s.uid]==="❌").length;
+  const kmCourus = Math.round(stravaActivities.reduce((acc,a)=>acc+a.distance,0)/100)/10;
+  const predPdf = currentPred || predict10K();
+  doc.text("Objectif : "+fmtTimeShort(raceGoalTime)+" ("+fmtPace(10000/raceGoalTime)+"/km)", M, y); y+=6;
+  doc.text("Estimation : "+(predPdf.time ? fmtTimeShort(predPdf.time) : "N/A"), M, y); y+=6;
+  doc.text("Seances : "+nbDone+" validees - "+nbAdapted+" adaptees - "+nbMissed+" ratees", M, y); y+=6;
+  doc.text("Km courus : "+kmCourus+" km", M, y); y+=10;
+
+  doc.setFontSize(13); doc.setFont("helvetica","bold");
+  doc.text("Detail par semaine", M, y); y+=7;
+
+  PLAN.forEach(wk => {
+    if (y > 260) { doc.addPage(); y=20; }
+    const ph = phaseOf(wk.week);
+    doc.setFillColor(240,240,240);
+    doc.rect(M, y-4, W-2*M, 7, "F");
+    doc.setFontSize(10); doc.setFont("helvetica","bold");
+    doc.setTextColor(30,30,30);
+    doc.text("Semaine "+wk.week+" - "+(ph.label||""), M+2, y+1); y+=9;
+    wk.sessions.forEach(s => {
+      if (s.type==="REPOS") return;
+      const st = statuses[s.uid]||"-";
+      doc.setFontSize(9); doc.setFont("helvetica","normal");
+      doc.text(s.date+" - "+s.type+" - "+s.session+" -> "+st, M+4, y); y+=5;
+      if (y > 270) { doc.addPage(); y=20; }
+    });
+    y+=3;
+  });
+
+  doc.save("RunByLea_Recap.pdf");
+}
+
+// PDF B : Plan vierge imprimable
+function exportPdfPlanVierge() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
+  const W=210, M=12;
+  let y=20;
+
+  doc.setFillColor(249,115,22);
+  doc.rect(0,0,W,28,"F");
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(18); doc.setFont("helvetica","bold");
+  doc.text("Run by Lea - Plan entrainement", M, 13);
+  doc.setFontSize(10); doc.setFont("helvetica","normal");
+  doc.text("10 km Gem Aubagne - 6 sept. 2026 - Objectif "+fmtTimeShort(raceGoalTime), M, 22);
+  y=36;
+
+  PLAN.forEach(wk => {
+    if (y > 255) { doc.addPage(); y=20; }
+    const ph = phaseOf(wk.week);
+    doc.setFillColor(230,230,230);
+    doc.rect(M, y-4, W-2*M, 7, "F");
+    doc.setFontSize(10); doc.setFont("helvetica","bold");
+    doc.setTextColor(30,30,30);
+    doc.text("S"+wk.week+" - "+(ph.label||""), M+2, y+1); y+=9;
+    wk.sessions.forEach(s => {
+      if (y > 270) { doc.addPage(); y=20; }
+      doc.setFontSize(9); doc.setFont("helvetica","normal");
+      doc.rect(M+2, y-3.5, 4, 4);
+      doc.text(s.date+"  "+s.type+"  "+s.session, M+8, y); y+=6;
+    });
+    y+=2;
+  });
+
+  doc.save("RunByLea_Plan_Vierge.pdf");
+}
+
+// PDF C : Fiche de resultats (apres la course)
+function exportPdfResultats() {
+  const raceRes = load("lk_race_result", null);
+  if (!raceRes) { alert("Saisis ton resultat dans onglet Course !"); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
+  const W=210, M=20;
+  let y=20;
+
+  const diff = raceRes - raceGoalTime;
+  const achieved = diff <= 0;
+  const close = diff > 0 && diff <= 60;
+  const [r,g,b] = achieved ? [34,197,94] : close ? [234,179,8] : [168,85,247];
+
+  doc.setFillColor(r,g,b);
+  doc.rect(0,0,W,40,"F");
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(22); doc.setFont("helvetica","bold");
+  doc.text(achieved ? "Objectif atteint !" : close ? "Tres belle course !" : "Belle progression !", M, 17);
+  doc.setFontSize(12); doc.setFont("helvetica","normal");
+  doc.text("10 km Gem Aubagne - 6 septembre 2026", M, 27);
+  doc.text("Run by Lea", M, 35);
+  y=55;
+
+  doc.setTextColor(30,30,30);
+  doc.setFontSize(14); doc.setFont("helvetica","bold");
+  doc.text("Resultats", M, y); y+=8;
+  doc.setFontSize(11); doc.setFont("helvetica","normal");
+  doc.text("Objectif  : "+fmtTimeShort(raceGoalTime)+" ("+fmtPace(10000/raceGoalTime)+"/km)", M, y); y+=7;
+  doc.text("Resultat  : "+fmtTimeShort(raceRes)+" ("+fmtPace(10000/raceRes)+"/km)", M, y); y+=7;
+  const diffVsStart = 3021 - raceRes;
+  doc.text("vs depart : "+(diffVsStart>0?"-":"+")+fmtTimeShort(Math.abs(diffVsStart))+" vs 50min21s", M, y); y+=7;
+  doc.text("vs objectif : "+(diff<=0?"-":"+")+fmtTimeShort(Math.abs(diff)), M, y); y+=14;
+
+  doc.setFontSize(13); doc.setFont("helvetica","bold");
+  doc.text("Preparation", M, y); y+=8;
+  doc.setFontSize(10); doc.setFont("helvetica","normal");
+  const nbDone2 = ALL_SESSIONS.filter(s=>statuses[s.uid]==="✅").length;
+  const nbAdapted2 = ALL_SESSIONS.filter(s=>statuses[s.uid]==="⚠️").length;
+  const nbMissed2 = ALL_SESSIONS.filter(s=>statuses[s.uid]==="❌").length;
+  const km2 = Math.round(stravaActivities.reduce((acc,a)=>acc+a.distance,0)/100)/10;
+  doc.text(nbDone2+" seances validees - "+nbAdapted2+" adaptees - "+nbMissed2+" ratees", M, y); y+=6;
+  doc.text(km2+" km courus - 11 semaines", M, y);
+
+  doc.save("RunByLea_Resultats.pdf");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // AIDE
 // ══════════════════════════════════════════════════════════════════════════════
 function renderHelp() {
@@ -3247,9 +3394,10 @@ function renderSettings() {
 
   const versionSection = (function buildVersionSection() {
     const VERSIONS = [
-      { ver:"v1.9.3", title:"Banniere post-course", current:true, notes:[
+      { ver:"v1.9.3", title:"Banniere post-course & Export PDF", current:true, notes:[
         "🏅 Banniere post-course (objectif atteint / proche / progression)",
-        "📝 Saisie du resultat officiel dans l'onglet Course",
+        "📝 Saisie du resultat officiel dans onglet Course",
+        "📄 Export PDF (recap, plan vierge, fiche resultats)",
       ]},
       { ver:"v1.9.2", title:"Dashboard condense & Course enrichie", current:false, notes:[
         "🎨 Dashboard condensé — Coach intégré dans la carte séance",
@@ -3476,10 +3624,24 @@ function renderSettings() {
     render();
   });
 
+  // Section PDF
+  const hasResult = !!load("lk_race_result", null);
+  const pdfSection = el("div",{style:{marginBottom:"24px"}},
+    el("div",{class:"label"},"Exporter en PDF"),
+    el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",display:"flex",flexDirection:"column",gap:"8px"}},
+      el("button",{style:{width:"100%",background:"#f9731622",border:"1px solid #f9731644",borderRadius:"8px",padding:"10px",color:"#f97316",fontSize:"14px",fontWeight:"700",cursor:"pointer"},
+        onClick:()=>exportPdfRecap()},"Recap de preparation"),
+      el("button",{style:{width:"100%",background:"#60a5fa22",border:"1px solid #60a5fa44",borderRadius:"8px",padding:"10px",color:"#60a5fa",fontSize:"14px",fontWeight:"700",cursor:"pointer"},
+        onClick:()=>exportPdfPlanVierge()},"Plan vierge imprimable"),
+      el("button",{style:{width:"100%",background:hasResult?"#22c55e22":"#232738",border:"1px solid "+(hasResult?"#22c55e44":"#2e3347"),borderRadius:"8px",padding:"10px",color:hasResult?"#22c55e":"#475569",fontSize:"14px",fontWeight:"700",cursor:hasResult?"pointer":"not-allowed"},
+        onClick:()=>hasResult?exportPdfResultats():null},"Fiche resultats"+(hasResult?"":" (disponible apres la course)"))
+    )
+  );
+
   return el("div",{style:{padding:"0 16px 100px"}},
     el("div",{style:{marginTop:"8px"}}),
     appHeaderEl,
-    profileSection, saveBtn, stravaSection,
+    profileSection, saveBtn, pdfSection, stravaSection,
     el("div",{style:{marginBottom:"24px"}}, advancedToggle, advancedContent),
     githubToken ? qrSection : null,
     versionSection
