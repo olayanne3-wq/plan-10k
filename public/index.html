@@ -997,17 +997,38 @@ function runByLeaIcon(size, radius) {
 }
 
 // ── Détection des intervalles via streams (seconde par seconde) ──────────────
-function getEffortLapsFromStreams(streams) {
+function extractTargetDuration(sessionStr) {
+  if (!sessionStr) return null;
+  const m = sessionStr.match(/\d+[x×](\d+)'(\d+)?/);
+  if (m) return parseInt(m[1])*60 + (m[2] ? parseInt(m[2]) : 0);
+  const m2 = sessionStr.match(/(\d+)-(\d+)/);
+  if (m2) return parseInt(m2[1]);
+  return null;
+}
+
+function extractTargetSpeed(sessionStr) {
+  if (!sessionStr) return null;
+  // Pattern MM:SS/km
+  const m = sessionStr.match(/(\d+):(\d+)\/km/);
+  if (m) return 1000 / (parseInt(m[1])*60 + parseInt(m[2]));
+  return null;
+}
+
+function getEffortLapsFromStreams(streams, targetDuration, targetSpeed) {
   // streams: {velocity_smooth: [...], heart_rate: [...], time: [...]}
   const vel = streams.velocity_smooth;
   const hr = streams.heart_rate;
   const t = streams.time;
   if (!vel || vel.length < 10) return [];
 
-  // Seuil adaptatif : percentile 85 des vitesses de la séance
-  // Cela s'adapte automatiquement quelle que soit l'allure (VMA, SPEC, SEUIL)
-  const velSorted = [...vel].sort((a,b) => a-b);
-  const SPEED_THRESHOLD = velSorted[Math.floor(velSorted.length * 0.85)];
+  // Lisser la vitesse sur 10s pour éliminer les micro-pics GPS
+  const velSmooth = vel.map((v,i) => {
+    const w = vel.slice(Math.max(0,i-10), i+1);
+    return w.reduce((s,x)=>s+x,0)/w.length;
+  });
+  // Seuil adaptatif : P75 sur la vitesse lissée
+  const velSorted = [...velSmooth].sort((a,b) => a-b);
+  const SPEED_THRESHOLD = velSorted[Math.floor(velSorted.length * 0.75)];
 
   // Détecter les blocs d'effort continus > 20s au-dessus du seuil
   const intervals = [];
@@ -1015,7 +1036,7 @@ function getEffortLapsFromStreams(streams) {
   let startIdx = 0;
 
   for (let i = 0; i < vel.length; i++) {
-    const fast = vel[i] >= SPEED_THRESHOLD;
+    const fast = velSmooth[i] >= SPEED_THRESHOLD;
     if (fast && !inEffort) {
       inEffort = true;
       startIdx = i;
@@ -1059,47 +1080,54 @@ function getEffortLapsFromStreams(streams) {
     merged.push(iv);
   }
 
-  // Garder seulement les intervalles d'effort (vitesse > médiane des blocs)
-  if (merged.length <= 1) return merged;
-  const speeds = merged.map(iv=>iv.average_speed).sort((a,b)=>a-b);
-  const medSpeed = speeds[Math.floor(speeds.length/2)];
+  if (merged.length === 0) return merged;
 
-  // Si grosse disparité de durées (échauffement long + intervalles courts) :
-  // on garde ceux dont la vitesse est dans le top 50%
-  const durations = merged.map(iv=>iv.elapsed_time).sort((a,b)=>a-b);
-  const durRange = durations[durations.length-1] - durations[0];
-  if (durRange > 120) {
-    // Garder uniquement les blocs dont la durée est proche de la médiane ±60%
-    const medDur = durations[Math.floor(durations.length/2)];
-    return merged.filter(iv => iv.elapsed_time >= medDur*0.4 && iv.elapsed_time <= medDur*1.8 && iv.average_speed >= medSpeed);
+  // Filtrer par vitesse cible si disponible (±15%)
+  if (targetSpeed) {
+    const bySpeed = merged.filter(iv => Math.abs(iv.average_speed - targetSpeed) <= targetSpeed * 0.15);
+    if (bySpeed.length > 0) {
+      // Si durée cible aussi disponible, affiner
+      if (targetDuration) {
+        const tol = Math.max(targetDuration * 0.3, 15);
+        const exact = bySpeed.filter(iv => Math.abs(iv.elapsed_time - targetDuration) <= tol);
+        if (exact.length > 0) return exact;
+      }
+      return bySpeed;
+    }
   }
 
-  return merged.filter(iv => iv.average_speed >= medSpeed);
+  // Filtrer par durée cible si disponible (±30%)
+  if (targetDuration && targetDuration >= 20) {
+    const tol = Math.max(targetDuration * 0.3, 15);
+    const exact = merged.filter(iv => Math.abs(iv.elapsed_time - targetDuration) <= tol);
+    if (exact.length > 0) return exact;
+  }
+
+  // Fallback : durée minimale 60s + médiane
+  const valid = merged.filter(iv => iv.elapsed_time >= 60);
+  if (valid.length === 0) return merged.filter(iv => iv.elapsed_time >= 20);
+  const durations = valid.map(iv=>iv.elapsed_time).sort((a,b)=>a-b);
+  const medDur = durations[Math.floor(durations.length/2)];
+  return valid.filter(iv => Math.abs(iv.elapsed_time - medDur) <= medDur * 0.6);
 }
 
 function getEffortLaps(activity) {
-  // Si on a les streams, les utiliser
   const actId = String(activity.id_str || activity.id);
   if (streamsCache[actId]) {
-    const intervals = getEffortLapsFromStreams(streamsCache[actId]);
+    const date = activity.start_date_local ? activity.start_date_local.slice(0,10) : null;
+    const planSess = date ? ALL_SESSIONS.find(s => s.date === date) : null;
+    const targetDur = planSess ? extractTargetDuration(planSess.session) : null;
+    const targetSpd = planSess ? extractTargetSpeed(planSess.session) : null;
+    const intervals = getEffortLapsFromStreams(streamsCache[actId], targetDur, targetSpd);
     if (intervals.length > 0) return intervals;
   }
-
-  // Fallback sur les laps
+  // Fallback laps
   if (!activity.laps || !activity.laps.length) return [];
-  const laps = activity.laps.filter(l => l.average_speed > 0);
+  const laps = activity.laps.filter(l => l.average_speed > 0 && (1000/l.average_speed) < 360);
   if (!laps.length) return [];
-  const fastLaps = laps.filter(l => (1000/l.average_speed) < 360);
-  if (!fastLaps.length) return [];
-  const durations = fastLaps.map(l => l.elapsed_time).sort((a,b) => a-b);
-  const medDur = durations[Math.floor(durations.length/2)];
-  const durRange = durations[durations.length-1] - durations[0];
-  if (durRange < 15) {
-    const speeds = fastLaps.map(l => l.average_speed).sort((a,b) => a-b);
-    const medSpeed = speeds[Math.floor(speeds.length/2)];
-    return fastLaps.filter(l => l.average_speed >= medSpeed);
-  }
-  return fastLaps.filter(l => l.elapsed_time >= medDur * 0.7 && l.elapsed_time <= medDur * 1.5);
+  const speeds = laps.map(l => l.average_speed).sort((a,b) => a-b);
+  const medSpeed = speeds[Math.floor(speeds.length/2)];
+  return laps.filter(l => l.average_speed >= medSpeed);
 }
 
 // ── Chargement des streams pour les séances intensives ────────────────────────
