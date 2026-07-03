@@ -1015,101 +1015,62 @@ function extractTargetSpeed(sessionStr) {
 }
 
 function getEffortLapsFromStreams(streams, targetDuration, targetSpeed) {
-  // streams: {velocity_smooth: [...], heart_rate: [...], time: [...]}
   const vel = streams.velocity_smooth;
   const hr = streams.heart_rate;
   const t = streams.time;
   if (!vel || vel.length < 10) return [];
 
-  // Lisser la vitesse sur 10s pour éliminer les micro-pics GPS
-  const velSmooth = vel.map((v,i) => {
-    const w = vel.slice(Math.max(0,i-10), i+1);
-    return w.reduce((s,x)=>s+x,0)/w.length;
-  });
-  // Seuil adaptatif : P75 sur la vitesse lissée
-  const velSorted = [...velSmooth].sort((a,b) => a-b);
-  const SPEED_THRESHOLD = velSorted[Math.floor(velSorted.length * 0.75)];
+  // Seuil de detection : vitesse cible * 0.85 si connue, sinon P60
+  let THRESHOLD;
+  if (targetSpeed) {
+    THRESHOLD = targetSpeed * 0.85;
+  } else {
+    const s2 = [...vel].sort((a,b)=>a-b);
+    THRESHOLD = s2[Math.floor(s2.length*0.60)];
+  }
 
-  // Détecter les blocs d'effort continus > 20s au-dessus du seuil
-  const intervals = [];
-  let inEffort = false;
-  let startIdx = 0;
-
+  // Detecter les blocs continus au-dessus du seuil
+  const blocks = [];
+  let inEffort = false, startIdx = 0;
   for (let i = 0; i < vel.length; i++) {
-    const fast = velSmooth[i] >= SPEED_THRESHOLD;
-    if (fast && !inEffort) {
-      inEffort = true;
-      startIdx = i;
-    } else if (!fast && inEffort) {
+    if (vel[i] >= THRESHOLD && !inEffort) { inEffort=true; startIdx=i; }
+    else if (vel[i] < THRESHOLD && inEffort) {
       inEffort = false;
       const duration = t[i] - t[startIdx];
-      if (duration >= 20) { // ignorer les micro-accélérations < 20s
-        // Calculer vitesse et FC moyennes sur ce bloc
-        const velSlice = vel.slice(startIdx, i);
-        const hrSlice = hr ? hr.slice(startIdx, i).filter(v => v > 0) : [];
-        const avgSpeed = velSlice.reduce((s,v)=>s+v,0)/velSlice.length;
-        const avgHr = hrSlice.length ? hrSlice.reduce((s,v)=>s+v,0)/hrSlice.length : null;
-        intervals.push({
-          average_speed: avgSpeed,
-          average_heartrate: avgHr,
-          elapsed_time: duration,
-          _fromStreams: true
+      if (duration >= 15) {
+        const vs = vel.slice(startIdx,i);
+        const hs = hr ? hr.slice(startIdx,i).filter(v=>v>0) : [];
+        blocks.push({
+          average_speed: vs.reduce((s,v)=>s+v,0)/vs.length,
+          average_heartrate: hs.length ? hs.reduce((s,v)=>s+v,0)/hs.length : null,
+          elapsed_time: duration, _fromStreams: true
         });
       }
     }
   }
   if (inEffort) {
-    const i = vel.length;
-    const duration = t[i-1] - t[startIdx];
-    if (duration >= 20) {
-      const velSlice = vel.slice(startIdx);
-      const hrSlice = hr ? hr.slice(startIdx).filter(v => v > 0) : [];
-      const avgSpeed = velSlice.reduce((s,v)=>s+v,0)/velSlice.length;
-      const avgHr = hrSlice.length ? hrSlice.reduce((s,v)=>s+v,0)/hrSlice.length : null;
-      intervals.push({ average_speed: avgSpeed, average_heartrate: avgHr, elapsed_time: duration, _fromStreams: true });
+    const duration = t[t.length-1] - t[startIdx];
+    if (duration >= 15) {
+      const vs = vel.slice(startIdx);
+      const hs = hr ? hr.slice(startIdx).filter(v=>v>0) : [];
+      blocks.push({ average_speed: vs.reduce((s,v)=>s+v,0)/vs.length, average_heartrate: hs.length?hs.reduce((s,v)=>s+v,0)/hs.length:null, elapsed_time: duration, _fromStreams: true });
     }
   }
+  if (!blocks.length) return [];
 
-  // Fusionner les intervalles séparés par moins de 5s (artefacts GPS)
-  const merged = [];
-  for (const iv of intervals) {
-    if (merged.length > 0) {
-      const prev = merged[merged.length-1];
-      // Pas besoin de fusionner ici — on garde les blocs distincts
-    }
-    merged.push(iv);
+  // Filtrer par duree cible +/-30%
+  if (targetDuration && targetDuration >= 15) {
+    const tol = Math.max(targetDuration * 0.30, 10);
+    const byDur = blocks.filter(b => Math.abs(b.elapsed_time - targetDuration) <= tol);
+    if (byDur.length > 0) return byDur;
   }
 
-  if (merged.length === 0) return merged;
-
-  // Filtrer par vitesse cible si disponible (±15%)
-  if (targetSpeed) {
-    const bySpeed = merged.filter(iv => Math.abs(iv.average_speed - targetSpeed) <= targetSpeed * 0.15);
-    if (bySpeed.length > 0) {
-      // Si durée cible aussi disponible, affiner
-      if (targetDuration) {
-        const tol = Math.max(targetDuration * 0.3, 15);
-        const exact = bySpeed.filter(iv => Math.abs(iv.elapsed_time - targetDuration) <= tol);
-        if (exact.length > 0) return exact;
-      }
-      return bySpeed;
-    }
-  }
-
-  // Filtrer par durée cible si disponible (±30%)
-  if (targetDuration && targetDuration >= 20) {
-    const tol = Math.max(targetDuration * 0.3, 15);
-    const exact = merged.filter(iv => Math.abs(iv.elapsed_time - targetDuration) <= tol);
-    if (exact.length > 0) return exact;
-  }
-
-  // Fallback : durée minimale 60s + médiane
-  const valid = merged.filter(iv => iv.elapsed_time >= 60);
-  if (valid.length === 0) return merged.filter(iv => iv.elapsed_time >= 20);
-  const durations = valid.map(iv=>iv.elapsed_time).sort((a,b)=>a-b);
-  const medDur = durations[Math.floor(durations.length/2)];
-  return valid.filter(iv => Math.abs(iv.elapsed_time - medDur) <= medDur * 0.6);
+  // Fallback : mediane des durees
+  const durs = blocks.map(b=>b.elapsed_time).sort((a,b)=>a-b);
+  const med = durs[Math.floor(durs.length/2)];
+  return blocks.filter(b => Math.abs(b.elapsed_time-med) <= med*0.5 && b.elapsed_time >= 20);
 }
+
 
 function getEffortLaps(activity) {
   const actId = String(activity.id_str || activity.id);
