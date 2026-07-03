@@ -1,14 +1,13 @@
 {
   "version": 2,
   "builds": [
-    { "src": "public/**", "use": "@vercel/static" },
+    { "src": "public/**", "use": "@vercel/static", "config": { "distDir": "public" } },
     { "src": "api/*.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/api/strava/(.*)", "dest": "/api/strava.js" },
     { "src": "/api/coach", "dest": "/api/coach.js" },
-    { "src": "/sw.js", "dest": "/public/sw.js" },
-    { "src": "/manifest.json", "dest": "/public/manifest.json" },
+    { "src": "/api/streams", "dest": "/api/streams.js" },
     { "src": "/(.*)", "dest": "/public/$1" }
   ]
 }
