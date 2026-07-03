@@ -1074,17 +1074,34 @@ function getEffortLapsFromStreams(streams, targetDuration, targetSpeed) {
 
 function getEffortLaps(activity) {
   if (!activity.laps || activity.laps.length < 4) return [];
-  // Structure : 1 lap echauffement + intervalles (effort+recup) + 2 laps retour au calme
+  // Trouver la seance dans le plan pour connaitre l allure cible
+  const date = activity.start_date_local ? activity.start_date_local.slice(0,10) : null;
+  const planSess = date ? ALL_SESSIONS.find(s => s.date === date) : null;
+  const targetSpeed = planSess ? extractTargetSpeed(planSess.session) : null;
+
+  // Supprimer 1er lap (echauffement) et 2 derniers (retour au calme)
   const middle = activity.laps.slice(1, -2);
   if (!middle.length) return [];
-  // Parmi les laps du milieu, garder les plus rapides (laps d effort)
-  // Trier par vitesse et garder la moitie superieure
-  const sorted = [...middle].sort((a,b) => b.average_speed - a.average_speed);
+
+  // Vitesse cible : depuis le libelle de seance, ou depuis SESSION_TARGETS
+  let effSpeed = targetSpeed;
+  if (!effSpeed && planSess && SESSION_TARGETS[planSess.type]) {
+    effSpeed = 1000 / SESSION_TARGETS[planSess.type].targetMin;
+  }
+
+  // Filtrer par vitesse ±15%
+  if (effSpeed) {
+    const bySpeed = middle.filter(l => l.average_speed > 0 &&
+      Math.abs(l.average_speed - effSpeed) <= effSpeed * 0.15);
+    if (bySpeed.length > 0) return bySpeed;
+  }
+
+  // Fallback : moitie la plus rapide
+  const withSpeed = middle.filter(l => l.average_speed > 0);
+  const sorted = [...withSpeed].sort((a,b) => b.average_speed - a.average_speed);
   const half = Math.ceil(sorted.length / 2);
-  const effortLaps = sorted.slice(0, half);
-  // Re-trier dans l ordre chronologique
-  const effortIndices = new Set(effortLaps.map(l => l.lap_index || l.id));
-  return middle.filter(l => effortIndices.has(l.lap_index || l.id));
+  const effortSet = new Set(sorted.slice(0, half).map(l => l.lap_index || l.id));
+  return withSpeed.filter(l => effortSet.has(l.lap_index || l.id));
 }
 
 
