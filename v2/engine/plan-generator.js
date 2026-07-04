@@ -170,6 +170,12 @@ export function computeVolumeProgression({ volumeDepart, distance, niveau, total
     ? Math.min(plafondPopulation, volumeDepart * 1.20)
     : plafondPopulation;
 
+  // Durée nulle : date invalide déjà signalée par computePhases, pas la peine
+  // de calculer une fausse progression ni de remonter un 2e avertissement
+  if (totalSemaines <= 0) {
+    return { plafond, volumesParSemaine: [], warnings };
+  }
+
   // Garde-fou #4 : volume de départ déjà proche/au-dessus du plafond
   if (volumeDepart >= plafond * 0.9) {
     warnings.push({
@@ -260,6 +266,13 @@ function pickLongueDay(joursDisponibles) {
   return Math.max(...joursDisponibles);
 }
 
+// Distance circulaire entre deux jours (0=Lundi...6=Dimanche) : Dimanche(6) et
+// Lundi(0) sont adjacents dans un vrai calendrier (écart réel de 1 jour, pas 6)
+function distanceCirculaire(a, b) {
+  const diff = Math.abs(a - b);
+  return Math.min(diff, 7 - diff);
+}
+
 /**
  * Place les séances de la semaine sur les jours disponibles.
  * joursDisponibles : indices 0=Lundi ... 6=Dimanche
@@ -294,7 +307,7 @@ export function placerSemaine({ joursDisponibles, niveau, renforcementActif, mod
   const qualiteDays = [];
 
   // Garde-fou #7 : éviter la qualité veille/lendemain de la longue, sauf repli forcé
-  const strictPool = pool.filter(d => Math.abs(d - longueDay) !== 1);
+  const strictPool = pool.filter(d => distanceCirculaire(d, longueDay) !== 1);
   const candidatePool = strictPool.length >= nbQualite ? strictPool : pool;
   const usedFallbackAdjacence = candidatePool === pool && strictPool.length < nbQualite;
 
@@ -303,7 +316,7 @@ export function placerSemaine({ joursDisponibles, niveau, renforcementActif, mod
     let best = null, bestScore = -1;
     working.forEach(d => {
       const refs = [longueDay, ...qualiteDays];
-      const minDist = Math.min(...refs.map(r => Math.abs(d - r)));
+      const minDist = Math.min(...refs.map(r => distanceCirculaire(d, r)));
       if (minDist > bestScore) { bestScore = minDist; best = d; }
     });
     qualiteDays.push(best);
@@ -330,13 +343,23 @@ export function placerSemaine({ joursDisponibles, niveau, renforcementActif, mod
     });
   }
 
-  // Garde-fou #6 : écart < 48h entre séances dures
+  // Garde-fou #6 : écart < 48h entre séances dures (y compris le dernier jour
+  // de la semaine vers le premier jour de la semaine suivante, circulairement)
   const hardDays = [longueDay, ...qualiteDays].sort((a, b) => a - b);
   for (let i = 1; i < hardDays.length; i++) {
     if (hardDays[i] - hardDays[i - 1] < 2) {
       warnings.push({
         code: 'ECART_RECUPERATION_INSUFFISANT',
         message: `Moins de 48h de récupération entre deux séances dures (jours ${hardDays[i - 1]} et ${hardDays[i]}).`
+      });
+    }
+  }
+  if (hardDays.length > 1) {
+    const ecartBouclage = 7 - (hardDays[hardDays.length - 1] - hardDays[0]);
+    if (ecartBouclage < 2) {
+      warnings.push({
+        code: 'ECART_RECUPERATION_INSUFFISANT',
+        message: `Moins de 48h de récupération entre la fin d'une semaine (jour ${hardDays[hardDays.length - 1]}) et le début de la suivante (jour ${hardDays[0]}).`
       });
     }
   }
@@ -442,13 +465,13 @@ const ROTATION_SOUS_TYPE = {
   },
   'Semi': {
     Reacclimatation: [],
-    Construction: ['tempo-court'],
+    Construction: ['tempo-court', 'fartlek'],
     Specifique: ['seuil', 'i-3min', 'allure-course'],
     Affutage: ['allure-course-court']
   },
   'Marathon': {
     Reacclimatation: [],
-    Construction: ['tempo-court'],
+    Construction: ['tempo-court', 'seuil-court'],
     Specifique: ['seuil', 'allure-course'],
     Affutage: ['tempo-court']
   }
@@ -545,6 +568,13 @@ export function genererContenuQualite({ distance, phase, semaineDansPhase, index
       const duree = reduireSelonNiveauProgression(20, 5, 35, semaineDansPhase);
       const kmEstime = kmDepuisMinutes(duree, T);
       return { sousType, contenu: `${duree}min continu @ ${formatPace(T)} (Seuil léger)`, kmEstime };
+    }
+    case 'fartlek': {
+      const reps = reduireSelonNiveauProgression(4, 1, 8, semaineDansPhase);
+      // Portions rapides comptées à l'allure T, portions faciles ignorées dans
+      // l'estimation km (approximation assumée, comme pour i-30-30)
+      const kmEstime = kmDepuisMinutes(reps * 2, T);
+      return { sousType, contenu: `${reps}×2min rapide (${formatPace(T)}) / 2min facile, en continu (fartlek)`, kmEstime };
     }
     default: {
       const kmEstime = kmDepuisMinutes(24, T);
