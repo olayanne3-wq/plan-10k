@@ -90,11 +90,29 @@ export const DUREE_AFFUTAGE_JOURS = {
 // Ratio Construction / Spécifique du temps restant après Affûtage, par niveau
 const RATIO_CONSTRUCTION = { debutant: 0.55, intermediaire: 0.40, confirme: 0.30 };
 
+// Ajustement du ratio selon l'ampleur de l'objectif (piste ouverte de la doc, tranchée ici :
+// validée concrètement sur le profil réel — un objectif modeste n'a pas besoin d'un pic de
+// volume, juste de plus de temps à affiner et récupérer)
+const AJUSTEMENT_RATIO_PAR_AMPLEUR = { faible: +0.15, moderee: 0, ambitieuse: -0.05 };
+
+/**
+ * Catégorise l'ampleur du gain visé (% de temps à gagner par rapport à la référence).
+ * < 5% : faible (ex. profil déjà en forme, petit ajustement)
+ * 5-10% : modérée
+ * > 10% : ambitieuse (vrai gain de fond à construire)
+ */
+export function categoriserAmpleurObjectif(refTimeSeconds, objectifTimeSeconds) {
+  const gain = (refTimeSeconds - objectifTimeSeconds) / refTimeSeconds;
+  if (gain < 0.05) return 'faible';
+  if (gain <= 0.10) return 'moderee';
+  return 'ambitieuse';
+}
+
 // ---------------------------------------------------------------------------
 // Section 4bis — calcul des phases à partir des dates réelles
 // ---------------------------------------------------------------------------
 
-export function computePhases({ dateDebut, dateCourse, distance, niveau }) {
+export function computePhases({ dateDebut, dateCourse, distance, niveau, ampleurObjectif }) {
   const debut = new Date(dateDebut);
   const course = new Date(dateCourse);
   const totalJours = Math.round((course - debut) / 86400000);
@@ -121,7 +139,8 @@ export function computePhases({ dateDebut, dateCourse, distance, niveau }) {
   }
 
   const resteSemaines = Math.max(0, totalSemaines - affutageSemaines);
-  const ratioConstruction = RATIO_CONSTRUCTION[niveau];
+  const ajustement = AJUSTEMENT_RATIO_PAR_AMPLEUR[ampleurObjectif] ?? 0;
+  const ratioConstruction = Math.min(0.75, Math.max(0.20, RATIO_CONSTRUCTION[niveau] + ajustement));
   const constructionSemaines = Math.max(1, Math.round(resteSemaines * ratioConstruction));
   const specifiqueSemaines = Math.max(0, resteSemaines - constructionSemaines);
 
@@ -140,10 +159,16 @@ export function computePhases({ dateDebut, dateCourse, distance, niveau }) {
 // Section 6 — progression du volume (règle des 10%, décharge tous les 3-4 sem)
 // ---------------------------------------------------------------------------
 
-export function computeVolumeProgression({ volumeDepart, distance, niveau, totalSemaines, contraintes = [] }) {
+export function computeVolumeProgression({ volumeDepart, distance, niveau, totalSemaines, contraintes = [], ampleurObjectif }) {
   const [plafondBas, plafondHaut] = PLAFONDS_VOLUME[distance][niveau];
-  const plafond = (plafondBas + plafondHaut) / 2;
+  const plafondPopulation = (plafondBas + plafondHaut) / 2;
   const warnings = [];
+
+  // Objectif modeste : pas besoin de viser le plafond de population, un plateau
+  // proche du volume de départ suffit (validé sur profil réel — cf. section 4bis "piste ouverte")
+  const plafond = ampleurObjectif === 'faible'
+    ? Math.min(plafondPopulation, volumeDepart * 1.20)
+    : plafondPopulation;
 
   // Garde-fou #4 : volume de départ déjà proche/au-dessus du plafond
   if (volumeDepart >= plafond * 0.9) {
@@ -169,8 +194,10 @@ export function computeVolumeProgression({ volumeDepart, distance, niveau, total
   }
 
   // Garde-fou #5 : écart volume/plafond trop grand pour la durée disponible
+  // (ne s'applique pas si l'objectif est modeste : le plafond effectif est déjà
+  // recalculé au-dessus pour rester atteignable, cf. ajustement ampleurObjectif)
   const volumeFinConstruction = volumesParSemaine[volumesParSemaine.length - 1].volumeKm;
-  if (volumeFinConstruction < plafond * 0.85 && !blessureActive) {
+  if (volumeFinConstruction < plafond * 0.85 && !blessureActive && ampleurObjectif !== 'faible') {
     warnings.push({
       code: 'PROGRESSION_INSUFFISANTE',
       message: "L'écart entre le volume de départ et le plafond visé est trop grand pour la durée du plan, même en respectant la règle des 10%."
@@ -199,9 +226,14 @@ function pickLongueDay(joursDisponibles) {
 /**
  * Place les séances de la semaine sur les jours disponibles.
  * joursDisponibles : indices 0=Lundi ... 6=Dimanche
+ * modulation : sortie de appliquerContraintes() — applique le plafond de qualité
+ *   et transmet les restrictions d'allure (interdireV/interdireI) sur chaque séance
+ *   qualité, en attendant que le contenu réel des séances soit généré (chantier à part)
+ * forcerAucuneQualite : true pendant une semaine de réacclimatation — pas de qualité,
+ *   quel que soit le niveau ou le nombre de séances
  * Retourne { assignment: {jourIndex: {type, ...}}, warnings: [] }
  */
-export function placerSemaine({ joursDisponibles, niveau, renforcementActif }) {
+export function placerSemaine({ joursDisponibles, niveau, renforcementActif, modulation = {}, forcerAucuneQualite = false }) {
   const days = [...joursDisponibles].sort((a, b) => a - b);
   const nb = days.length;
   const warnings = [];
@@ -216,7 +248,12 @@ export function placerSemaine({ joursDisponibles, niveau, renforcementActif }) {
   assignment[longueDay] = { type: 'longue' };
 
   let pool = days.filter(d => d !== longueDay);
-  const nbQualite = Math.min(nbQualiteFor(nb, niveau), pool.length);
+  const nbQualiteBase = forcerAucuneQualite ? 0 : nbQualiteFor(nb, niveau);
+  const nbQualite = Math.min(
+    nbQualiteBase,
+    modulation.quantiteMaxQualite ?? Infinity,
+    pool.length
+  );
   const qualiteDays = [];
 
   // Garde-fou #7 : éviter la qualité veille/lendemain de la longue, sauf repli forcé
@@ -237,7 +274,16 @@ export function placerSemaine({ joursDisponibles, niveau, renforcementActif }) {
     pool = pool.filter(d => d !== best);
   }
 
-  qualiteDays.forEach(d => { assignment[d] = { type: 'qualite' }; });
+  qualiteDays.forEach(d => {
+    assignment[d] = { type: 'qualite' };
+    if (modulation.interdireV || modulation.interdireI) {
+      assignment[d].restrictionsAllure = {
+        interdireV: !!modulation.interdireV,
+        interdireI: !!modulation.interdireI,
+        repli5KDouleurChronique: !!modulation.repli5KDouleurChronique
+      };
+    }
+  });
   pool.forEach(d => { assignment[d] = { type: 'ef' }; });
 
   if (usedFallbackAdjacence) {
@@ -307,6 +353,7 @@ export function appliquerContraintes({ contraintes, repriseDuree, distance }) {
     modulation.interdireV = true;
     // Cas particulier 5K (section 7 corrigée) : repli sur I plutôt que suppression pure
     if (distance === '5K') {
+      modulation.repli5KDouleurChronique = true;
       modulation.warnings.push({
         code: 'REPLI_5K_DOULEUR_CHRONIQUE',
         message: "V contre-indiqué pour un plan 5K : repli sur I (VMA) plus soutenu pour garder un stimulus de vitesse."
@@ -329,6 +376,15 @@ export function appliquerContraintes({ contraintes, repriseDuree, distance }) {
 }
 
 // ---------------------------------------------------------------------------
+// Section 8 — zone FC par défaut (formule de Tanaka, à partir de l'année de naissance)
+// ---------------------------------------------------------------------------
+
+export function computeFcMaxTanaka(anneeNaissance) {
+  const age = new Date().getFullYear() - anneeNaissance;
+  return Math.round(208 - 0.7 * age);
+}
+
+// ---------------------------------------------------------------------------
 // Orchestrateur — assemble tout en un Plan conforme au schéma (section 9)
 // ---------------------------------------------------------------------------
 
@@ -336,6 +392,7 @@ export function generatePlan(profil, params) {
   const distanceKm = KM_BY_DISTANCE[params.distance];
   const refTimeSeconds = parseTimeToSeconds(params.tempsReference);
   const objectifTimeSeconds = parseTimeToSeconds(params.objectif);
+  const ampleurObjectif = categoriserAmpleurObjectif(refTimeSeconds, objectifTimeSeconds);
 
   const allSeconds = computeAllures({
     refTimeSeconds,
@@ -351,7 +408,8 @@ export function generatePlan(profil, params) {
     dateDebut: params.dateDebut,
     dateCourse: params.dateCourse,
     distance: params.distance,
-    niveau: profil.niveau
+    niveau: profil.niveau,
+    ampleurObjectif
   });
 
   const modulation = appliquerContraintes({
@@ -365,18 +423,37 @@ export function generatePlan(profil, params) {
     distance: params.distance,
     niveau: profil.niveau,
     totalSemaines,
-    contraintes: params.contraintesPonctuelles ?? []
+    contraintes: params.contraintesPonctuelles ?? [],
+    ampleurObjectif
   });
+
+  // Carotte les semaines de réacclimatation (contrainte "reprise") sur le budget
+  // Construction, plutôt que d'allonger le plan (durée totale fixée par les dates)
+  const semainesReacclimatation = Math.min(
+    Math.ceil(modulation.semainesReacclimatation),
+    Math.max(0, (phases.find(p => p.nom === 'Construction')?.semaines ?? 1) - 1)
+  );
+  const phasesAvecReacclimatation = [];
+  for (const phase of phases) {
+    if (phase.nom === 'Construction' && semainesReacclimatation > 0) {
+      phasesAvecReacclimatation.push({ nom: 'Reacclimatation', semaines: semainesReacclimatation });
+      phasesAvecReacclimatation.push({ nom: 'Construction', semaines: phase.semaines - semainesReacclimatation });
+    } else {
+      phasesAvecReacclimatation.push(phase);
+    }
+  }
 
   const semaines = [];
   let semaineGlobale = 0;
-  for (const phase of phases) {
+  for (const phase of phasesAvecReacclimatation) {
     for (let i = 0; i < phase.semaines; i++) {
       semaineGlobale++;
       const { assignment, warnings: warningsPlacement } = placerSemaine({
         joursDisponibles: profil.joursDisponiblesHabituels,
         niveau: profil.niveau,
-        renforcementActif: profil.renforcementMusculaire
+        renforcementActif: profil.renforcementMusculaire,
+        modulation,
+        forcerAucuneQualite: phase.nom === 'Reacclimatation'
       });
       semaines.push({
         semaineNum: semaineGlobale,
@@ -399,11 +476,13 @@ export function generatePlan(profil, params) {
   return {
     distance: params.distance,
     objectif: params.objectif,
+    ampleurObjectif,
     dateDebut: params.dateDebut,
     dateCourse: params.dateCourse,
     dureeSemaines: totalSemaines,
-    phases,
+    phases: phasesAvecReacclimatation,
     allures,
+    zoneFC: profil.anneeNaissance ? { methode: 'tanaka', fcMax: computeFcMaxTanaka(profil.anneeNaissance) } : null,
     volumePlafondKm: plafond,
     semaines,
     warnings
