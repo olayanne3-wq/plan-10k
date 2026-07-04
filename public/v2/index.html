@@ -2046,8 +2046,18 @@ function generatePlan(profil, params) {
 
     const dayNames = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
 
+    // Jour de la semaine (0=Lun...6=Dim) où tombe la course, pour le marquer
+    // sur la toute dernière semaine du plan affiché
+    const jsDay = new Date(plan.dateCourse).getDay(); // 0=Dim...6=Sam (convention JS)
+    const jourCourseIndex = (jsDay + 6) % 7;
+    const derniereSemaineNum = plan.semaines.length ? plan.semaines[plan.semaines.length - 1].semaineNum : null;
+
     function renderSemaineHtml(semaine) {
+      const estDerniereSemaine = semaine.semaineNum === derniereSemaineNum;
       const rows = dayNames.map((d, i) => {
+        if (estDerniereSemaine && i === jourCourseIndex) {
+          return `<div class="day-row"><div class="dname">${d}</div><div style="flex:1;"><div class="badge longue"><span>🏁 Jour J — Course !</span></div></div></div>`;
+        }
         const a = semaine.assignment[i];
         let badgeClass, label, detail = '';
         if (!a) { badgeClass = 'repos'; label = 'Repos'; }
