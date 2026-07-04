@@ -43,6 +43,24 @@
     font-size:11.5px; color:rgba(238,240,234,0.5);
     margin-top:4px; padding-left:2px; line-height:1.4;
   }
+  .phase-header{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:16px; font-weight:700;
+    color:var(--paper);
+    margin:22px 0 10px 0;
+    padding-bottom:6px;
+    border-bottom:1px solid var(--line);
+  }
+  .semaine-header{
+    display:flex; align-items:center; justify-content:space-between;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px; color:rgba(238,240,234,0.55);
+    margin:14px 0 6px 0;
+  }
+  .semaine-header .decharge-tag{
+    color:var(--signal);
+    font-weight:600;
+  }
 
   .toggle-row{
     display:flex; align-items:center; justify-content:space-between;
@@ -856,8 +874,8 @@
       <div class="block-label" style="margin-top:20px;">Allures calculées</div>
       <div class="bib" id="resAllures"></div>
 
-      <div class="block-label" id="resSemaineLabel" style="margin-top:20px;">Semaine type</div>
-      <div class="week" id="resSemaine"></div>
+      <div class="block-label" style="margin-top:20px;">Plan complet</div>
+      <div id="resPlanComplet"></div>
 
       <div id="resWarnings"></div>
     </div>
@@ -1473,14 +1491,15 @@ const DUREE_MAX_LONGUE_MIN = { '5K': 90, '10K': 90, 'Semi': 120, 'Marathon': 150
  * Approximation assumée : échauffement/retour au calme et jogs de récupération
  * ne sont pas comptés séparément, ils sont absorbés dans l'allure EF globale.
  */
-function genererContenuEF({ alluresSec, kmCible }) {
+function genererContenuEF({ alluresSec, kmCible, role = 'standard' }) {
   const dureeMinBrut = (kmCible * alluresSec.E) / 60;
   const dureeMin = Math.round(Math.min(dureeMinBrut, DUREE_MAX_EF_MIN));
   const kmEffectif = (dureeMin * 60) / alluresSec.E;
   const warning = dureeMinBrut > DUREE_MAX_EF_MIN + 1
     ? { code: 'SEANCE_EF_PLAFONNEE', message: `Séance EF plafonnée à ${DUREE_MAX_EF_MIN}min (${Math.round(dureeMinBrut)}min auraient été nécessaires pour caser tout le volume) — trop peu de séances/semaine pour ce volume cible.` }
     : null;
-  return { contenu: `${dureeMin}min à allure EF (${formatPace(alluresSec.E)}) — ${Math.round(kmEffectif * 10) / 10}km`, kmEstime: kmEffectif, warning };
+  const labelRole = role === 'recuperation' ? ' (récupération)' : '';
+  return { contenu: `${dureeMin}min à allure EF${labelRole} (${formatPace(alluresSec.E)}) — ${Math.round(kmEffectif * 10) / 10}km`, kmEstime: kmEffectif, warning };
 }
 
 function genererContenuLongue({ distance, phase, alluresSec, kmCible }) {
@@ -1522,8 +1541,13 @@ function repartirVolumeSemaine({ volumeCibleKm, kmQualiteTotal, nbEF, aLongue })
   const kmRestant = Math.max(0, volumeCibleKm - kmQualiteTotal);
   let kmLongue = 0, kmParEF = 0;
 
+  // Ratio Daniels : la sortie longue ne devrait jamais dépasser 25-30% du
+  // volume hebdo TOTAL, quelle que soit la distance visée (5K ou marathon) —
+  // pas de variation par distance ici, la règle est volontairement universelle.
+  const RATIO_LONGUE = 0.28;
+
   if (aLongue) {
-    kmLongue = kmRestant * 0.40;
+    kmLongue = Math.min(volumeCibleKm * RATIO_LONGUE, kmRestant);
     const kmRestantApresLongue = kmRestant - kmLongue;
     kmParEF = nbEF > 0 ? kmRestantApresLongue / nbEF : 0;
   } else {
@@ -1540,6 +1564,34 @@ function repartirVolumeSemaine({ volumeCibleKm, kmQualiteTotal, nbEF, aLongue })
   }
 
   return { kmLongue, kmParEF, warning };
+}
+
+/**
+ * Différencie les séances EF entre elles selon leur position dans la semaine :
+ * une EF qui suit directement une séance dure (qualité ou longue) devient une
+ * EF de récupération plus courte ; les autres restent "standard". Le total
+ * reste égal à kmParEF × nbEF (pas de nouvelle incohérence avec le volume cible).
+ */
+function differencierEF({ assignment, kmParEF }) {
+  const efDays = Object.entries(assignment).filter(([, s]) => s.type === 'ef').map(([j]) => parseInt(j));
+  const hardDays = Object.entries(assignment).filter(([, s]) => s.type === 'qualite' || s.type === 'longue').map(([j]) => parseInt(j));
+
+  if (efDays.length <= 1) {
+    return Object.fromEntries(efDays.map(j => [j, { role: 'standard', kmCible: kmParEF }]));
+  }
+
+  // "Récupération" = le jour suit directement (circulairement) une séance dure
+  const estRecuperation = j => hardDays.some(h => (j - h + 7) % 7 === 1);
+  const roles = Object.fromEntries(efDays.map(j => [j, estRecuperation(j) ? 'recuperation' : 'standard']));
+
+  const POIDS = { recuperation: 0.75, standard: 1.0 };
+  const sommePoids = efDays.reduce((acc, j) => acc + POIDS[roles[j]], 0);
+  const kmTotal = kmParEF * efDays.length;
+
+  return Object.fromEntries(efDays.map(j => [
+    j,
+    { role: roles[j], kmCible: sommePoids > 0 ? (kmTotal * POIDS[roles[j]]) / sommePoids : kmParEF }
+  ]));
 }
 
 // ---------------------------------------------------------------------------
@@ -1650,11 +1702,16 @@ function generatePlan(profil, params) {
         warningsSemaines.push({ ...warningRepartition, message: `S${semaineGlobale} : ${warningRepartition.message}` });
       }
 
+      const roleParJourEF = differencierEF({ assignment, kmParEF });
+
       for (const [jour, seance] of Object.entries(assignment)) {
         if (seance.type === 'ef') {
-          const { contenu, kmEstime, warning } = genererContenuEF({ alluresSec: allSeconds, kmCible: kmParEF });
+          const jourNum = parseInt(jour);
+          const { role, kmCible } = roleParJourEF[jourNum] ?? { role: 'standard', kmCible: kmParEF };
+          const { contenu, kmEstime, warning } = genererContenuEF({ alluresSec: allSeconds, kmCible, role });
           seance.contenu = contenu;
           seance.kmEstime = kmEstime;
+          seance.role = role;
           if (warning) warningsSemaines.push({ ...warning, message: `S${semaineGlobale} (jour ${jour}) : ${warning.message}` });
         } else if (seance.type === 'longue') {
           const { contenu, kmEstime, warning } = genererContenuLongue({
@@ -1988,24 +2045,40 @@ function generatePlan(profil, params) {
     ).join('');
 
     const dayNames = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
-    const semaine = plan.semaines.find(s => s.phase === 'Specifique') ?? plan.semaines[Math.min(1, plan.semaines.length - 1)];
-    document.getElementById('resSemaineLabel').textContent = `Semaine ${semaine.semaineNum} (${semaine.phase})`;
-    const semaineDiv = document.getElementById('resSemaine');
-    semaineDiv.innerHTML = dayNames.map((d, i) => {
-      const a = semaine.assignment[i];
-      let badgeClass, label, detail = '';
-      if (!a) { badgeClass = 'repos'; label = 'Repos'; }
-      else if (a.type === 'longue') { badgeClass = 'longue'; label = 'Sortie longue'; detail = a.contenu; }
-      else if (a.type === 'qualite') {
-        badgeClass = 'qualite'; label = 'Qualité'; detail = a.contenu;
-        const r = a.restrictionsAllure;
-        if (r) label += ` <span class="tag">${r.repli5KDouleurChronique ? 'repli I' : (r.interdireV ? 'sans V' : '') + (r.interdireI ? ' sans I' : '')}</span>`;
+
+    function renderSemaineHtml(semaine) {
+      const rows = dayNames.map((d, i) => {
+        const a = semaine.assignment[i];
+        let badgeClass, label, detail = '';
+        if (!a) { badgeClass = 'repos'; label = 'Repos'; }
+        else if (a.type === 'longue') { badgeClass = 'longue'; label = 'Sortie longue'; detail = a.contenu; }
+        else if (a.type === 'qualite') {
+          badgeClass = 'qualite'; label = 'Qualité'; detail = a.contenu;
+          const r = a.restrictionsAllure;
+          if (r) label += ` <span class="tag">${r.repli5KDouleurChronique ? 'repli I' : (r.interdireV ? 'sans V' : '') + (r.interdireI ? ' sans I' : '')}</span>`;
+        }
+        else if (a.type === 'ef') { badgeClass = 'ef'; label = 'EF'; detail = a.contenu; }
+        else if (a.type === 'repos') { badgeClass = 'repos'; label = 'Repos' + (a.renfo ? ' <span class="tag">+ RENFO</span>' : ''); }
+        const detailHtml = detail ? `<div class="day-detail">${detail}</div>` : '';
+        return `<div class="day-row"><div class="dname">${d}</div><div style="flex:1;"><div class="badge ${badgeClass}"><span>${label}</span></div>${detailHtml}</div></div>`;
+      }).join('');
+
+      const dechargeTag = semaine.estDechargeSemaine ? '<span class="decharge-tag">décharge</span>' : '';
+      const header = `<div class="semaine-header"><span>Semaine ${semaine.semaineNum} — ${semaine.volumeCibleKm ?? '—'}km</span>${dechargeTag}</div>`;
+      return `${header}<div class="week">${rows}</div>`;
+    }
+
+    const planDiv = document.getElementById('resPlanComplet');
+    let html = '';
+    let dernierePhase = null;
+    plan.semaines.forEach(semaine => {
+      if (semaine.phase !== dernierePhase) {
+        html += `<div class="phase-header">${semaine.phase}</div>`;
+        dernierePhase = semaine.phase;
       }
-      else if (a.type === 'ef') { badgeClass = 'ef'; label = 'EF'; detail = a.contenu; }
-      else if (a.type === 'repos') { badgeClass = 'repos'; label = 'Repos' + (a.renfo ? ' <span class="tag">+ RENFO</span>' : ''); }
-      const detailHtml = detail ? `<div class="day-detail">${detail}</div>` : '';
-      return `<div class="day-row"><div class="dname">${d}</div><div style="flex:1;"><div class="badge ${badgeClass}"><span>${label}</span></div>${detailHtml}</div></div>`;
-    }).join('');
+      html += renderSemaineHtml(semaine);
+    });
+    planDiv.innerHTML = html;
 
     const warnDiv = document.getElementById('resWarnings');
     warnDiv.innerHTML = plan.warnings.map(w =>
