@@ -461,6 +461,19 @@ Trouvé en usage réel (deux fois de suite sur le même problème) :
 
 Semaines de décharge désormais exclues de ce garde-fou (même raison que l'Affûtage, section 21) — un volume réduit avec des EF plus courtes y est voulu, pas un défaut.
 
+## 27. Première brique de persistance — sauvegarde cloud via GitHub Gist
+
+Premier pas vers le suivi dans le temps (nécessaire avant toute adaptation du plan selon la réalisation des séances). Implémenté :
+
+- **Porte d'entrée unique** vers le stockage (`sauvegarderPlan()`, `chargerPlans()`) — le reste du code (wizard, PDF, affichage) ne sait pas d'où viennent les données. Objectif : pouvoir migrer vers Supabase (v2.5) en ne réécrivant que l'intérieur de ces fonctions, sans toucher au reste.
+- **Implémentation actuelle : GitHub Gist**, même pattern que v1 (token GitHub personnel saisi côté client, pas de serveur intermédiaire) — réutilise la même clé de stockage local pour le token (`lk_github_token`) que v1, mais un Gist séparé et dédié au schéma de données v2 (`plan10k_v2_plans.json`), pour ne pas interférer avec la sauvegarde existante de v1
+- Bouton "Sauvegarder ce plan dans le cloud" sur l'écran de résultats, avec messages d'erreur explicites (token manquant, scope insuffisant, etc.)
+
+**Ce qui reste à faire** (chantiers suivants, pas encore commencés) :
+- Suivi de complétion des séances (✅/⚠️/❌ comme v1)
+- Interface pour charger/consulter les plans précédemment sauvegardés
+- Règles d'adaptation du plan selon les résultats réels — le vrai chantier méthodologique, pas encore abordé
+
 ## Sources consultées
 
 - Jack Daniels' Running Formula — zones VDOT (E/M/T/I/R, adaptées en Récup/E/C/T/I/V dans ce document ; M devient C "Allure course objectif", généralisée à toute distance et non réservée au marathon, et Récup ajoutée comme zone distincte — corrections validées sur plan réel)
