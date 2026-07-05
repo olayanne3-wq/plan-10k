@@ -166,9 +166,15 @@ export function computeVolumeProgression({ volumeDepart, distance, niveau, total
 
   // Objectif modeste : pas besoin de viser le plafond de population, un plateau
   // proche du volume de départ suffit (validé sur profil réel — cf. section 4bis "piste ouverte")
-  const plafond = ampleurObjectif === 'faible'
+  const plafondCible = ampleurObjectif === 'faible'
     ? Math.min(plafondPopulation, volumeDepart * 1.20)
     : plafondPopulation;
+
+  // Le plafond ne doit jamais descendre sous le volume de départ réel — sinon
+  // la formule de croissance écrête brutalement dès la 2e semaine (trouvé en
+  // usage réel : quelqu'un qui court déjà à 50km/sem ne doit pas être ramené
+  // de force à un plafond de population plus bas, ce serait contre-productif)
+  const plafond = Math.max(plafondCible, volumeDepart);
 
   // Durée nulle : date invalide déjà signalée par computePhases, pas la peine
   // de calculer une fausse progression ni de remonter un 2e avertissement
@@ -176,12 +182,14 @@ export function computeVolumeProgression({ volumeDepart, distance, niveau, total
     return { plafond, volumesParSemaine: [], warnings };
   }
 
-  // Garde-fou #4 : volume de départ déjà proche/au-dessus du plafond
-  if (volumeDepart >= plafond * 0.9) {
-    warnings.push({
-      code: 'MARGE_PROGRESSION_FAIBLE',
-      message: `Volume de départ (${volumeDepart}km) déjà proche du plafond visé (${plafond}km) — marge de progression réduite.`
-    });
+  // Garde-fou #4 : volume de départ déjà proche ou au-dessus du plafond de
+  // population — signalé même si le plafond effectif a été relevé au-dessus,
+  // car ça reste une info utile (le profil déclaré dépasse les repères habituels)
+  if (volumeDepart >= plafondCible * 0.9) {
+    const messageEcart = volumeDepart > plafondCible
+      ? `Volume de départ (${volumeDepart}km) déjà au-dessus du plafond habituel pour ce profil (${Math.round(plafondCible * 10) / 10}km) — le plafond a été relevé pour ne pas te faire régresser.`
+      : `Volume de départ (${volumeDepart}km) déjà proche du plafond visé (${Math.round(plafondCible * 10) / 10}km) — marge de progression réduite.`;
+    warnings.push({ code: 'MARGE_PROGRESSION_FAIBLE', message: messageEcart });
   }
 
   const blessureActive = contraintes.includes('blessure-active');
@@ -454,6 +462,26 @@ export function appliquerContraintes({ contraintes, repriseDuree, distance }) {
 export function computeFcMaxTanaka(anneeNaissance) {
   const age = new Date().getFullYear() - anneeNaissance;
   return Math.round(208 - 0.7 * age);
+}
+
+// Zones FC par type de séance, en % de FC max — validé contre le vrai code v1
+// (EF/Longue 65-75%, Seuil 90-95%, VMA 90-100%, Allure course 85-90%)
+const ZONES_FC_POURCENTAGE = {
+  recup: [0.55, 0.65],
+  E: [0.65, 0.75],
+  C: [0.85, 0.90],
+  T: [0.90, 0.95],
+  I: [0.90, 1.00],
+  V: [0.95, 1.00]
+};
+
+export function computeZonesFC(fcMax) {
+  return Object.fromEntries(
+    Object.entries(ZONES_FC_POURCENTAGE).map(([zone, [bas, haut]]) => [
+      zone,
+      { min: Math.round(fcMax * bas), max: Math.round(fcMax * haut) }
+    ])
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -912,9 +940,15 @@ export function generatePlan(profil, params) {
     dureeSemaines: totalSemaines,
     phases: phasesAvecReacclimatation,
     allures,
-    zoneFC: profil.fcMaxConnue
-      ? { methode: 'mesuree', fcMax: profil.fcMaxConnue }
-      : profil.anneeNaissance ? { methode: 'tanaka', fcMax: computeFcMaxTanaka(profil.anneeNaissance) } : null,
+    zoneFC: (() => {
+      const fcMax = profil.fcMaxConnue ?? (profil.anneeNaissance ? computeFcMaxTanaka(profil.anneeNaissance) : null);
+      if (!fcMax) return null;
+      return {
+        methode: profil.fcMaxConnue ? 'mesuree' : 'tanaka',
+        fcMax,
+        zonesParType: computeZonesFC(fcMax)
+      };
+    })(),
     volumePlafondKm: plafond,
     semaines,
     warnings
