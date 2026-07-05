@@ -537,6 +537,12 @@ Les règles définies en section 33 sont maintenant codées et testées (4 scén
 
 **Ce qui reste hors scope pour l'instant** (documenté comme piste future, pas commencé) : la comparaison allure/FC réelles (via Strava) contre les zones attendues, pour détecter qu'une séance était trop facile et suggérer — jamais imposer — une hausse du plafond de volume. Nécessiterait une vraie intégration Strava dans v2, qui n'existe pas aujourd'hui.
 
+## 35. Correctif — les adaptations peuvent maintenant être annulées
+
+Trouvé en usage réel : le bouton "Analyser et adapter" modifiait le plan **en place, de façon cumulative** — une fois une semaine marquée "adaptée", rien ne pouvait revenir en arrière si on corrigeait un statut mal saisi par erreur (ex. une séance notée "ratée" par erreur, remise en "réussie" après coup).
+
+Corrigé : chaque analyse repart maintenant d'une **régénération propre** du plan à partir de `profilOrigine`/`paramsOrigine`, puis ré-applique les adaptations selon les statuts *actuels* — plutôt que d'empiler des modifications sur un état déjà modifié. Concrètement, si les statuts qui avaient déclenché une adaptation sont corrigés, la prochaine analyse "oublie" cette adaptation qui ne se justifie plus. Testé et confirmé sur le scénario exact (2 séances marquées ratées par erreur → adaptation appliquée → corrigées en réussies → nouvelle analyse → adaptation bien annulée).
+
 ## Sources consultées
 
 - Jack Daniels' Running Formula — zones VDOT (E/M/T/I/R, adaptées en Récup/E/C/T/I/V dans ce document ; M devient C "Allure course objectif", généralisée à toute distance et non réservée au marathon, et Récup ajoutée comme zone distincte — corrections validées sur plan réel)
