@@ -2155,7 +2155,11 @@ function generatePlan(profil, params) {
     function texte(str, taille, gras, couleur) {
       doc.setFontSize(taille);
       doc.setFont(undefined, gras ? 'bold' : 'normal');
-      doc.setTextColor(couleur ?? 20);
+      if (Array.isArray(couleur)) {
+        doc.setTextColor(couleur[0], couleur[1], couleur[2]);
+      } else {
+        doc.setTextColor(couleur ?? 20);
+      }
       const lignes = doc.splitTextToSize(str, largeurUtile);
       lignes.forEach(l => {
         doc.text(l, marge, y);
