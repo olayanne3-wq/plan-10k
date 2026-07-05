@@ -474,6 +474,18 @@ Premier pas vers le suivi dans le temps (nécessaire avant toute adaptation du p
 - Interface pour charger/consulter les plans précédemment sauvegardés
 - Règles d'adaptation du plan selon les résultats réels — le vrai chantier méthodologique, pas encore abordé
 
+## 28. Suivi de complétion des séances (✅/⚠️/❌)
+
+Deuxième brique du chantier "adaptation du plan" (après la persistance, section 27). Chaque séance qualité/EF/longue affichée dans le plan complet a maintenant une icône cliquable (⬜ par défaut) qui cycle entre réussie (✅) / adaptée (⚠️) / ratée (❌) / non marquée, au clic — même principe que v1.
+
+Détails techniques :
+- Chaque plan généré reçoit un **identifiant stable** (`plan.id`, UUID) dès la génération, pour que la sauvegarde mette à jour le plan existant dans le Gist plutôt que d'en créer un doublon à chaque fois qu'un statut change
+- Les statuts sont stockés dans `plan.statuses` (clé `"semaine-jour"` → statut), inclus automatiquement dans la sauvegarde cloud
+
+Bug trouvé et corrigé pendant l'implémentation : les fonctions de rendu (`renderSemaineHtml`, `rafraichirPlanComplet`) étaient imbriquées dans `renderResults`, invisibles depuis `cycleStatutSeance` (portée JS) — sorties au niveau global.
+
+**Toujours pas fait** : les vraies règles d'adaptation (comment le plan devrait réagir aux statuts accumulés) — c'est le morceau le plus important, encore entièrement à faire.
+
 ## Sources consultées
 
 - Jack Daniels' Running Formula — zones VDOT (E/M/T/I/R, adaptées en Récup/E/C/T/I/V dans ce document ; M devient C "Allure course objectif", généralisée à toute distance et non réservée au marathon, et Récup ajoutée comme zone distincte — corrections validées sur plan réel)
