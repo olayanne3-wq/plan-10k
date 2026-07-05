@@ -880,7 +880,9 @@ export function generatePlan(profil, params) {
     dureeSemaines: totalSemaines,
     phases: phasesAvecReacclimatation,
     allures,
-    zoneFC: profil.anneeNaissance ? { methode: 'tanaka', fcMax: computeFcMaxTanaka(profil.anneeNaissance) } : null,
+    zoneFC: profil.fcMaxConnue
+      ? { methode: 'mesuree', fcMax: profil.fcMaxConnue }
+      : profil.anneeNaissance ? { methode: 'tanaka', fcMax: computeFcMaxTanaka(profil.anneeNaissance) } : null,
     volumePlafondKm: plafond,
     semaines,
     warnings
