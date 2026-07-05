@@ -451,6 +451,16 @@ Ajouté au moteur : une zone FC (en % de FC max) par type de séance, dérivée 
 
 Les 4 zones comparables donnent des bornes en bpm **identiques** au vrai code v1 sur le profil de Laurent (FC max 181), ce qui valide au passage que les pourcentages choisis sont corrects — pas seulement une estimation plausible.
 
+## 26. Correction — décharge classique et seuil du garde-fou trop sensible
+
+Trouvé en usage réel (deux fois de suite sur le même problème) :
+
+**1. Les semaines de décharge classiques (pas seulement l'Affûtage) souffraient du même trou que la section 22** : le corps des séances qualité ne rétrécissait pas pendant une décharge, seul le volume hebdo total baissait (-25%), écrasant les EF. Corrigé en étendant la réduction proportionnelle des répétitions (déjà appliquée à l'Affûtage) aux semaines de décharge — même logique, même planchers.
+
+**2. Le garde-fou "volume trop faible pour la répartition" était devenu trop sensible** une fois l'échauffement/RAC réaliste pris en compte (section 22) : il se déclenchait dès qu'une EF de récupération (~15min, ~2,4km — parfaitement normale) tombait sous son seuil de 3km. Seuil abaissé à 2km, qui laisse passer les EF de récupération légitimes tout en continuant à détecter les vrais cas dégénérés (contraintes cumulées + volume faible, testé et confirmé).
+
+Semaines de décharge désormais exclues de ce garde-fou (même raison que l'Affûtage, section 21) — un volume réduit avec des EF plus courtes y est voulu, pas un défaut.
+
 ## Sources consultées
 
 - Jack Daniels' Running Formula — zones VDOT (E/M/T/I/R, adaptées en Récup/E/C/T/I/V dans ce document ; M devient C "Allure course objectif", généralisée à toute distance et non réservée au marathon, et Récup ajoutée comme zone distincte — corrections validées sur plan réel)
