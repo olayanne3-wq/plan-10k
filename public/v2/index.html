@@ -667,7 +667,12 @@
       <div class="date-field">
         <input type="number" id="birthYear" placeholder="Année de naissance" style="font-size:16px; padding:14px;">
       </div>
-      <p class="sub" style="margin-top:8px; margin-bottom:0;">Sert à calculer une zone de fréquence cardiaque par défaut, en complément des zones d'allure.</p>
+      <p class="sub" style="margin-top:8px; margin-bottom:0;">Sert à calculer une zone de fréquence cardiaque par défaut (formule de Tanaka), en complément des zones d'allure.</p>
+
+      <div class="date-field" style="margin-top:10px;">
+        <input type="number" id="fcMaxConnue" placeholder="FC max connue (optionnel)" style="font-size:16px; padding:14px;">
+      </div>
+      <p class="sub" style="margin-top:8px; margin-bottom:0;">Si tu connais ta vraie FC max (mesurée en course ou via un test), indique-la ici — elle remplacera l'estimation par formule, toujours plus précise qu'une moyenne de population.</p>
     </div>
 
     <!-- STEP 3: Volume actuel -->
@@ -870,7 +875,7 @@
         <div class="bib-row"><span class="k">Durée</span><span class="v" id="resDuree">—</span></div>
         <div class="bib-row"><span class="k">Phases</span><span class="v" id="resPhases">—</span></div>
         <div class="bib-row"><span class="k">Plafond volume</span><span class="v accent" id="resPlafond">—</span></div>
-        <div class="bib-row"><span class="k">Zone FC (Tanaka)</span><span class="v" id="resFcMax">—</span></div>
+        <div class="bib-row"><span class="k">Zone FC</span><span class="v" id="resFcMax">—</span></div>
       </div>
 
       <div class="block-label" style="margin-top:20px;">Allures calculées</div>
@@ -1777,7 +1782,9 @@ function generatePlan(profil, params) {
     dureeSemaines: totalSemaines,
     phases: phasesAvecReacclimatation,
     allures,
-    zoneFC: profil.anneeNaissance ? { methode: 'tanaka', fcMax: computeFcMaxTanaka(profil.anneeNaissance) } : null,
+    zoneFC: profil.fcMaxConnue
+      ? { methode: 'mesuree', fcMax: profil.fcMaxConnue }
+      : profil.anneeNaissance ? { methode: 'tanaka', fcMax: computeFcMaxTanaka(profil.anneeNaissance) } : null,
     volumePlafondKm: plafond,
     semaines,
     warnings
@@ -2035,6 +2042,7 @@ function generatePlan(profil, params) {
     const profil = {
       niveau: NIVEAU_MAP[niveauLabel] ?? 'intermediaire',
       anneeNaissance: parseInt(document.getElementById('birthYear').value) || undefined,
+      fcMaxConnue: parseInt(document.getElementById('fcMaxConnue').value) || undefined,
       joursDisponiblesHabituels: joursDisponibles,
       renforcementMusculaire: renfoOn
     };
@@ -2062,7 +2070,7 @@ function generatePlan(profil, params) {
     document.getElementById('resPhases').textContent = plan.phases.map(p => `${p.nom} ${p.semaines}sem`).join(' / ');
     document.getElementById('resPlafond').textContent = `${plan.volumePlafondKm} km/sem`;
     document.getElementById('resFcMax').textContent = plan.zoneFC
-      ? `${plan.zoneFC.fcMax} bpm max (méthode ${plan.zoneFC.methode})`
+      ? `${plan.zoneFC.fcMax} bpm max (${plan.zoneFC.methode === 'mesuree' ? 'mesurée' : 'estimée, formule de Tanaka'})`
       : 'Année de naissance manquante';
 
     const alluresDiv = document.getElementById('resAllures');
@@ -2179,7 +2187,7 @@ function generatePlan(profil, params) {
 
     // Tableau des allures
     const lignesAllures = Object.entries(plan.allures).map(([zone, val]) => [zone, val]);
-    if (plan.zoneFC) lignesAllures.push(['Zone FC max (Tanaka)', `${plan.zoneFC.fcMax} bpm`]);
+    if (plan.zoneFC) lignesAllures.push([`Zone FC max (${plan.zoneFC.methode === 'mesuree' ? 'mesurée' : 'Tanaka'})`, `${plan.zoneFC.fcMax} bpm`]);
     doc.autoTable({
       startY: y,
       margin: { left: marge, right: marge },
@@ -2212,7 +2220,7 @@ function generatePlan(profil, params) {
       const estCourse = [];
       for (let i = 0; i < 7; i++) {
         if (semaine.semaineNum === derniereSemaineNum && i === jourCourseIndex) {
-          lignesJours.push([dayNames[i], '🏁 JOUR J', 'Course !']);
+          lignesJours.push([dayNames[i], 'JOUR J', 'Course !']);
           estCourse.push(lignesJours.length - 1);
           continue;
         }
@@ -2248,7 +2256,7 @@ function generatePlan(profil, params) {
     if (plan.warnings.length) {
       sautDeLigne(2);
       texte('Avertissements', 12, true);
-      plan.warnings.forEach(w => texte(`  ⚠ ${w.message}`, 9));
+      plan.warnings.forEach(w => texte(`  [!] ${w.message}`, 9));
     }
 
     doc.save(`plan-${plan.distance}-${plan.dateCourse}.pdf`);
