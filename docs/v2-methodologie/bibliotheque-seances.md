@@ -543,6 +543,25 @@ Trouvé en usage réel : le bouton "Analyser et adapter" modifiait le plan **en 
 
 Corrigé : chaque analyse repart maintenant d'une **régénération propre** du plan à partir de `profilOrigine`/`paramsOrigine`, puis ré-applique les adaptations selon les statuts *actuels* — plutôt que d'empiler des modifications sur un état déjà modifié. Concrètement, si les statuts qui avaient déclenché une adaptation sont corrigés, la prochaine analyse "oublie" cette adaptation qui ne se justifie plus. Testé et confirmé sur le scénario exact (2 séances marquées ratées par erreur → adaptation appliquée → corrigées en réussies → nouvelle analyse → adaptation bien annulée).
 
+## 36. Séance test — ajoutée, placée vers la fin de Spécifique
+
+Trouvé en comparant avec v1 (qui a un vrai type `"TEST"` lié à un système de prédiction) : le moteur v2 ne recalibrait jamais les allures en cours de plan — calculées une fois à la génération, figées jusqu'à la fin. Ajouté : une séance test unique par plan.
+
+**Sourcé via recherche ("tune-up race")** — placement vers la fin de Spécifique, avec un tampon de récupération avant l'Affûtage (trop proche, et la récupération du test empièterait sur le taper) :
+
+| Distance | Distance du test | Tampon avant l'Affûtage |
+|---|---|---|
+| 5K | 2km | 1 semaine |
+| 10K | 3km | 1 semaine |
+| Semi | 5km | 2 semaines |
+| Marathon | 10km | 2 semaines |
+
+**Plancher** : si Spécifique est trop courte pour le tampon complet, le test bascule sur la première semaine de Spécifique plutôt que de produire un index invalide — testé et confirmé sur un cas limite (Semi, Spécifique à 2 semaines).
+
+**Implémentation** : `placerSeanceTest(plan, alluresSec)`, appelée en fin de `generatePlan`, remplace le contenu d'une séance qualité existante (pas un nouveau jour) et recalcule la répartition EF/longue de cette semaine-là (même mécanique que `appliquerAdaptations`, section 34). Distance du test volontairement plus courte que l'objectif et standardisée — permet d'utiliser `riegelPredict` (déjà dans le moteur) pour vérifier/recalibrer l'objectif, sans avoir à courir la distance de course elle-même.
+
+**Ce qui reste hors scope** : le résultat du test n'est pas encore automatiquement exploité pour suggérer un ajustement d'objectif — la séance est placée et son contenu généré, mais l'analyse du résultat reste manuelle pour l'instant (cohérent avec le principe déjà établi : les décisions sur l'objectif restent humaines).
+
 ## Sources consultées
 
 - Jack Daniels' Running Formula — zones VDOT (E/M/T/I/R, adaptées en Récup/E/C/T/I/V dans ce document ; M devient C "Allure course objectif", généralisée à toute distance et non réservée au marathon, et Récup ajoutée comme zone distincte — corrections validées sur plan réel)
