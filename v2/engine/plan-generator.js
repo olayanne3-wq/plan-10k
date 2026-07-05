@@ -555,9 +555,9 @@ export function genererContenuQualite({ distance, phase, semaineDansPhase, index
     }
     case 'i-30-30': {
       const series = ajuster(reduireSelonNiveauProgression(2, 1, 3, semaineDansPhase), 1);
-      // 8×30″ effort par série ; on ignore les 30″ de récup (approximation assumée)
+      // 8×30s effort par série ; on ignore les 30s de récup (approximation assumée)
       const kmEstime = kmDepuisMinutes(series * 8 * 0.5, I);
-      return { sousType, contenu: `${series}×8×30″-30″ @ ${formatPace(I)} (VMA)`, kmEstime };
+      return { sousType, contenu: `${series}×8×30s-30s @ ${formatPace(I)} (VMA)`, kmEstime };
     }
     case 'i-3min': {
       const reps = ajuster(reduireSelonNiveauProgression(4, 1, 6, semaineDansPhase), 2);
