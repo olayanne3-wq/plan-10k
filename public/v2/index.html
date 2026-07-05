@@ -2972,15 +2972,6 @@ function appliquerAdaptations(plan) {
       if (a.type === 'qualite') return COULEURS_SEANCE[a.sousType] ?? COULEUR_TEXTE;
       return COULEURS_SEANCE.repos;
     }
-    // Fond pastel (couleur éclaircie) pour toute la ligne — reste lisible avec
-    // du texte foncé, contrairement à la couleur saturée en fond plein
-    function eclaircir([r, g, b], quantite = 0.78) {
-      return [
-        Math.round(r + (255 - r) * quantite),
-        Math.round(g + (255 - g) * quantite),
-        Math.round(b + (255 - b) * quantite)
-      ];
-    }
 
     function sautDeLigne(hauteur) {
       y += hauteur;
@@ -3122,11 +3113,8 @@ function appliquerAdaptations(plan) {
           } else {
             const c = couleursJours[data.row.index];
             if (c) {
-              data.cell.styles.fillColor = eclaircir(c);
-              if (data.column.index === 1) {
-                data.cell.styles.textColor = c;
-                data.cell.styles.fontStyle = 'bold';
-              }
+              data.cell.styles.textColor = c;
+              if (data.column.index === 1) data.cell.styles.fontStyle = 'bold';
             }
           }
         }
