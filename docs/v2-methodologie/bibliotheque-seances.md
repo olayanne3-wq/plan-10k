@@ -420,6 +420,22 @@ Trouvé en usage réel : le moteur ne générait que le corps des séances quali
 
 Le symbole "″" (secondes) utilisé pour le VMA 30-30 a aussi été remplacé par "s" — non supporté par les polices standards de jsPDF (export PDF), il s'affichait comme des caractères aléatoires. La récupération entre les séries (distincte de la récup intra-série) a été précisée dans le contenu généré.
 
+## 23. Correction — le plafond ne descend plus sous le volume de départ réel
+
+Signalé via un vrai export PDF (10K, volume de départ 50km/sem) : la semaine 1 affichait fidèlement le volume déclaré (50km), mais la semaine 2 chutait brutalement à 42,5km — le plafond de population pour ce profil (intermédiaire, 10K). Le volume de départ dépassait déjà le plafond visé, et la formule de croissance écrêtait sans transition, donnant l'impression d'un recul plutôt qu'une progression.
+
+Corrigé : **le plafond ne descend jamais sous le volume de départ réel** (`plafond = max(plafond de population/ampleur, volumeDepart)`). Si quelqu'un court déjà à un volume supérieur aux repères habituels pour son profil, il n'y a aucune raison méthodologique de le faire régresser — le plafond est relevé en conséquence, et un message clair l'explique (distinct du cas "juste proche du plafond").
+
+## 24. Décision — échauffement/RAC restent fixes, EF et longue restent sans échauffement
+
+Comparaison avec le vrai code v1 (`index.html` de production) : v1 fait varier la durée d'échauffement selon l'intensité de la séance qualité (20min pour VMA/Test, 15min pour Seuil/Allure course), et donne même à l'EF et à la sortie longue un petit rituel d'ouverture/fermeture (footing+éducatifs, marche+étirements) — avec une distinction entre EF standard et EF récupération.
+
+**Décision** : le moteur v2 reste plus simple, délibérément :
+- **EF et sortie longue n'ont pas d'échauffement structuré** — l'allure facile fait déjà office d'échauffement, pas besoin d'ajouter un bloc distinct
+- **Échauffement/RAC des séances qualité restent fixes** (15min / 10min, section 22), pas différenciés par intensité (V/I vs T/C) comme le fait v1
+
+Choisi pour la simplicité de maintenance plutôt que pour coller exactement à v1 — un compromis assumé, pas un oubli.
+
 ## Sources consultées
 
 - Jack Daniels' Running Formula — zones VDOT (E/M/T/I/R, adaptées en Récup/E/C/T/I/V dans ce document ; M devient C "Allure course objectif", généralisée à toute distance et non réservée au marathon, et Récup ajoutée comme zone distincte — corrections validées sur plan réel)
