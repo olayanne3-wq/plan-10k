@@ -397,6 +397,19 @@ Trouvé en testant l'affichage du plan complet (section précédente) : les séa
 
 Corrigé : les répétitions/durée des séances qualité se réduisent maintenant proportionnellement à la même fraction que le volume hebdo (section 6/18), avec un plancher minimum par sous-type pour garder un vrai stimulus (ex. 2 répétitions minimum pour Seuil/allure course, pas de descente en dessous). Résultat sur la dernière semaine testée : EF à 9-11min plutôt que 5-7min — une "sortie découverte" courte à 2 jours de la course, ce qui est en fait une pratique normale, pas un signe de calcul cassé.
 
+## 21. Correction — profondeur du taper calibrée par distance, pas générique
+
+Retour terrain sur la section 20 : même après le plancher sur les répétitions qualité, la dernière semaine restait perçue comme trop faible. En creusant les sources, la formule générique (75%→35% du pic, quelle que soit la distance) était trop agressive — jusqu'à -65% en semaine de course, alors que même un marathon ne descend qu'à -40/-50% en pratique courante. Corrigé avec des fractions propres à chaque distance :
+
+| Distance | Début Affûtage | Fin Affûtage (semaine de course) |
+|---|---|---|
+| 5K | 80% du pic | 65% du pic (réduction ~30-40%) |
+| 10K | 80% du pic | 60% du pic (réduction ~35-45%) |
+| Semi | 75% du pic | 55% du pic |
+| Marathon | 75% du pic | 50% du pic (réduction ~40-50%) |
+
+Sur le profil réel (10K), la dernière semaine passe de 35% à 60% du pic — des EF à 21-27min et une longue de 37min, bien plus proche de ce qu'on observerait en pratique qu'un quasi-arrêt.
+
 ## Sources consultées
 
 - Jack Daniels' Running Formula — zones VDOT (E/M/T/I/R, adaptées en Récup/E/C/T/I/V dans ce document ; M devient C "Allure course objectif", généralisée à toute distance et non réservée au marathon, et Récup ajoutée comme zone distincte — corrections validées sur plan réel)
