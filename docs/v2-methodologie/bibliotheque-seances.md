@@ -486,6 +486,14 @@ Bug trouvé et corrigé pendant l'implémentation : les fonctions de rendu (`ren
 
 **Toujours pas fait** : les vraies règles d'adaptation (comment le plan devrait réagir aux statuts accumulés) — c'est le morceau le plus important, encore entièrement à faire.
 
+## 29. Interface de rappel des plans sauvegardés
+
+Troisième brique du chantier persistance/suivi. Au chargement de `/v2`, si un token GitHub est déjà connu (stocké dans le navigateur), un bloc "Plans sauvegardés" apparaît sur le tout premier écran du wizard — liste triée du plus récent au plus ancien, avec le nombre de séances déjà marquées visible en un coup d'œil. Cliquer sur un plan le recharge directement à l'écran de résultats (allures, plan complet, statuts déjà cochés inclus), sans repasser par le wizard.
+
+**Limite connue** : si c'est la toute première visite sur cet appareil/navigateur (token pas encore renseigné), la liste ne s'affiche qu'après avoir sauvegardé un premier plan — pas de vérification automatique après la saisie du token sur l'écran de résultats. Suffisant pour l'usage réel (le token, une fois entré, reste stocké), mais à améliorer si besoin plus tard.
+
+Avec cette brique, les trois fondations du chantier "adaptation du plan" sont posées : persistance (27), suivi de complétion (28), rappel (29). **La partie la plus intéressante — les vraies règles d'adaptation selon les résultats — reste entièrement à faire.**
+
 ## Sources consultées
 
 - Jack Daniels' Running Formula — zones VDOT (E/M/T/I/R, adaptées en Récup/E/C/T/I/V dans ce document ; M devient C "Allure course objectif", généralisée à toute distance et non réservée au marathon, et Récup ajoutée comme zone distincte — corrections validées sur plan réel)
