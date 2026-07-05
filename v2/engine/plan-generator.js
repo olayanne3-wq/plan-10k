@@ -956,3 +956,187 @@ export function generatePlan(profil, params) {
     warnings
   };
 }
+
+// ---------------------------------------------------------------------------
+// Section 33 — Règles d'adaptation du plan selon les résultats réels
+// ---------------------------------------------------------------------------
+
+const POIDS_STATUT = { ratee: 1, adaptee: 0.5, reussie: 0 };
+
+/**
+ * Score d'une semaine à partir des statuts des séances dures (qualité +
+ * longue uniquement — les EF ne comptent pas, cohérent avec la priorité
+ * "rattraper les séances clés" trouvée dans la littérature). Retourne null
+ * si aucune séance dure de cette semaine n'a de statut enregistré (semaine
+ * pas encore vécue, ou pas suivie) — distingué de 0 (tout réussi).
+ */
+export function calculerScoreSemaine(semaine, statuses) {
+  let score = 0;
+  let auMoinsUnStatut = false;
+  for (const [jour, seance] of Object.entries(semaine.assignment)) {
+    if (seance.type !== 'qualite' && seance.type !== 'longue') continue;
+    const uid = `${semaine.semaineNum}-${jour}`;
+    const statut = statuses?.[uid];
+    if (statut) {
+      auMoinsUnStatut = true;
+      score += POIDS_STATUT[statut] ?? 0;
+    }
+  }
+  return auMoinsUnStatut ? score : null;
+}
+
+/**
+ * Analyse le plan et détermine quelles semaines doivent être adaptées
+ * (décharge supplémentaire) suite aux résultats de la semaine précédente.
+ * Règle : score ≥ 2 sur les séances dures d'une semaine déclenche une
+ * adaptation pour la semaine SUIVANTE. Compte aussi les déclenchements
+ * consécutifs, pour le garde-fou "plan probablement trop ambitieux".
+ */
+export function analyserAdaptations(plan) {
+  const semainesAAdapter = new Map(); // semaineNum -> { dejaDecharge }
+  let consecutives = 0;
+  let maxConsecutives = 0;
+
+  const semainesTriees = [...plan.semaines].sort((a, b) => a.semaineNum - b.semaineNum);
+
+  for (const semaine of semainesTriees) {
+    const score = calculerScoreSemaine(semaine, plan.statuses);
+    if (score === null) { consecutives = 0; continue; } // semaine pas suivie, rien à en déduire
+
+    const declenche = score >= 2;
+    if (declenche) {
+      const suivante = semainesTriees.find(s => s.semaineNum === semaine.semaineNum + 1);
+      if (suivante) semainesAAdapter.set(suivante.semaineNum, { dejaDecharge: suivante.estDechargeSemaine });
+      consecutives += 1;
+      maxConsecutives = Math.max(maxConsecutives, consecutives);
+    } else {
+      consecutives = 0;
+    }
+  }
+
+  return { semainesAAdapter, adaptationsConsecutivesMax: maxConsecutives };
+}
+
+/**
+ * Applique les adaptations déterminées par analyserAdaptations : régénère le
+ * contenu des semaines concernées (volume et séances qualité réduits, même
+ * mécanique que la décharge classique — sections 22/26), sans cumul si la
+ * semaine était déjà une décharge programmée (la décharge programmée absorbe
+ * l'adaptation, section 33). Mute le plan en place et retourne les
+ * avertissements générés (à fusionner avec plan.warnings par l'appelant).
+ */
+export function appliquerAdaptations(plan) {
+  const { semainesAAdapter, adaptationsConsecutivesMax } = analyserAdaptations(plan);
+  const nouveauxWarnings = [];
+
+  if (semainesAAdapter.size === 0) return nouveauxWarnings;
+
+  // Les plans sauvegardés avant l'ajout de profilOrigine/paramsOrigine (section
+  // 32) n'ont pas ces données — impossible de régénérer du contenu sans elles.
+  if (!plan.paramsOrigine || !plan.profilOrigine) {
+    nouveauxWarnings.push({
+      code: 'ADAPTATION_IMPOSSIBLE',
+      message: "Ce plan a été sauvegardé avant l'ajout du suivi d'adaptation et ne peut pas être adapté automatiquement — regénère-le depuis le wizard pour bénéficier de cette fonctionnalité."
+    });
+    return nouveauxWarnings;
+  }
+
+  const alluresSec = computeAllures({
+    refTimeSeconds: parseTimeToSeconds(plan.paramsOrigine.tempsReference),
+    refDistanceKm: KM_BY_DISTANCE[plan.paramsOrigine.refDistance ?? plan.paramsOrigine.distance],
+    objectifTimeSeconds: parseTimeToSeconds(plan.paramsOrigine.objectif),
+    distanceCibleKm: KM_BY_DISTANCE[plan.paramsOrigine.distance]
+  });
+
+  // Bornes de chaque phase (en numéros de semaine), pour retrouver
+  // semaineDansPhase à partir du seul semaineNum
+  let curseur = 0;
+  const bornesPhases = plan.phases.map(p => {
+    const debut = curseur;
+    curseur += p.semaines;
+    return { nom: p.nom, debut, fin: curseur };
+  });
+
+  for (const [semaineNum, { dejaDecharge }] of semainesAAdapter.entries()) {
+    const semaine = plan.semaines.find(s => s.semaineNum === semaineNum);
+    if (!semaine) continue;
+
+    if (dejaDecharge) {
+      semaine.estAdaptee = true;
+      nouveauxWarnings.push({
+        code: 'ADAPTATION_ABSORBEE',
+        message: `S${semaineNum} : adaptation suite aux résultats de la semaine précédente, absorbée par la décharge déjà programmée (pas de réduction supplémentaire).`
+      });
+      continue;
+    }
+
+    const phaseInfo = bornesPhases.find(b => b.nom === semaine.phase && semaineNum > b.debut && semaineNum <= b.fin);
+    const semaineDansPhase = phaseInfo ? semaineNum - phaseInfo.debut - 1 : 0;
+
+    const nouveauVolume = Math.round(semaine.volumeCibleKm * 0.75 * 10) / 10;
+    let kmQualiteTotal = 0;
+
+    for (const seance of Object.values(semaine.assignment)) {
+      if (seance.type !== 'qualite') continue;
+      const { sousType, contenu, kmEstime } = genererContenuQualite({
+        distance: plan.paramsOrigine.distance,
+        phase: semaine.phase,
+        semaineDansPhase,
+        indexQualiteSemaine: seance.indexQualite ?? 0,
+        alluresSec,
+        restrictionsAllure: seance.restrictionsAllure,
+        tauxAffutage: 1,
+        estDechargeSemaine: true // réutilise le même levier de réduction (facteur 0.75, sections 22/26)
+      });
+      seance.sousType = sousType;
+      seance.contenu = contenu;
+      seance.kmEstime = kmEstime;
+      kmQualiteTotal += kmEstime;
+    }
+
+    const nbEF = Object.values(semaine.assignment).filter(s => s.type === 'ef').length;
+    const aLongue = Object.values(semaine.assignment).some(s => s.type === 'longue');
+    const { kmLongue, kmParEF } = repartirVolumeSemaine({
+      volumeCibleKm: nouveauVolume,
+      kmQualiteTotal,
+      nbEF,
+      aLongue
+    });
+
+    const roleParJourEF = differencierEF({ assignment: semaine.assignment, kmParEF });
+    for (const [jour, seance] of Object.entries(semaine.assignment)) {
+      if (seance.type === 'ef') {
+        const { role, kmCible } = roleParJourEF[jour] ?? { role: 'standard', kmCible: kmParEF };
+        const { contenu, kmEstime } = genererContenuEF({ alluresSec, kmCible, role });
+        seance.contenu = contenu;
+        seance.kmEstime = kmEstime;
+        seance.role = role;
+      } else if (seance.type === 'longue') {
+        const { contenu, kmEstime } = genererContenuLongue({
+          distance: plan.paramsOrigine.distance,
+          phase: semaine.phase,
+          alluresSec,
+          kmCible: kmLongue
+        });
+        seance.contenu = contenu;
+        seance.kmEstime = kmEstime;
+      }
+    }
+
+    semaine.volumeCibleKm = nouveauVolume;
+    semaine.estAdaptee = true;
+    nouveauxWarnings.push({
+      code: 'ADAPTATION_APPLIQUEE',
+      message: `S${semaineNum} : décharge d'adaptation (volume réduit à ${nouveauVolume}km) suite à plusieurs séances difficiles la semaine précédente.`
+    });
+  }
+
+  if (adaptationsConsecutivesMax >= 3) {
+    nouveauxWarnings.push({
+      code: 'ADAPTATIONS_REPETEES',
+      message: `${adaptationsConsecutivesMax} semaines d'affilée avec des séances difficiles — le plan actuel semble trop ambitieux compte tenu de ta disponibilité réelle. Envisage de revoir ton objectif ou la durée du plan plutôt que de continuer à enchaîner les adaptations.`
+    });
+  }
+
+  return nouveauxWarnings;
+}
