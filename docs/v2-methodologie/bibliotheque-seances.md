@@ -436,6 +436,21 @@ Comparaison avec le vrai code v1 (`index.html` de production) : v1 fait varier l
 
 Choisi pour la simplicité de maintenance plutôt que pour coller exactement à v1 — un compromis assumé, pas un oubli.
 
+## 25. Zones FC par type de séance (ajouté, validé contre v1 réel)
+
+Ajouté au moteur : une zone FC (en % de FC max) par type de séance, dérivée de `fcMax` — jusque-là, le moteur ne calculait qu'une seule valeur (la FC max), jamais les zones par type.
+
+| Zone | % FC max | Comparaison v1 (FC max 181) |
+|---|---|---|
+| Récup | 55-65% | — |
+| E (EF/Longue) | 65-75% | v1 : 118-136 bpm ✅ identique |
+| C (Allure course) | 85-90% | v1 : 154-163 bpm ✅ identique |
+| T (Seuil) | 90-95% | v1 : 163-172 bpm ✅ identique |
+| I (VMA) | 90-100% | v1 : 163-181 bpm ✅ identique |
+| V (Vitesse) | 95-100% | — (pas de type équivalent dans v1) |
+
+Les 4 zones comparables donnent des bornes en bpm **identiques** au vrai code v1 sur le profil de Laurent (FC max 181), ce qui valide au passage que les pourcentages choisis sont corrects — pas seulement une estimation plausible.
+
 ## Sources consultées
 
 - Jack Daniels' Running Formula — zones VDOT (E/M/T/I/R, adaptées en Récup/E/C/T/I/V dans ce document ; M devient C "Allure course objectif", généralisée à toute distance et non réservée au marathon, et Récup ajoutée comme zone distincte — corrections validées sur plan réel)
