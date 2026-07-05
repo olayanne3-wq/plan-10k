@@ -619,6 +619,8 @@
 
     <!-- STEP 1: Distance -->
     <div class="screen active" data-step="1">
+      <div id="resPlansSauvegardes"></div>
+
       <span class="eyebrow">Distance visée</span>
       <h1>Tu prépares quelle course&nbsp;?</h1>
       <p class="sub">Le type de séances et la structure des phases changent selon la distance.</p>
@@ -2355,11 +2357,50 @@ function generatePlan(profil, params) {
   }
 
   // Préremplir le champ token s'il est déjà connu (ex. déjà configuré ailleurs)
+  // et proposer les plans déjà sauvegardés, s'il y en a
   document.addEventListener('DOMContentLoaded', () => {
     const existant = getGithubToken();
     const champ = document.getElementById('githubTokenInput');
     if (existant && champ) champ.value = existant;
+    if (existant) afficherPlansSauvegardes();
   });
+
+  async function afficherPlansSauvegardes() {
+    const conteneur = document.getElementById('resPlansSauvegardes');
+    if (!conteneur) return;
+    const plans = await chargerPlans();
+    if (!plans.length) { conteneur.innerHTML = ''; return; }
+
+    const lignes = plans
+      .map((p, i) => ({ p, i }))
+      .sort((a, b) => new Date(b.p.sauvegardeLe) - new Date(a.p.sauvegardeLe))
+      .map(({ p, i }) => {
+        const date = p.sauvegardeLe ? new Date(p.sauvegardeLe).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+        const nbFaites = Object.keys(p.statuses || {}).length;
+        return `<div class="bib-row" style="cursor:pointer;" onclick="chargerPlanExistant(${i})">
+          <span class="k">${p.distance} — ${p.objectif}</span>
+          <span class="v" style="text-align:right;">${date}${nbFaites ? ` · ${nbFaites} séance(s) marquée(s)` : ''}</span>
+        </div>`;
+      }).join('');
+
+    conteneur.innerHTML = `
+      <div class="block-label">Plans sauvegardés</div>
+      <div class="bib" style="margin-bottom:20px;">${lignes}</div>
+    `;
+    // Garder la liste en mémoire pour chargerPlanExistant (indices d'origine)
+    window.__plansSauvegardes = plans;
+  }
+
+  function chargerPlanExistant(index) {
+    const plan = window.__plansSauvegardes[index];
+    if (!plan) return;
+    dernierPlanGenere = plan;
+    renderResults(plan);
+    showingResults = true;
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelector('.screen[data-step="10"]').classList.add('active');
+    document.getElementById('nextBtn').textContent = 'Terminer';
+  }
 
   function exporterPDF(){
     if (!dernierPlanGenere) { alert("Génère d'abord un plan."); return; }
