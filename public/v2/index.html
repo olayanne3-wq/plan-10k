@@ -877,9 +877,8 @@
         <div class="bib-row"><span class="k">Plafond volume</span><span class="v accent" id="resPlafond">—</span></div>
         <div class="bib-row"><span class="k">Zone FC</span><span class="v" id="resFcMax">—</span></div>
       </div>
-      <div class="bib" id="resZonesFC" style="margin-top:10px;"></div>
 
-      <div class="block-label" style="margin-top:20px;">Allures calculées</div>
+      <div class="block-label" style="margin-top:20px;">Allures et FC par zone</div>
       <div class="bib" id="resAllures"></div>
 
       <div class="block-label" style="margin-top:20px;">Plan complet</div>
@@ -2140,20 +2139,13 @@ function generatePlan(profil, params) {
       ? `${plan.zoneFC.fcMax} bpm max (${plan.zoneFC.methode === 'mesuree' ? 'mesurée' : 'estimée, formule de Tanaka'})`
       : 'Année de naissance manquante';
 
-    const zonesFCDiv = document.getElementById('resZonesFC');
-    if (plan.zoneFC) {
-      const labels = { recup: 'Récup', E: 'EF', C: 'Allure course', T: 'Seuil', I: 'VMA', V: 'Vitesse' };
-      zonesFCDiv.innerHTML = Object.entries(plan.zoneFC.zonesParType).map(([zone, { min, max }]) =>
-        `<div class="bib-row"><span class="k">${labels[zone] ?? zone}</span><span class="v">${min}-${max} bpm</span></div>`
-      ).join('');
-    } else {
-      zonesFCDiv.innerHTML = '';
-    }
-
+    const labelsZones = { recup: 'Récup', E: 'EF', C: 'Allure course', T: 'Seuil', I: 'VMA', V: 'Vitesse' };
     const alluresDiv = document.getElementById('resAllures');
-    alluresDiv.innerHTML = Object.entries(plan.allures).map(([zone, val]) =>
-      `<div class="bib-row"><span class="k">${zone}</span><span class="v accent">${val}</span></div>`
-    ).join('');
+    alluresDiv.innerHTML = Object.entries(plan.allures).map(([zone, val]) => {
+      const fc = plan.zoneFC?.zonesParType?.[zone];
+      const fcHtml = fc ? `<span class="v" style="margin-left:8px; opacity:.7;">${fc.min}-${fc.max} bpm</span>` : '';
+      return `<div class="bib-row"><span class="k">${labelsZones[zone] ?? zone}</span><span><span class="v accent">${val}</span>${fcHtml}</span></div>`;
+    }).join('');
 
     const dayNames = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
 
@@ -2262,38 +2254,26 @@ function generatePlan(profil, params) {
     texte(`Du ${plan.dateDebut} au ${plan.dateCourse}`, 10);
     sautDeLigne(3);
 
-    // Tableau des allures
-    const lignesAllures = Object.entries(plan.allures).map(([zone, val]) => [zone, val]);
-    if (plan.zoneFC) lignesAllures.push([`Zone FC max (${plan.zoneFC.methode === 'mesuree' ? 'mesurée' : 'Tanaka'})`, `${plan.zoneFC.fcMax} bpm`]);
+    // Tableau fusionné allures + zones FC (mêmes zones des deux côtés)
+    const labelsZones = { recup: 'Récup', E: 'EF', C: 'Allure course', T: 'Seuil', I: 'VMA', V: 'Vitesse' };
+    const lignesZones = Object.entries(plan.allures).map(([zone, allure]) => {
+      const fc = plan.zoneFC?.zonesParType?.[zone];
+      return [labelsZones[zone] ?? zone, allure, fc ? `${fc.min}-${fc.max} bpm` : '—'];
+    });
     doc.autoTable({
       startY: y,
       margin: { left: marge, right: marge },
-      head: [['Zone', 'Allure']],
-      body: lignesAllures,
+      head: [['Zone', 'Allure', 'FC']],
+      body: lignesZones,
       theme: 'grid',
       headStyles: { fillColor: COULEUR_SIGNAL, fontSize: 9 },
       bodyStyles: { fontSize: 9, textColor: COULEUR_TEXTE },
       styles: { cellPadding: 2 }
     });
     y = doc.lastAutoTable.finalY + 8;
-
-    // Tableau des zones FC par type de séance
     if (plan.zoneFC) {
-      const labelsFC = { recup: 'Récup', E: 'EF', C: 'Allure course', T: 'Seuil', I: 'VMA', V: 'Vitesse' };
-      const lignesZonesFC = Object.entries(plan.zoneFC.zonesParType).map(([zone, { min, max }]) =>
-        [labelsFC[zone] ?? zone, `${min}-${max} bpm`]
-      );
-      doc.autoTable({
-        startY: y,
-        margin: { left: marge, right: marge },
-        head: [['Zone FC', 'Plage']],
-        body: lignesZonesFC,
-        theme: 'grid',
-        headStyles: { fillColor: [42, 49, 56], fontSize: 9 },
-        bodyStyles: { fontSize: 9, textColor: COULEUR_TEXTE },
-        styles: { cellPadding: 2 }
-      });
-      y = doc.lastAutoTable.finalY + 8;
+      texte(`FC max ${plan.zoneFC.methode === 'mesuree' ? 'mesurée' : 'estimée (Tanaka)'} : ${plan.zoneFC.fcMax} bpm`, 8.5);
+      sautDeLigne(4);
     }
 
     const dayNames = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
