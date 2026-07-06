@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Run by Léa — Nouveau plan</title>
 <link rel="manifest" href="/v2/manifest.json">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
@@ -1223,6 +1223,17 @@
     if (!tokens) return;
     Engine.setStravaTokens(tokens);
     window.history.replaceState({}, document.title, window.location.pathname);
+
+    // Sur certains Android/Chrome, revenir d'une navigation externe (Strava)
+    // vers une PWA standalone laisse le viewport hérité de la page
+    // précédente (zoomé arrière) au lieu de reprendre initial-scale=1.0.
+    // Retoucher la balise meta force le navigateur à recalculer le viewport.
+    const viewportMeta = document.querySelector('meta[name="viewport"]');
+    if (viewportMeta) {
+      const contenuActuel = viewportMeta.getAttribute('content');
+      viewportMeta.setAttribute('content', contenuActuel + ', shrink-to-fit=yes');
+      requestAnimationFrame(() => viewportMeta.setAttribute('content', contenuActuel));
+    }
   }
 
   async function chargerVolumeStrava() {
