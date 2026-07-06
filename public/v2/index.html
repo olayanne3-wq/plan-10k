@@ -705,6 +705,7 @@
         </div>
         <div class="strava-value"><span id="stravaKm">32</span><span class="strava-unit">km / semaine</span></div>
         <span class="alt-toggle" onclick="toggleManualVolume()">Ce chiffre ne te semble pas juste ? Corriger manuellement</span>
+        <span class="alt-toggle" onclick="deconnecterStrava()" style="display:block; margin-top:4px; opacity:0.6;">Déconnecter Strava</span>
       </div>
 
       <div class="manual-volume" id="manualVolume" style="display:none;">
@@ -1204,6 +1205,14 @@
 
   function connecterStrava() {
     window.location.href = Engine.urlConnexionStrava();
+  }
+
+  // Efface les tokens Strava stockés et rafraîchit l'affichage pour
+  // repasser en état "non connecté" — pratique pour retester le flux
+  // OAuth complet sans manipuler les réglages du navigateur.
+  function deconnecterStrava() {
+    Engine.clearStravaTokens();
+    chargerVolumeStrava();
   }
 
   // Capte le retour d'authentification (tokens dans l'URL après redirection

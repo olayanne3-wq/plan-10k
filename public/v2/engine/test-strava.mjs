@@ -1,4 +1,4 @@
-import { calculerMedianeVolumeHebdo, extraireTokensDepuisUrl, urlConnexionStrava } from './strava.js';
+import { calculerMedianeVolumeHebdo, extraireTokensDepuisUrl, urlConnexionStrava, getStravaTokens, setStravaTokens, clearStravaTokens } from './strava.js';
 
 console.log('--- urlConnexionStrava ---');
 console.log(urlConnexionStrava());
@@ -47,3 +47,19 @@ const activites5 = [
   { type: 'Run', start_date_local: '2026-06-03', distance: 5000 }, // mercredi, même semaine
 ];
 console.log('2 sorties même semaine (5+5km) -> médiane:', calculerMedianeVolumeHebdo(activites5), '(attendu: 10)');
+
+console.log('\n--- clearStravaTokens ---');
+function creerStorageMock() {
+  const data = {};
+  return {
+    getItem: (k) => (k in data ? data[k] : null),
+    setItem: (k, v) => { data[k] = v; },
+    removeItem: (k) => { delete data[k]; }
+  };
+}
+const storage = creerStorageMock();
+setStravaTokens({ accessToken: 'abc', refreshToken: 'xyz', expiresAt: 123 }, storage);
+console.log('Avant clear :', getStravaTokens(storage));
+clearStravaTokens(storage);
+console.log('Après clear :', getStravaTokens(storage), '(attendu: accessToken/refreshToken null, expiresAt 0)');
+

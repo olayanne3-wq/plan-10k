@@ -33,6 +33,16 @@ export function setStravaTokens({ accessToken, refreshToken, expiresAt }, storag
   if (expiresAt) storage.setItem(STORAGE_KEYS.expiresAt, expiresAt);
 }
 
+// Efface les tokens Strava stockés (déconnexion locale — ne révoque pas
+// l'autorisation côté Strava lui-même, seulement les tokens conservés
+// dans ce storage). Utile notamment pour retester le flux OAuth complet
+// sans devoir passer par les réglages du navigateur.
+export function clearStravaTokens(storage = localStorage) {
+  storage.removeItem(STORAGE_KEYS.accessToken);
+  storage.removeItem(STORAGE_KEYS.refreshToken);
+  storage.removeItem(STORAGE_KEYS.expiresAt);
+}
+
 // Construit l'URL d'autorisation Strava (state=v2 pour que le callback
 // redirige vers v2). La navigation elle-même (window.location.href = ...)
 // reste à la charge de l'appelant : effet de bord hors du périmètre de ce
