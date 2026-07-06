@@ -593,6 +593,25 @@ Le bloc "répartir le volume entre EF et longue puis régénérer leur contenu" 
 
 Testé et confirmé : les trois usages (génération, adaptation, séance test) produisent des résultats identiques à avant, et un vrai cas de plafonnement (3 jours/semaine, volume élevé) remonte bien 9 avertissements.
 
+## 40. Intégration Strava — pré-remplissage du volume de départ
+
+Première étape concrète du chantier "intégrer les bons morceaux de v1 dans v2" (décidé après Gem'Aubagne, mais commencée dès maintenant pour ce morceau précis). Le champ "volume actuel" du wizard (étape 3), jusqu'ici un placeholder statique à 32km, se remplit maintenant automatiquement depuis Strava.
+
+**Réutilise le point d'entrée serverless existant de v1** (`api/strava.js`) plutôt que d'en créer un nouveau — une seule modification a minima : le `/callback` redirige maintenant vers `/v2` si un paramètre `state=v2` a été transmis à `/auth`, sinon vers `/` comme avant (comportement de v1 inchangé par défaut, aucun risque de régression).
+
+**Côté wizard** :
+- Bouton "📡 Connecter Strava" si pas encore connecté, sinon calcul automatique
+- Tokens stockés sous des clés distinctes de v1 (`v2_strava_*`), pas de conflit entre les deux sessions Strava
+- Rafraîchissement automatique du token si expiré, avant chaque requête
+- Médiane (pas moyenne, cohérent avec la doc existante) du volume hebdomadaire sur les 8 dernières semaines glissantes
+- Si pas assez d'historique ou erreur : bascule automatique en saisie manuelle avec message explicite
+
+Testé (mock) : calcul de médiane exact sur 8 semaines simulées, affichage correct connecté/non connecté, capture et nettoyage des tokens depuis l'URL de retour OAuth.
+
+**Déploiement** : remplacer `api/strava.js` (même chemin qu'avant) — aucune nouvelle variable d'environnement nécessaire, réutilise `STRAVA_CLIENT_ID`/`STRAVA_CLIENT_SECRET` déjà configurées pour v1 sur Vercel.
+
+**Reste à faire** (chantier suivant) : comparer allure/FC réelles des séances aux zones attendues — nécessite de résoudre l'appariement activité Strava ↔ séance prévue du plan.
+
 ## Sources consultées
 
 - Jack Daniels' Running Formula — zones VDOT (E/M/T/I/R, adaptées en Récup/E/C/T/I/V dans ce document ; M devient C "Allure course objectif", généralisée à toute distance et non réservée au marathon, et Récup ajoutée comme zone distincte — corrections validées sur plan réel)
