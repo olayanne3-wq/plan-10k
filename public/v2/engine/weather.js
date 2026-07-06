@@ -35,7 +35,9 @@ export async function recupererPrevisionMeteo({ latitude, longitude, date }, sto
   const cache = storage.getItem(cleCache);
   if (cache) {
     try {
-      return JSON.parse(cache);
+      const parsed = JSON.parse(cache);
+      console.log('[météo] Résultat pris depuis le cache (pas d\'appel réseau) :', parsed);
+      return parsed;
     } catch {
       // Cache corrompu, on ignore et refait l'appel
     }
@@ -43,11 +45,14 @@ export async function recupererPrevisionMeteo({ latitude, longitude, date }, sto
 
   try {
     const params = new URLSearchParams({ lat: latitude, lon: longitude, date });
+    console.log('[météo] Appel réseau vers /api/weather...');
     const resp = await fetch(`/api/weather?${params}`);
     const data = await resp.json();
+    console.log('[météo] Réponse /api/weather :', resp.status, data);
     storage.setItem(cleCache, JSON.stringify(data));
     return data;
   } catch (e) {
+    console.log('[météo] Erreur réseau :', e.message);
     return { disponible: false, erreur: e.message };
   }
 }
@@ -75,19 +80,25 @@ export function enrichirSeanceAvecMeteo(seance, prevision) {
  * venir).
  */
 export async function verifierMeteoPourSeance(seance, date, storage = localStorage) {
+  console.log('[météo] verifierMeteoPourSeance appelée, geolocation disponible:', 'geolocation' in navigator);
   if (!('geolocation' in navigator)) return seance;
 
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
+        console.log('[météo] Position obtenue:', position.coords.latitude, position.coords.longitude);
         const prevision = await recupererPrevisionMeteo({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           date
         }, storage);
+        console.log('[météo] Prévision reçue:', prevision);
         resolve(enrichirSeanceAvecMeteo(seance, prevision));
       },
-      () => resolve(seance), // géolocalisation refusée/indisponible : pas d'enrichissement, pas d'erreur bloquante
+      (err) => {
+        console.log('[météo] Échec géolocalisation:', err.message, '(code', err.code, ')');
+        resolve(seance);
+      },
       { timeout: 5000 }
     );
   });
