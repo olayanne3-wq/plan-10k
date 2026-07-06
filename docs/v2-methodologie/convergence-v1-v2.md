@@ -112,7 +112,22 @@ Les deux natures de note se traitent différemment :
   - Lendemain : `"Très facile · Récupération après le test"`
 - **v2** : la séance test elle-même est déjà bien marquée (`sousType: "test"`, `estTest: true`) et son contenu technique est bon (comparable à v1 — "sert à confirmer/recalibrer ton allure objectif"), **mais** les séances EF qui l'entourent (veille, lendemain) restent génériques, sans lien narratif explicite avec le test à venir/passé
 - **Décision : À COMBLER.** Le plus structurant des écarts identifiés à ce jour : contrairement aux points 2.4/2.5 (une note isolée sur une séance), celui-ci demande que le moteur *sache*, au moment de générer les séances EF adjacentes à la séance test, qu'elles sont adjacentes à un moment clé — pas juste ajouter une note indépendante à chaque séance individuellement. Nécessite que la génération de contenu EF puisse recevoir un contexte du type "veille de test" / "lendemain de test", pas seulement son propre type/rôle actuel (`standard`/`recuperation`).
-- **Statut : non commencé.**
+
+**Décision technique — décidée le 6 juillet 2026 :**
+
+Réduit à deux mécanismes, dont un seul vraiment nouveau par rapport aux autres points de ce document :
+
+1. **Détection du contexte (nouveau)** : le moteur construit déjà toute la semaine (`assignment` avec les 7 jours) avant de la finaliser. Une fois la séance test placée, regarder le jour juste avant et juste après et leur assigner un rôle supplémentaire (`role: 'veille-test'` / `role: 'lendemain-test'`), en plus du rôle existant (`standard`/`recuperation`).
+
+2. **Banque de variantes pour ces deux rôles (réutilise le mécanisme déjà tranché en 2.3/2.4/2.5)** :
+   - Veille de test : "Jambes fraîches pour demain — reste facile." / "Rien à prouver aujourd'hui, garde de l'énergie pour demain."
+   - Lendemain de test : "Récupération après l'effort d'hier." / "Jambes qui tournent tranquillement après le test."
+
+3. **La note "Semaine test" en tête de semaine ne demande pas de mécanisme séparé** : c'est en fait un jalon de transition au sens large (entrée dans une semaine à enjeu particulier), qui rejoint le mécanisme déjà tranché en 2.5 — à ajouter comme jalon supplémentaire dans sa banque de variantes plutôt qu'un système à part.
+
+Cette réduction simplifie beaucoup l'ampleur de ce qui semblait être le plus complexe des écarts : seule la détection du contexte veille/lendemain (point 1) est réellement nouvelle, le reste réutilise des mécanismes déjà actés dans ce document.
+
+- **Statut : non commencé** (détection du contexte veille/lendemain-test + banques de variantes associées).
 
 ## 3. Point sur la structure des phases (écart structurel, pas seulement de contenu)
 
