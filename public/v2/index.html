@@ -1220,21 +1220,24 @@
   // visibles dans la barre d'adresse / l'historique du navigateur
   function capterRetourStravaOAuth() {
     const tokens = Engine.extraireTokensDepuisUrl(window.location.search);
-    if (!tokens) return;
+    if (!tokens) return false;
     Engine.setStravaTokens(tokens);
     window.history.replaceState({}, document.title, window.location.pathname);
 
     // Sur certains Android/Chrome, revenir d'une navigation externe (Strava)
-    // vers une PWA standalone laisse le viewport hérité de la page
-    // précédente (zoomé arrière) au lieu de reprendre initial-scale=1.0.
-    // Retoucher la balise meta force le navigateur à recalculer le viewport.
-    const viewportMeta = document.querySelector('meta[name="viewport"]');
-    if (viewportMeta) {
-      const contenuActuel = viewportMeta.getAttribute('content');
-      viewportMeta.setAttribute('content', contenuActuel + ', shrink-to-fit=yes');
-      requestAnimationFrame(() => viewportMeta.setAttribute('content', contenuActuel));
-    }
+    // vers une PWA standalone laisse le rendu visuel corrompu (zoom hérité,
+    // éléments mal dimensionnés) jusqu'à un rechargement manuel — confirmé
+    // par Laurent : un simple refresh règle systématiquement le problème,
+    // alors qu'un recalcul de viewport en JS (tenté précédemment) ne
+    // suffisait pas. Un vrai rechargement de page est le seul moyen fiable
+    // de réinitialiser complètement le moteur de rendu. Sans risque de
+    // boucle : l'URL est déjà nettoyée des tokens juste au-dessus, donc au
+    // rechargement cette fonction ne retrouvera plus de tokens et ne
+    // redéclenchera pas de reload.
+    window.location.reload();
+    return true;
   }
+
 
   async function chargerVolumeStrava() {
     const blocConnexion = document.getElementById('stravaConnexionBloc');
@@ -1490,7 +1493,12 @@
     if (existant && champ) champ.value = existant;
     if (existant) afficherPlansSauvegardes();
 
-    capterRetourStravaOAuth();
+    // Si capterRetourStravaOAuth() déclenche un reload (retour OAuth Strava),
+    // la page va se recharger de toute façon : pas la peine de lancer
+    // chargerVolumeStrava() (appel réseau) juste avant, il serait interrompu
+    // ou gaspillé inutilement.
+    const rechargementEnCours = capterRetourStravaOAuth();
+    if (rechargementEnCours) return;
     chargerVolumeStrava();
   }
 
