@@ -301,6 +301,80 @@ export function injecterProgressionRelative(semaines) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Cohérence narrative de la semaine test (doc convergence-v1-v2.md, section
+// 2.6) — doit s'exécuter APRÈS placerSeanceTest (la séance test n'existe pas
+// encore au moment où injecterJalonsTransition/injecterNotesPratiques/etc.
+// tournent, cf. l'ordre des appels dans generatePlan : placerSeanceTest est
+// appelée bien après, une fois l'objet plan construit).
+// ---------------------------------------------------------------------------
+
+export const NOTES_SEMAINE_TEST = {
+  'annonce': [
+    "Semaine test : l'occasion de vérifier où tu en es sur ton allure objectif.",
+    "Cette semaine contient ta séance test — vise à arriver dessus en forme."
+  ],
+  'veille-test': [
+    "Jambes fraîches pour demain — reste facile.",
+    "Rien à prouver aujourd'hui, garde de l'énergie pour demain."
+  ],
+  'lendemain-test': [
+    "Récupération après l'effort d'hier.",
+    "Jambes qui tournent tranquillement après le test."
+  ]
+};
+
+/**
+ * Détecte la séance test (estTest: true) dans le plan et enrichit la
+ * cohérence narrative de sa semaine à trois niveaux :
+ * - Annonce en tête de semaine (1er jour), rejoint le principe des jalons
+ *   de transition (2.5) mais implémenté ici faute d'exister au moment où
+ *   injecterJalonsTransition tourne
+ * - Contexte "veille de test" sur le jour juste avant (assigné en plus du
+ *   rôle standard/recuperation existant)
+ * - Contexte "lendemain de test" sur le jour juste après
+ * Ne fait rien si aucune séance test n'a été placée dans le plan (ex. plan
+ * trop court pour accueillir une phase Spécifique).
+ */
+export function injecterCoherenceSemaineTest(plan) {
+  const piocher = (cle) => {
+    const variantes = NOTES_SEMAINE_TEST[cle];
+    return variantes[Math.floor(Math.random() * variantes.length)];
+  };
+
+  for (const semaine of plan.semaines) {
+    const jours = Object.entries(semaine.assignment);
+    const indexTest = jours.findIndex(([, s]) => s.estTest);
+    if (indexTest === -1) continue;
+
+    // Annonce en tête de semaine (1er jour, différent du jour du test lui-même)
+    const [, premierJour] = jours[0];
+    if (premierJour.contenu && !premierJour.estTest) {
+      premierJour.contenu = `${premierJour.contenu} ${piocher('annonce')}`;
+    }
+
+    // Veille (jour juste avant le test dans l'ordre de la semaine)
+    if (indexTest > 0) {
+      const [, veille] = jours[indexTest - 1];
+      if (veille.contenu) {
+        veille.role = veille.role ? `${veille.role}+veille-test` : 'veille-test';
+        veille.contenu = `${veille.contenu} ${piocher('veille-test')}`;
+      }
+    }
+
+    // Lendemain (jour juste après)
+    if (indexTest < jours.length - 1) {
+      const [, lendemain] = jours[indexTest + 1];
+      if (lendemain.contenu) {
+        lendemain.role = lendemain.role ? `${lendemain.role}+lendemain-test` : 'lendemain-test';
+        lendemain.contenu = `${lendemain.contenu} ${piocher('lendemain-test')}`;
+      }
+    }
+
+    break; // une seule séance test par plan actuellement, pas la peine de continuer
+  }
+}
+
 /**
  * Calcule les zones d'allure à partir d'une performance de référence
  * (n'importe quelle distance), normalisée en équivalent 10K via Riegel.
@@ -1366,6 +1440,11 @@ export function generatePlan(profil, params) {
   // Séance test, placée vers la fin de Spécifique (section 36) — silencieux
   // si le plan est trop court pour en accueillir une
   placerSeanceTest(plan, allSeconds);
+
+  // Cohérence narrative de la semaine test (doc convergence-v1-v2.md, 2.6) —
+  // doit s'exécuter après placerSeanceTest, la séance test n'existant pas
+  // encore au moment des autres injections de notes plus haut
+  injecterCoherenceSemaineTest(plan);
 
   return plan;
 }
