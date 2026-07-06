@@ -43,7 +43,7 @@ export default async function handler(req, res) {
       }),
     });
     const data = await resp.json();
-    if (data.errors) return res.status(400).json({ error: data.message });
+    if (data.errors) return res.status(400).json({ error: data.message, details: data.errors, state_recu: req.query?.state || null });
 
     const params = new URLSearchParams({
       access_token: data.access_token,
