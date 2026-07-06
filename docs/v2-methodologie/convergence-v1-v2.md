@@ -54,7 +54,26 @@ Le moteur reste générique : rien de ce qui est ajouté ne doit être spécifiq
   - `"Fin affûtage ✨ · Très tranquille"` (dernières séances avant course)
 - **v2** : aucun mécanisme de ce type — les phases existent dans la donnée (`plan.semaines[].phase`) mais rien n'accompagne le passage d'une phase à l'autre pour l'utilisateur
 - **Décision : À COMBLER.** Contrairement aux points précédents (conseils techniques), celui-ci relève de l'accompagnement de l'expérience utilisateur aux moments clés — vaut le coup indépendamment du reste, relativement simple à détecter techniquement (première/dernière semaine d'une phase, ou changement de phase par rapport à la semaine précédente).
-- **Statut : non commencé.**
+
+**Décision technique — décidée le 6 juillet 2026 :**
+
+*Règle de détection*, générique (pas de date/phase codée en dur pour Laurent) :
+- **Début de phase** : `semaine.phase !== semainePrecedente.phase` → première semaine d'une nouvelle phase
+- **Fin de phase** : `semaine.phase !== semaineSuivante.phase` → dernière semaine avant un changement de phase
+- **Dernière sortie longue avant Affûtage** : cas particulier — dernière séance de type `longue` dans la dernière semaine où `phase !== 'Affutage'`
+
+*Format d'intégration* : fusionné dans le champ `contenu` existant (pas un champ séparé type `noteTransition`) — cohérent avec la décision 2.1 (champ unique plutôt que warmup/session/cooldown/notes séparés).
+
+*Variété des messages* : banque de variantes pré-écrites par jalon, tirée au sort à la génération du plan (pas d'appel API pour ce cas — enjeu trop faible par rapport au coût/latence/dépendance réseau ajoutés ; un appel API aurait plus de sens pour du coaching réactif à la progression réelle, cf. `lea-coach.js` dans la roadmap, pas pour une phrase d'encouragement ponctuelle). Première proposition de banque, à étoffer :
+
+| Jalon | Variantes proposées (à tirer au sort) |
+|---|---|
+| Dernière longue avant Affûtage | "Dernière sortie longue avant l'affûtage — allonge un peu si la forme le permet." / "C'est la dernière grosse sortie avant de lever le pied. Profites-en." |
+| Début Affûtage | "Entrée en affûtage : le volume baisse, l'intensité reste." / "Le gros du travail est fait — place à la récupération active avant le jour J." |
+| Début phase Spécifique | "Début de la phase spécifique : place aux séances à allure course." / "On rentre dans le dur — les séances vont maintenant coller à ton allure objectif." |
+| Dernières séances avant course | "Dernières séances avant le jour J — reste tranquille." / "Presque prêt. Ces derniers jours ne servent qu'à arriver frais." |
+
+- **Statut : non commencé** (implémentation de la détection + banque de variantes dans le moteur).
 
 ### 2.6 Cohérence narrative de la semaine entière autour de la séance test
 
