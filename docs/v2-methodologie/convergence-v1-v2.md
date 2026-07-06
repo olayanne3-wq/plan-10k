@@ -24,17 +24,35 @@ Le moteur reste générique : rien de ce qui est ajouté ne doit être spécifiq
 
 - **v1** : notes conditionnelles liées aux conditions du jour, ex. `"Chaleur > 28°C → 6:40/km"` sur une séance EF
 - **v2** : aucun mécanisme de note contextuelle ; le moteur ne reçoit aucune donnée externe (météo ou autre)
-- **Décision : À COMBLER, en deux temps.**
-  1. D'abord des notes statiques utiles par type de séance (rapide à construire, déjà un vrai gain)
-  2. Puis des notes conditionnelles réellement dynamiques (ex. ajustement allure si chaleur prévue), qui demandent de brancher une source météo au moteur — chantier dépendant d'une intégration externe (API météo), pas juste du moteur seul
-- **Statut : non commencé.**
+- **Décision : À COMBLER — avec une vraie donnée météo (pas une note générique).**
+
+**Décision technique — décidée le 6 juillet 2026 :**
+
+Contrainte de fond actée d'emblée : une prévision météo n'a de sens que proche de la date réelle de la séance — impossible de connaître la météo à J+60 au moment de la génération du plan. Ce n'est donc pas une note injectée une fois pour toutes à la génération (contrairement à 2.3/2.5), mais un **second passage**, déclenché plus près du jour J, qui enrichit une séance déjà générée.
+
+- **Fenêtre de rafraîchissement** : la veille de la séance (pas de rafraîchissement continu dans une fenêtre J-7) — suffisant en pratique, plus simple à implémenter qu'un système qui réévalue à chaque ouverture de l'app
+- **Source de localisation** : géolocalisation de l'utilisateur (GPS), pas une ville renseignée manuellement au profil
+- **Seuil de déclenchement** : 28°C, repris tel quel de v1, fixe (pas de variation par profil pour l'instant — un seuil adaptatif à la tolérance individuelle à la chaleur est une amélioration possible mais non retenue à ce stade, faute de donnée fiable pour le calibrer)
+
+**Implication technique** : nécessite une API météo externe (à choisir — non tranché à ce stade) et un mécanisme applicatif qui tourne à un moment différent de la génération du plan (ex: notification/vérification quotidienne plutôt qu'un calcul unique). C'est le seul écart de ce document qui a une dépendance externe (API tierce) en plus du travail sur le moteur lui-même.
+
+- **Statut : non commencé** (choix de l'API météo et du mécanisme de déclenchement quotidien restent à faire).
 
 ### 2.3 Notes pratiques par type de séance (hors météo)
 
 - **v1** : conseils pratiques ponctuels sur certains types de séance, ex. sortie longue → `"Hydratation++ · Allonge selon la forme"`
 - **v2** : aucune note de ce type actuellement
-- **Décision : À COMBLER.** Rejoint le point 2.2 (notes statiques par type), à traiter dans le même chantier.
-- **Statut : non commencé.**
+- **Décision : À COMBLER.**
+
+**Décision technique — décidée le 6 juillet 2026 :** même mécanisme que 2.5 (banque de variantes pré-écrites par type de séance, tirée au sort à la génération, fusionnée dans le champ `contenu`), déclenché par type de séance plutôt que par transition de phase. Première proposition de banque, à étoffer :
+
+| Type de séance | Variantes proposées (à tirer au sort) |
+|---|---|
+| Sortie longue | "Hydrate-toi bien avant et pendant si besoin." / "Emporte de quoi boire si tu pars plus d'1h." |
+| Seuil | "Effort contrôlé — tu dois pouvoir tenir une phrase courte, pas plus." |
+| VMA / Vitesse | "Récupération complète entre les répétitions — pas de course contre la montre sur la récup." |
+
+- **Statut : non commencé** (implémentation de la banque de variantes dans le moteur).
 
 ### 2.4 Repères qualitatifs sur séances dures (ressenti, progression relative)
 
