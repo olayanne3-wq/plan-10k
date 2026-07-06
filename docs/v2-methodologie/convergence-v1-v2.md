@@ -47,9 +47,10 @@ Le moteur reste générique : rien de ce qui est ajouté ne doit être spécifiq
 
 ### 2.5 Jalons narratifs aux moments de transition du plan
 
-- **v1** : notes signalant un moment charnière du plan plutôt qu'un conseil de contenu, toutes concentrées autour de la bascule vers l'affûtage :
+- **v1** : notes signalant un moment charnière du plan plutôt qu'un conseil de contenu — vérifié systématiquement sur tous les jours de repos du plan (la grande majorité n'ont aucune note ; les seules qui en ont coïncident avec une transition de phase) :
   - `"Dernière longue avant affûtage · Allonge selon la forme"` (dernière sortie longue avant la coupure de volume)
-  - `"Début affûtage"` (première séance de la phase)
+  - `"Début affûtage"` (première séance de la phase `affutage`)
+  - `"Début pic de forme"` (première séance de la phase `pic`)
   - `"Fin affûtage ✨ · Très tranquille"` (dernières séances avant course)
 - **v2** : aucun mécanisme de ce type — les phases existent dans la donnée (`plan.semaines[].phase`) mais rien n'accompagne le passage d'une phase à l'autre pour l'utilisateur
 - **Décision : À COMBLER.** Contrairement aux points précédents (conseils techniques), celui-ci relève de l'accompagnement de l'expérience utilisateur aux moments clés — vaut le coup indépendamment du reste, relativement simple à détecter techniquement (première/dernière semaine d'une phase, ou changement de phase par rapport à la semaine précédente).
@@ -85,10 +86,11 @@ En vérifiant les décharges/affûtage, un écart plus profond que le contenu te
 - **Décision : À COMBLER — priorité haute.** Contrairement aux écarts précédents (notes d'accompagnement manquantes sur un contenu déjà correct), celui-ci est une vraie fonctionnalité manquante : le moteur ne sait pas produire de séance de course, ni de semaine d'approche structurée avec repères J-X. À traiter avant les autres points de ce document si l'ordre de traitement doit suivre un critère d'impact plutôt que d'ordre chronologique de découverte.
 - **Statut : non commencé.**
 
-## 4. Écarts restant à vérifier
+## 4. Statut de la comparaison
 
-Cette liste sera complétée au fur et à mesure. Comparé au 6 juillet 2026 : séances EF, sortie longue (semaine 1), séances qualité Seuil/VMA (semaines 1, 5, 8 — plusieurs phases), semaine de décharge implicite/séance test (semaine 4), structure globale des phases, dernière semaine et jour de course. Reste à comparer :
-- Les autres notes de type "Repos" ou jours sans séance dure, si elles existent ailleurs dans v1
+Premier passage de comparaison terminé le 6 juillet 2026 : séances EF, sortie longue, séances qualité Seuil/VMA (plusieurs phases), semaine de décharge implicite/séance test, structure globale des phases, dernière semaine et jour de course, ainsi que la vérification systématique de toutes les notes sur jours de repos (confirmé : uniquement aux transitions de phase, aucune autre catégorie de note manquante trouvée).
+
+7 écarts documentés au total (2.1 à 2.7) : 2 tranchés en faveur de l'approche v2 (2.1), 5 à combler (2.2 à 2.7), plus l'écart structurel sur le découpage des phases (section 3, décision reportée). Prochaine étape suggérée si ce chantier reprend : prioriser 2.7 (traitement du jour de course), identifié comme le plus structurant.
 
 ## 4. Étapes du chantier (rappel, une fois le contenu du moteur jugé suffisant)
 
