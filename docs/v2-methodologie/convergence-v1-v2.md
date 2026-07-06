@@ -203,3 +203,14 @@ Premier passage de comparaison terminé le 6 juillet 2026 : séances EF, sortie 
 4. Brancher le bouton d'adaptation (`analyserAdaptations`/`appliquerAdaptations`) dans l'interface v1
 
 Aucune de ces étapes n'est commencée à ce jour (6 juillet 2026) — ce document liste le travail de contenu (section 2) à faire avant de s'y attaquer.
+
+## 6. Avancement réel de l'étape 2 (mise à jour du 6 juillet 2026)
+
+Contrairement à la note ci-dessus, l'étape 2 a en fait été commencée le jour même :
+
+- **Étape 1** (générer un plan proche de l'actuel) : validée sur les grandes masses (11 semaines, volumes cohérents) — décision explicite de ne pas viser une fidélité littérale jour par jour, le moteur restant générique
+- **Étape 2** (adapter l'affichage) : `public/index-v2-preview.html` créé comme copie de travail (pas `index.html` directement). Module `v1-bridge.js` écrit pour traduire un plan v2 vers le format `PLAN`/`ALL_SESSIONS` attendu. Moteur chargé en scripts classiques (pas modules ES) pour éviter un risque de timing sur un fichier où presque tout dépend de `PLAN` dès le chargement
+
+**Découverte importante en testant avec Laurent** : la fonction de prédiction de performance (`predict10K`/`weightedAvgByEffortDuration`) sélectionnait les activités Strava à analyser par correspondance stricte de date+type avec le plan affiché — cassée dès que le plan généré diffère du déroulé réel (ce qui est le cas, cf. étape 1). Corrigée en détectant le type d'effort directement depuis l'allure réelle des laps (déjà générique dans `SESSION_TARGETS`), indépendamment de toute correspondance de date. Ce défaut existait structurellement dans v1 aussi, pas seulement lié au chantier v2.
+
+**Limite non résolue, à traiter avec le chantier v2.0 streams (detection d'intervalles par streams Strava, jamais commencé)** : les séances VMA très fractionnées (ex. "2×8×30″-30″") ne se segmentent pas correctement en laps Strava classiques — une activité avec seulement 7 laps pour 16 répétitions attendues produit des laps qui mélangent phases rapides et lentes, donnant une vitesse moyenne diluée sans rapport avec l'effort réel (observé : 5'33/km calculé sur une vraie séance VMA, alors que l'allure réelle des répétitions est ~4'15/km). Ce n'est pas un bug corrigible par ajustement de seuil — c'est la même limite structurelle qui motivait le chantier v2.0 streams dès l'origine (analyse seconde par seconde via `get_activity_streams`, indépendante de la segmentation en laps de la montre). Décision actée : ne pas contourner par un patch, traiter avec le vrai chantier streams le moment venu.
