@@ -55,10 +55,29 @@ Le moteur reste générique : rien de ce qui est ajouté ne doit être spécifiq
 - **Décision : À COMBLER.** Contrairement aux points précédents (conseils techniques), celui-ci relève de l'accompagnement de l'expérience utilisateur aux moments clés — vaut le coup indépendamment du reste, relativement simple à détecter techniquement (première/dernière semaine d'une phase, ou changement de phase par rapport à la semaine précédente).
 - **Statut : non commencé.**
 
-## 3. Écarts restant à vérifier
+### 2.6 Cohérence narrative de la semaine entière autour de la séance test
 
-Cette liste sera complétée au fur et à mesure. Comparé au 6 juillet 2026 : séances EF, sortie longue (semaine 1), séances qualité Seuil/VMA (semaines 1, 5, 8 — plusieurs phases). Reste à comparer :
-- Contenu détaillé des semaines de décharge classiques (hors affûtage) — v1 en a-t-il un traitement de contenu différent, ou seulement un volume réduit ?
+- **v1** : la semaine contenant la séance test (semaine 4 dans le plan actuel) est construite comme un tout cohérent autour de cet objectif, pas seulement la séance elle-même :
+  - Note du lundi : `"Semaine test"` (annonce dès le début de semaine)
+  - Veille du test : `"Jambes fraîches pour le test demain — très facile"`
+  - Jour du test : `"🎯 SÉANCE TEST CLEF ! Si ça passe → viser sub-48'"`
+  - Lendemain : `"Très facile · Récupération après le test"`
+- **v2** : la séance test elle-même est déjà bien marquée (`sousType: "test"`, `estTest: true`) et son contenu technique est bon (comparable à v1 — "sert à confirmer/recalibrer ton allure objectif"), **mais** les séances EF qui l'entourent (veille, lendemain) restent génériques, sans lien narratif explicite avec le test à venir/passé
+- **Décision : À COMBLER.** Le plus structurant des écarts identifiés à ce jour : contrairement aux points 2.4/2.5 (une note isolée sur une séance), celui-ci demande que le moteur *sache*, au moment de générer les séances EF adjacentes à la séance test, qu'elles sont adjacentes à un moment clé — pas juste ajouter une note indépendante à chaque séance individuellement. Nécessite que la génération de contenu EF puisse recevoir un contexte du type "veille de test" / "lendemain de test", pas seulement son propre type/rôle actuel (`standard`/`recuperation`).
+- **Statut : non commencé.**
+
+## 3. Point sur la structure des phases (écart structurel, pas seulement de contenu)
+
+En vérifiant les décharges/affûtage, un écart plus profond que le contenu texte est apparu : **v1 et v2 ne découpent pas les phases de la même façon.**
+
+- **v1** : 3 phases seulement — `construction` (semaines 1-5, avec une semaine 4 de décharge implicite non étiquetée comme telle, organisée autour de la séance test), `affutage` (semaines 6-9, qui est en réalité une phase de maintien avec séances qualité complètes, pas une vraie réduction de volume), `pic` (semaines 10-11, la vraie réduction de volume avant course, avec jours de repos supplémentaires)
+- **v2** : phases `Construction` / `Specifique` / `Affutage`, avec des semaines de décharge explicitement marquées et régulières (tous les 3-4 semaines, cf. principe des 10% dans `bibliotheque-seances.md`), et un `Affutage` qui correspond à la vraie réduction de volume finale (ce que v1 appelle `pic`)
+- **Implication** : le nom `affutage` en v1 ne désigne pas la même chose que `Affutage` en v2 — la note de terminologie déjà présente dans `bibliotheque-seances.md` (section 0) sur ce point s'applique : *"Affûtage" désigne la réduction finale de volume avant course, pas la phase de développement du seuil qui la précède, nommée "Spécifique"*. v1 n'a pas cette distinction Spécifique/Affûtage, il fusionne les deux dans sa phase `affutage`.
+- **Décision : à trancher plus tard**, une fois qu'on comparera plus finement la progression de volume semaine par semaine entre les deux — pas grave en soi tant qu'on garde la terminologie v2 (déjà clarifiée) comme référence pour le produit final, mais ça confirme qu'une simple "traduction" phase par phase entre v1 et v2 ne sera pas directe.
+
+## 4. Écarts restant à vérifier
+
+Cette liste sera complétée au fur et à mesure. Comparé au 6 juillet 2026 : séances EF, sortie longue (semaine 1), séances qualité Seuil/VMA (semaines 1, 5, 8 — plusieurs phases), semaine de décharge implicite/séance test (semaine 4), structure globale des phases. Reste à comparer :
 - Contenu de la semaine de course elle-même
 - Les autres notes de type "Repos" ou jours sans séance dure, si elles existent ailleurs dans v1
 
