@@ -13,11 +13,16 @@ export default async function handler(req, res) {
 
   // ── /auth ────────────────────────────────────────────────────────────────
   if (path === "/auth" || path === "/" || path === "") {
+    // "state" est un paramètre OAuth standard, renvoyé tel quel par Strava au
+    // callback — utilisé ici pour savoir où rediriger ensuite (v1 par défaut,
+    // v2 si state=v2). N'affecte pas v1 : sans state, comportement inchangé.
+    const state = req.query?.state || "";
     const params = new URLSearchParams({
       client_id: CLIENT_ID,
       redirect_uri: REDIRECT_URI,
       response_type: "code",
       scope: "activity:read_all",
+      ...(state ? { state } : {}),
     });
     return res.redirect(302, `https://www.strava.com/oauth/authorize?${params}`);
   }
@@ -45,7 +50,10 @@ export default async function handler(req, res) {
       refresh_token: data.refresh_token,
       expires_at: data.expires_at,
     });
-    return res.redirect(302, `${BASE_URL}/?${params}`);
+    // Redirige vers v2 si state=v2 a été transmis, sinon vers v1 (racine)
+    // comme avant — comportement de v1 inchangé par défaut.
+    const destination = req.query?.state === "v2" ? "/v2" : "/";
+    return res.redirect(302, `${BASE_URL}${destination}?${params}`);
   }
 
   // ── /refresh ─────────────────────────────────────────────────────────────
