@@ -61,7 +61,17 @@ Contrainte de fond actée d'emblée : une prévision météo n'a de sens que pro
   - Repère de progression relative (comparaison à une séance antérieure similaire), ex. VMA semaine 5 → `"Volume VMA identique S1, fatigue cumulée"`
 - **v2** : le contenu technique (allures, répétitions, structure) est déjà solide et progresse correctement d'une semaine à l'autre (vérifié : 3×6' semaine 1 → 4×6' semaine 5 sur le Seuil, structure cohérente), mais **aucune note d'accompagnement** de ce type n'est produite
 - **Décision : À COMBLER.** Distinct du point 2.2/2.3 (météo/pratique) : celui-ci concerne spécifiquement le repère qualitatif sur l'effort lui-même et sa place dans la progression. Pour la note de progression relative en particulier, le moteur devrait pouvoir comparer une séance à son équivalent d'une semaine antérieure (même sous-type de séance qualité) — nécessite un mécanisme de lookup dans l'historique du plan déjà généré, pas juste un calcul local à la semaine courante.
-- **Statut : non commencé.**
+
+**Décision technique — décidée le 6 juillet 2026 :**
+
+Les deux natures de note se traitent différemment :
+
+- **Repère de ressenti** (ex. "Effort contrôlé, 3-4 mots max") : même mécanisme que 2.3/2.5 — banque de variantes pré-écrites par famille de séance qualité (Seuil / VMA / Vitesse), tirée au sort à la génération.
+- **Repère de progression relative** (ex. "Volume VMA identique S1, fatigue cumulée") : nécessite un mécanisme de comparaison. Retenu : comparer par **famille de séance** (Seuil vs Seuil, VMA vs VMA), pas par sous-type exact (`seuil-court` vs `seuil-long`) — un sous-type exact identique est peu probable d'une occurrence à l'autre vu que le contenu varie naturellement au fil du plan, la comparaison ne se déclencherait quasiment jamais. La famille se déduit du `sousType` existant (regroupement simple, ex. tout `seuil-*` → famille "seuil").
+
+*Format d'intégration* : fusionné dans le champ `contenu`, comme les autres notes de ce document (2.1, 2.3, 2.5).
+
+- **Statut : non commencé** (banque de variantes ressenti + mécanisme de comparaison par famille à implémenter).
 
 ### 2.5 Jalons narratifs aux moments de transition du plan
 
