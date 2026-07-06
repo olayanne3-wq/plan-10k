@@ -14,6 +14,26 @@ const SESSION_TARGETS = {
   TEST:  { targetMin:291, targetMax:298, okPace:298,  warnPace:310,  repOk:0.80, repWarn:0.60, effort:"4:51/km",      tolerance:"±7 sec",  recup:"≥ 6:00/km" },
 };
 
+function detecterTypeEffort(middle) {
+  let meilleurType = null;
+  let meilleurResultat = [];
+  let meilleurEcart = Infinity;
+  for (const [type, cible] of Object.entries(SESSION_TARGETS)) {
+    const effSpeed = 1000 / cible.targetMin;
+    const bySpeed = middle.filter(l => l.average_speed > 0 &&
+      Math.abs(l.average_speed - effSpeed) <= effSpeed * 0.15);
+    if (bySpeed.length === 0) continue;
+    const vitesseMoyReelle = bySpeed.reduce((s,l) => s + l.average_speed, 0) / bySpeed.length;
+    const ecart = Math.abs(vitesseMoyReelle - effSpeed);
+    if (ecart < meilleurEcart) {
+      meilleurEcart = ecart;
+      meilleurResultat = bySpeed;
+      meilleurType = type;
+    }
+  }
+  return meilleurType ? { type: meilleurType, laps: meilleurResultat } : null;
+}
+
 function creerGetEffortLaps(allSessions) {
   function extractTargetSpeed() { return null; } // stub : pas testé ici
   return function getEffortLaps(activity) {
@@ -25,24 +45,17 @@ function creerGetEffortLaps(allSessions) {
     const planSess = date ? allSessions.find(s => s.date === date) : null;
     const targetSpeedDuPlan = planSess ? extractTargetSpeed(planSess.session) : null;
 
-    const essayerCible = (effSpeed) => {
-      if (!effSpeed) return [];
-      return middle.filter(l => l.average_speed > 0 &&
-        Math.abs(l.average_speed - effSpeed) <= effSpeed * 0.15);
-    };
-
     if (targetSpeedDuPlan) {
-      const bySpeed = essayerCible(targetSpeedDuPlan);
+      const bySpeed = middle.filter(l => l.average_speed > 0 &&
+        Math.abs(l.average_speed - targetSpeedDuPlan) <= targetSpeedDuPlan * 0.15);
       if (bySpeed.length > 0) return bySpeed;
     }
 
-    let meilleurResultat = [];
-    for (const cible of Object.values(SESSION_TARGETS)) {
-      const effSpeed = 1000 / cible.targetMin;
-      const bySpeed = essayerCible(effSpeed);
-      if (bySpeed.length > meilleurResultat.length) meilleurResultat = bySpeed;
-    }
-    if (meilleurResultat.length > 0) return meilleurResultat;
+    // Choisit la cible dont l'écart de vitesse est le plus faible — pas la
+    // première/plus grosse correspondance trouvée (bug corrigé le 6 juillet
+    // 2026, cf. test 5 plus bas)
+    const detection = detecterTypeEffort(middle);
+    if (detection) return detection.laps;
 
     const withSpeed = middle.filter(l => l.average_speed > 0);
     const sorted = [...withSpeed].sort((a,b) => b.average_speed - a.average_speed);
@@ -154,4 +167,33 @@ console.log('\n--- Test 4 : aucun lap ne correspond à une cible connue -> fallb
   };
   const laps = getEffortLaps(activite);
   console.log('Fallback activé, pas de crash, retourne quelque chose :', laps.length > 0 ? 'OK' : 'ÉCHEC');
+}
+
+console.log('\n--- Test 5 : confusion SPEC/VMA (bug trouvé en test réel le 6 juillet 2026) ---');
+console.log("(une allure 4'49/km, réellement SPEC, passait le test de tolérance +/-15% de VMA");
+console.log(" -- qui vise 4'10/km -- car la marge en valeur absolue est large sur une cible rapide.");
+console.log(' Corrigé en choisissant la cible dont l\'écart de vitesse est le plus faible, pas la');
+console.log(' première/plus grosse correspondance trouvée)');
+{
+  const getEffortLaps = creerGetEffortLaps([]);
+  const activite = {
+    start_date_local: '2026-07-01T18:00:00Z',
+    laps: [
+      { average_speed: 2.5 },
+      { average_speed: 3.44 }, // ~4'50/km
+      { average_speed: 2.0 },
+      { average_speed: 3.50 }, // ~4'46/km
+      { average_speed: 2.0 },
+      { average_speed: 3.47 },
+      { average_speed: 2.0 },
+      { average_speed: 2.2 },
+    ]
+  };
+  const laps = getEffortLaps(activite);
+  const vitesseMoy = laps.reduce((s,l)=>s+l.average_speed,0)/laps.length;
+  const ecartSpec = Math.abs(vitesseMoy - 1000/291);
+  const ecartVma = Math.abs(vitesseMoy - 1000/250);
+  console.log('Vitesse détectée :', vitesseMoy.toFixed(3), 'm/s');
+  console.log('Écart à la cible SPEC :', ecartSpec.toFixed(3), '| Écart à la cible VMA :', ecartVma.toFixed(3));
+  console.log('SPEC est bien la cible la plus proche (pas VMA) :', ecartSpec < ecartVma ? 'OK' : 'ÉCHEC');
 }

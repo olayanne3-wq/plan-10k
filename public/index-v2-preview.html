@@ -553,6 +553,36 @@ function extractTargetSpeed(sessionStr) {
   return null;
 }
 
+/**
+ * Détecte, parmi les laps "milieu" d'une activité (hors échauffement/retour
+ * au calme), quelle cible générique de SESSION_TARGETS correspond le mieux
+ * — en choisissant celle dont la vitesse moyenne réelle est la PLUS PROCHE
+ * de la cible, pas juste celle qui capture le plus de laps (bug trouvé le
+ * 6 juillet 2026 : les plages ±15% de VMA/SEUIL/SPEC se chevauchent, une
+ * allure "seulement" 4'49/km reste dans la tolérance ±15% de VMA qui vise
+ * 4'10/km, la marge en valeur absolue étant large sur une cible rapide).
+ * Retourne { type, laps } ou null si aucune cible ne correspond.
+ */
+function detecterTypeEffort(middle) {
+  let meilleurType = null;
+  let meilleurResultat = [];
+  let meilleurEcart = Infinity;
+  for (const [type, cible] of Object.entries(SESSION_TARGETS)) {
+    const effSpeed = 1000 / cible.targetMin;
+    const bySpeed = middle.filter(l => l.average_speed > 0 &&
+      Math.abs(l.average_speed - effSpeed) <= effSpeed * 0.15);
+    if (bySpeed.length === 0) continue;
+    const vitesseMoyReelle = bySpeed.reduce((s,l) => s + l.average_speed, 0) / bySpeed.length;
+    const ecart = Math.abs(vitesseMoyReelle - effSpeed);
+    if (ecart < meilleurEcart) {
+      meilleurEcart = ecart;
+      meilleurResultat = bySpeed;
+      meilleurType = type;
+    }
+  }
+  return meilleurType ? { type: meilleurType, laps: meilleurResultat } : null;
+}
+
 function getEffortLaps(activity) {
   if (!activity.laps || activity.laps.length < 4) return [];
 
@@ -579,28 +609,16 @@ function getEffortLaps(activity) {
   const planSess = date ? ALL_SESSIONS.find(s => s.date === date) : null;
   const targetSpeedDuPlan = planSess ? extractTargetSpeed(planSess.session) : null;
 
-  const essayerCible = (effSpeed) => {
-    if (!effSpeed) return [];
-    return middle.filter(l => l.average_speed > 0 &&
-      Math.abs(l.average_speed - effSpeed) <= effSpeed * 0.15);
-  };
-
   // 1. Affinage par le plan prévu à cette date, si disponible
   if (targetSpeedDuPlan) {
-    const bySpeed = essayerCible(targetSpeedDuPlan);
+    const bySpeed = middle.filter(l => l.average_speed > 0 &&
+      Math.abs(l.average_speed - targetSpeedDuPlan) <= targetSpeedDuPlan * 0.15);
     if (bySpeed.length > 0) return bySpeed;
   }
 
-  // 2. Sinon, essaie chaque cible générique (VMA, SEUIL, SPEC, TEST) et
-  // retient celle qui capture le plus de laps — reconnaît le type
-  // d'effort réel sans dépendre de ce qui était prévu ce jour-là
-  let meilleurResultat = [];
-  for (const cible of Object.values(SESSION_TARGETS)) {
-    const effSpeed = 1000 / cible.targetMin;
-    const bySpeed = essayerCible(effSpeed);
-    if (bySpeed.length > meilleurResultat.length) meilleurResultat = bySpeed;
-  }
-  if (meilleurResultat.length > 0) return meilleurResultat;
+  // 2. Sinon, détection générique par cible la plus proche
+  const detection = detecterTypeEffort(middle);
+  if (detection) return detection.laps;
 
   // Fallback : moitie la plus rapide
   const withSpeed = middle.filter(l => l.average_speed > 0);
@@ -766,13 +784,18 @@ function predict10K() {
     // dans getEffortLaps). Le plan reste utilisé comme affinage à
     // l'intérieur de getEffortLaps quand une correspondance de date existe,
     // mais ne conditionne plus la sélection des activités analysées ici.
-    const cible = SESSION_TARGETS[sessionType];
-    const sessionRuns = cible ? runs.filter(r => {
-      const effSpeedCible = 1000 / cible.targetMin;
-      const laps = getEffortLaps(r);
-      if (!laps.length) return false;
-      const avgSpeed = laps.reduce((s,l) => s + l.average_speed, 0) / laps.length;
-      return Math.abs(avgSpeed - effSpeedCible) <= effSpeedCible * 0.15;
+    // Une activité "appartient" au type sessionType si detecterTypeEffort
+    // (même logique que dans getEffortLaps, cf. plus haut) retient
+    // précisément ce type comme la cible la plus proche — pas seulement
+    // "dans la tolérance ±15%", qui se chevauche entre types voisins (bug
+    // trouvé le 6 juillet 2026 : une séance SPEC à 4'49/km pouvait passer le
+    // test de tolérance VMA, qui vise 4'10/km, et être comptée deux fois).
+    const sessionRuns = SESSION_TARGETS[sessionType] ? runs.filter(r => {
+      if (!r.laps || r.laps.length < 4) return false;
+      const middle = r.laps.slice(1, -2);
+      if (!middle.length) return false;
+      const detection = detecterTypeEffort(middle);
+      return detection && detection.type === sessionType;
     }) : [];
     if (!sessionRuns.length) return null;
 
