@@ -957,7 +957,8 @@
 <script type="module">
   import * as PlanGenerator from '/v2/engine/plan-generator.js';
   import * as Strava from '/v2/engine/strava.js';
-  window.Engine = { ...PlanGenerator, ...Strava };
+  import * as GistSync from '/v2/engine/gist-sync.js';
+  window.Engine = { ...PlanGenerator, ...Strava, ...GistSync };
 </script>
 
 <script>
@@ -1391,109 +1392,19 @@
   // mais un gist séparé et dédié à v2 (schéma de données différent).
   // ===========================================================================
 
-  function getGithubToken() {
-    return localStorage.getItem('lk_github_token') || '';
-  }
-  function setGithubToken(token) {
-    localStorage.setItem('lk_github_token', token);
-  }
-  function getV2GistId() {
-    return localStorage.getItem('v2_gist_id') || '';
-  }
-  function setV2GistId(id) {
-    localStorage.setItem('v2_gist_id', id);
-  }
+  // ===========================================================================
+  // Persistence des plans — logique déplacée dans engine/gist-sync.js.
+  // Alias locaux vers Engine.xxx pour ne pas réécrire tous les appels
+  // ci-dessous (getGithubToken, chargerPlans, sauvegarderPlan, etc. sont
+  // utilisés telles quelles à de nombreux endroits du bloc UI).
+  // ===========================================================================
+  const getGithubToken = Engine.getGithubToken;
+  const setGithubToken = Engine.setGithubToken;
+  const chargerPlans = Engine.chargerPlans;
+  const sauvegarderPlan = Engine.sauvegarderPlan;
+  const supprimerPlan = Engine.supprimerPlan;
+  const renommerPlan = Engine.renommerPlan;
 
-  async function chargerPlans() {
-    const token = getGithubToken();
-    const gistId = getV2GistId();
-    if (!token || !gistId) return [];
-    try {
-      const resp = await fetch('https://api.github.com/gists/' + gistId, {
-        headers: { Authorization: 'token ' + token }
-      });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const data = await resp.json();
-      const raw = data.files['plan10k_v2_plans.json']?.content;
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      let plans = parsed.plans || [];
-
-      // Migration : les plans sauvegardés avant l'ajout de l'id (section 28)
-      // n'en ont pas, ce qui casse renommer/supprimer (rien à quoi s'accrocher).
-      // On leur en attribue un et on réécrit la liste immédiatement.
-      const sansId = plans.filter(p => !p.id);
-      if (sansId.length > 0) {
-        plans = plans.map(p => p.id ? p : { ...p, id: (window.crypto?.randomUUID ? crypto.randomUUID() : 'plan-' + Date.now() + '-' + Math.random()) });
-        try {
-          await ecrireListePlans(plans);
-        } catch (e) {
-          console.warn('Migration des ids a échoué (pas bloquant) :', e.message);
-        }
-      }
-
-      return plans;
-    } catch (e) {
-      console.warn('chargerPlans a échoué :', e.message);
-      return [];
-    }
-  }
-
-  // Écrit la liste complète des plans dans le Gist v2 (toujours un PATCH sur
-  // le même Gist si il existe déjà — le Gist lui-même n'est jamais supprimé,
-  // seul son contenu est mis à jour). Utilisée par sauvegarde, suppression et
-  // renommage : ces trois opérations ne sont que des variations sur la même
-  // écriture "liste de plans -> Gist".
-  async function ecrireListePlans(plans) {
-    const token = getGithubToken();
-    if (!token) {
-      throw new Error("Aucun token GitHub renseigné — impossible de sauvegarder.");
-    }
-    const body = {
-      description: 'Run by Léa v2 — plans sauvegardés',
-      public: false,
-      files: { 'plan10k_v2_plans.json': { content: JSON.stringify({ plans }, null, 2) } }
-    };
-    const gistId = getV2GistId();
-    const url = gistId ? 'https://api.github.com/gists/' + gistId : 'https://api.github.com/gists';
-    const method = gistId ? 'PATCH' : 'POST';
-
-    const resp = await fetch(url, {
-      method,
-      headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    setV2GistId(data.id);
-    return data.id;
-  }
-
-  async function sauvegarderPlan(plan) {
-    const plansExistants = await chargerPlans();
-    const nouveauPlan = { ...plan, sauvegardeLe: new Date().toISOString() };
-    // Remplace le plan existant (même id) plutôt que d'en créer un doublon —
-    // nécessaire pour que le suivi de complétion se mette à jour en place
-    const indexExistant = plansExistants.findIndex(p => p.id === plan.id);
-    const plans = indexExistant >= 0
-      ? plansExistants.map((p, i) => i === indexExistant ? nouveauPlan : p)
-      : [...plansExistants, nouveauPlan];
-    return ecrireListePlans(plans);
-  }
-
-  // Retire un seul plan de la liste et réécrit le Gist — le Gist lui-même
-  // n'est jamais supprimé, seul son contenu (liste de plans) est mis à jour.
-  async function supprimerPlan(planId) {
-    const plansExistants = await chargerPlans();
-    const plans = plansExistants.filter(p => p.id !== planId);
-    return ecrireListePlans(plans);
-  }
-
-  async function renommerPlan(planId, nouveauNom) {
-    const plansExistants = await chargerPlans();
-    const plans = plansExistants.map(p => p.id === planId ? { ...p, nom: nouveauNom } : p);
-    return ecrireListePlans(plans);
-  }
 
   let dernierPlanGenere = null;
 
