@@ -34,9 +34,11 @@ Contrainte de fond actée d'emblée : une prévision météo n'a de sens que pro
 - **Source de localisation** : géolocalisation de l'utilisateur (GPS), pas une ville renseignée manuellement au profil
 - **Seuil de déclenchement** : 28°C, repris tel quel de v1, fixe (pas de variation par profil pour l'instant — un seuil adaptatif à la tolérance individuelle à la chaleur est une amélioration possible mais non retenue à ce stade, faute de donnée fiable pour le calibrer)
 
-**Implication technique** : nécessite une API météo externe (à choisir — non tranché à ce stade) et un mécanisme applicatif qui tourne à un moment différent de la génération du plan (ex: notification/vérification quotidienne plutôt qu'un calcul unique). C'est le seul écart de ce document qui a une dépendance externe (API tierce) en plus du travail sur le moteur lui-même.
+**Implication technique** : nécessite une API météo externe et un mécanisme applicatif qui tourne à un moment différent de la génération du plan (ex: notification/vérification quotidienne plutôt qu'un calcul unique). C'est le seul écart de ce document qui a une dépendance externe (API tierce) en plus du travail sur le moteur lui-même.
 
-- **Statut : non commencé** (choix de l'API météo et du mécanisme de déclenchement quotidien restent à faire).
+**Choix de l'API météo — tranché le 6 juillet 2026 :** [Open-Meteo](https://open-meteo.com/), retenu pour l'absence totale de friction (pas de clé API, pas d'inscription, endpoint HTTP GET simple, JSON) et un volume gratuit large (10 000 appels/jour en usage non commercial) — largement suffisant pour l'usage prévu ici (un appel par utilisateur actif la veille de sa séance). Limite explicitement actée : la gratuité d'Open-Meteo est conditionnée à un usage non commercial ; **choix assumé de migrer plus tard si besoin** une fois la v2.5 (commercialisation) engagée, plutôt que de sur-anticiper maintenant un fournisseur payant (ex. OpenWeatherMap) pour un besoin qui n'existe pas encore.
+
+- **Statut : non commencé** (mécanisme de déclenchement quotidien reste à faire — le choix d'API est tranché).
 
 ### 2.3 Notes pratiques par type de séance (hors météo)
 

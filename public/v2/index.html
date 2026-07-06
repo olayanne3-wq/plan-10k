@@ -972,7 +972,8 @@
   import * as Strava from '/v2/engine/strava.js';
   import * as GistSync from '/v2/engine/gist-sync.js';
   import * as PdfExport from '/v2/engine/pdf-export.js';
-  window.Engine = { ...PlanGenerator, ...Strava, ...GistSync, ...PdfExport };
+  import * as Weather from '/v2/engine/weather.js';
+  window.Engine = { ...PlanGenerator, ...Strava, ...GistSync, ...PdfExport, ...Weather };
   // Signale explicitement que window.Engine est prêt : un <script type="module">
   // s'exécute de façon asynchrone/différée par rapport à un <script> classique
   // placé après lui dans le document, donc rien ne garantit que window.Engine
@@ -1347,6 +1348,38 @@
     warnDiv.innerHTML = plan.warnings.map(w =>
       `<div class="flag" style="margin-top:10px;"><span class="ico">⚠️</span><span>${w.message}</span></div>`
     ).join('') || '<div class="flag" style="margin-top:10px;"><span class="ico">✅</span><span>Aucun avertissement.</span></div>';
+
+    verifierMeteoSeanceDemain(plan);
+  }
+
+  // Notes météo dynamiques (doc convergence-v1-v2.md, 2.2) — vérifie si une
+  // séance est prévue demain, et si oui déclenche la prévision météo pour
+  // l'enrichir. Appelé à chaque affichage d'un plan (renderResults), pas
+  // seulement au chargement de la page, pour couvrir aussi la génération/
+  // régénération/chargement d'un plan existant.
+  async function verifierMeteoSeanceDemain(plan) {
+    if (!plan.dateDebut) return;
+    const debut = new Date(plan.dateDebut + 'T00:00:00Z');
+    const demain = new Date();
+    demain.setDate(demain.getDate() + 1);
+    const demainStr = demain.toISOString().slice(0, 10);
+
+    for (const semaine of plan.semaines) {
+      for (const [jourIndex, seance] of Object.entries(semaine.assignment)) {
+        const dateSeance = new Date(debut);
+        dateSeance.setUTCDate(debut.getUTCDate() + (semaine.semaineNum - 1) * 7 + Number(jourIndex));
+        const dateSeanceStr = dateSeance.toISOString().slice(0, 10);
+
+        if (dateSeanceStr === demainStr && seance.contenu) {
+          await Engine.verifierMeteoPourSeance(seance, demainStr);
+          // Rafraîchit l'affichage pour que la note météo (si ajoutée)
+          // soit visible immédiatement, sans attendre une navigation
+          rafraichirPlanComplet();
+          return; // une seule séance concernée par jour dans l'immense
+          // majorité des cas — pas la peine de continuer à parcourir
+        }
+      }
+    }
   }
 
   const DAY_NAMES_COURT = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
