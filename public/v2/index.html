@@ -549,13 +549,21 @@
     margin-top:12px;
     padding:11px;
     border-radius:10px;
-    border:1px solid var(--pace);
+    border:1.5px solid var(--pace);
     background:transparent;
-    color:var(--pace);
+    color:var(--pace-soft);
     font-family:'Manrope',sans-serif;
     font-weight:700;
     font-size:13px;
     cursor:pointer;
+    transition:background-color 0.15s ease, transform 0.1s ease;
+  }
+  .btn-mini:hover{
+    background:rgba(47,110,95,0.18);
+  }
+  .btn-mini:active{
+    background:rgba(47,110,95,0.32);
+    transform:scale(0.98);
   }
 
   /* Summary card step (bib) */
@@ -933,7 +941,7 @@
           </div>
 
           <div style="margin-top:14px;">
-            <button class="btn-mini" style="border-color:var(--pace); color:var(--pace);" onclick="lancerAnalyseAdaptation()">🔄 Analyser les résultats et adapter le plan</button>
+            <button class="btn-mini" onclick="lancerAnalyseAdaptation()">🔄 Analyser les résultats et adapter le plan</button>
             <p class="sub" style="margin-top:6px; font-size:12px;">Réduit automatiquement la semaine suivante quand plusieurs séances dures ont été ratées/adaptées — jamais sur une séance isolée, jamais un changement d'objectif.</p>
             <div id="adaptationMsg" style="margin-top:6px; font-size:13px;"></div>
           </div>
