@@ -1102,6 +1102,172 @@ export function genererContenuTest({ distance, alluresSec }) {
   return { sousType: 'test', contenu, kmEstime, distanceTestKm };
 }
 
+// ---------------------------------------------------------------------------
+// Jour de course (doc convergence-v1-v2.md, section 2.7) — stratégie de
+// pacing par distance décidée à partir de la littérature (cf. doc pour les
+// sources), explicitement pour un public amateur/intermédiaire, pas élite.
+// ---------------------------------------------------------------------------
+
+/**
+ * Génère le contenu de la séance de course, avec une stratégie de segments
+ * qui varie par distance (pas un pattern unique généralisé) :
+ * - 5K : quasi-plat, 1er km légèrement plus lent, accélération km 3-4,
+ *   dernier km à fond
+ * - 10K : 2 segments nets — 5 premiers km prudents (5-8s/km plus lent que
+ *   l'allure moyenne visée), 2 derniers km à l'allure maximale soutenable
+ * - Semi/Marathon : allure cible stable avec marge de sécurité au départ,
+ *   pas de paliers progressifs marqués
+ */
+export function genererContenuRace({ distance, alluresSec }) {
+  const distanceKm = KM_BY_DISTANCE[distance] ?? 10;
+  const C = alluresSec.C; // allure course, en secondes/km
+
+  const formatSegment = (kmDebut, kmFin, paceSec) =>
+    `Km ${kmDebut}-${kmFin} : ${formatPace(paceSec)}`;
+
+  let segments;
+  let resume;
+
+  if (distance === '5K') {
+    const paceDepart = C + 4; // 3-5s/km plus lent, milieu de fourchette
+    segments = [
+      `Km 1 : ${formatPace(paceDepart)}`,
+      `Km 2 : ${formatPace(C)}`,
+      `Km 3-4 : accélère progressivement vers ${formatPace(C - 3)}`,
+      `Dernier km : tout donner`
+    ];
+    resume = `Départ légèrement prudent (${formatPace(paceDepart)}), accélération progressive, dernier km à fond.`;
+  } else if (distance === '10K') {
+    const paceDepart = Math.round(C + 6.5); // 5-8s/km plus lent, milieu de fourchette
+    const kmSegment1 = Math.round(distanceKm * 0.5); // ~5 premiers km sur 10K
+    segments = [
+      formatSegment(1, kmSegment1, paceDepart),
+      `Km ${kmSegment1 + 1}-${Math.round(distanceKm)} : allure maximale soutenable, vise ${formatPace(C)}`
+    ];
+    resume = `2 segments : prudent sur la première moitié (${formatPace(paceDepart)}), tout donner sur la seconde.`;
+  } else {
+    // Semi / Marathon : allure stable, marge de sécurité au départ, pas de
+    // paliers progressifs marqués — ajustement au ressenti en fin de course
+    const paceDepart = Math.round(C + 5);
+    segments = [
+      `Premiers km : reste ${formatPace(paceDepart)}, ne te laisse pas emporter par l'excitation du départ`,
+      `Corps de course : allure cible ${formatPace(C)}`,
+      `Derniers km : ajuste au ressenti — accélère seulement si tu te sens vraiment bien`
+    ];
+    resume = `Allure stable avec marge de sécurité au départ (${formatPace(paceDepart)}), ajustement au ressenti en fin de course plutôt que paliers marqués.`;
+  }
+
+  const contenu = `🏁 Jour de course — ${distanceKm}km à l'allure objectif ${formatPace(C)}. ${resume} ${segments.join(' · ')}`;
+  return { sousType: 'race', contenu, kmEstime: distanceKm };
+}
+
+/**
+ * Remplace la séance du jour de course (date == dateCourse) par une vraie
+ * séance de course, avec stratégie de segments par distance. Mute le plan
+ * en place. Silencieux si le jour de course ne tombe sur aucune séance du
+ * plan (ne devrait pas arriver en pratique, computePhases cale la durée du
+ * plan sur dateCourse, mais pas de garde-fou bloquant par prudence).
+ */
+export function placerSeanceCourse(plan, alluresSec) {
+  const derniereSemaine = plan.semaines[plan.semaines.length - 1];
+  if (!derniereSemaine) return;
+
+  // Le jour de course est toujours le dernier jour du plan (dimanche de la
+  // dernière semaine, cf. computePhases qui cale la durée totale sur
+  // dateCourse) — pas besoin de comparer des dates jour par jour, plus
+  // simple et robuste que de reconstruire la date de chaque jour de la
+  // semaine à partir de dateDebut.
+  const jours = Object.entries(derniereSemaine.assignment);
+  const [, dernierJour] = jours[jours.length - 1];
+  if (!dernierJour) return;
+
+  const { sousType, contenu, kmEstime } = genererContenuRace({ distance: plan.distance, alluresSec });
+  dernierJour.type = 'race';
+  dernierJour.sousType = sousType;
+  dernierJour.contenu = contenu;
+  dernierJour.kmEstime = kmEstime;
+  dernierJour.estCourse = true;
+}
+
+// ---------------------------------------------------------------------------
+// Semaine d'approche : repères J-X et consignes logistiques (doc
+// convergence-v1-v2.md, section 2.7, deuxième partie) — les 3 derniers jours
+// avant course (hors le jour de course lui-même, traité par
+// placerSeanceCourse) reçoivent un repère de distance et/ou une consigne
+// pratique. Doit s'exécuter après placerSeanceCourse (a besoin de savoir
+// quel jour est le jour de course pour compter les J-X en arrière).
+// ---------------------------------------------------------------------------
+
+export const NOTES_APPROCHE_COURSE = {
+  'j3': [
+    "J-3 : footing léger uniquement, rien de plus.",
+    "Encore 3 jours. Cette séance reste volontairement courte et facile."
+  ],
+  'j2': [
+    "Hydratation et sommeil : les deux leviers qui comptent le plus maintenant.",
+    "Repos total aujourd'hui — priorité à l'hydratation et à un bon sommeil."
+  ],
+  'veille': [
+    "Pâtes le soir, coucher tôt. Prépare ce dont tu as besoin pour demain.",
+    "Repos complet, repas riche en glucides ce soir, et au lit tôt."
+  ]
+};
+
+/**
+ * Injecte les repères J-X et consignes logistiques sur les 3 derniers jours
+ * avant la course (J-3, J-2, veille), en comptant en arrière depuis le jour
+ * de course (estCourse: true). Mute le plan en place. Silencieux si aucun
+ * jour de course n'est trouvé, ou si le plan est trop court pour avoir 3
+ * jours avant (pas de garde-fou bloquant, juste les jours manquants sont
+ * ignorés).
+ */
+export function injecterApprocheCourse(plan) {
+  const piocher = (cle) => {
+    const variantes = NOTES_APPROCHE_COURSE[cle];
+    return variantes[Math.floor(Math.random() * variantes.length)];
+  };
+
+  const derniereSemaine = plan.semaines[plan.semaines.length - 1];
+  if (!derniereSemaine) return;
+
+  // Utilise directement la clé numérique du jour (0=Lun ... 6=Dim) plutôt
+  // que la position dans Object.values(assignment) : ce dernier ne
+  // reflète l'ordre réel des jours que si l'objet a ses 7 clés (0 à 6)
+  // contiguës, ce qui est vrai pour un plan généré normalement mais pas
+  // garanti dans tous les cas (ex. tests avec un assignment partiel).
+  const cleCourse = Object.entries(derniereSemaine.assignment).find(([, j]) => j.estCourse)?.[0];
+  if (cleCourse === undefined) return;
+  const jourCourseNum = Number(cleCourse);
+
+  // Garde-fou sportif : jamais de séance qualité dans les 2 derniers jours
+  // avant course (J-2 et veille) — la rotation Affûtage du moteur peut
+  // placer une séance qualité (ex. allure-course) à cet endroit sans tenir
+  // compte de la proximité de la course. Converti en EF léger générique
+  // plutôt que de complexifier placerSemaine avec un cas spécifique à la
+  // toute dernière semaine du plan.
+  [1, 2].forEach(decalage => {
+    const jour = derniereSemaine.assignment[jourCourseNum - decalage];
+    if (jour && jour.type === 'qualite') {
+      jour.type = 'ef';
+      jour.sousType = undefined;
+      jour.role = 'recuperation';
+      jour.contenu = `Footing très léger, aucune intensité à ${decalage} jour${decalage > 1 ? 's' : ''} de la course.`;
+      jour.kmEstime = (jour.kmEstime ?? 0) * 0.4; // réduit fortement le volume de cette séance
+    }
+  });
+
+  // J-3, J-2 (= veille de la veille), veille (J-1) — dans cet ordre, en
+  // comptant en arrière depuis le jour de course
+  const cles = ['j3', 'j2', 'veille'];
+  cles.forEach((cle, i) => {
+    const decalage = cles.length - i; // 3, 2, 1
+    const jour = derniereSemaine.assignment[jourCourseNum - decalage];
+    if (jour && jour.contenu) {
+      jour.contenu = `${jour.contenu} ${piocher(cle)}`;
+    }
+  });
+}
+
 /**
  * Place une séance test unique dans le plan déjà généré, vers la fin de la
  * phase Spécifique (avec le tampon de récupération avant l'Affûtage). Mute
@@ -1445,6 +1611,16 @@ export function generatePlan(profil, params) {
   // doit s'exécuter après placerSeanceTest, la séance test n'existant pas
   // encore au moment des autres injections de notes plus haut
   injecterCoherenceSemaineTest(plan);
+
+  // Jour de course (doc convergence-v1-v2.md, 2.7) — remplace le dernier
+  // jour du plan (générique jusqu'ici) par une vraie séance de course avec
+  // stratégie de segments par distance
+  placerSeanceCourse(plan, allSeconds);
+
+  // Semaine d'approche : repères J-X et consignes logistiques (doc
+  // convergence-v1-v2.md, 2.7) — doit s'exécuter après placerSeanceCourse
+  // (a besoin de savoir quel jour est estCourse pour compter en arrière)
+  injecterApprocheCourse(plan);
 
   return plan;
 }
