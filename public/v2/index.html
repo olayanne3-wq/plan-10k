@@ -1892,6 +1892,11 @@
     document.getElementById('backBtn').style.visibility = n === 1 ? 'hidden' : 'visible';
     document.getElementById('nextBtn').textContent = n === totalSteps ? 'Générer le plan' : 'Continuer';
     renderTrack();
+    // Persiste l'étape courante pour la restaurer après un rechargement de
+    // page (ex: retour OAuth Strava qui force un reload complet, cf.
+    // capterRetourStravaOAuth). sessionStorage plutôt que localStorage :
+    // ne doit pas survivre au-delà de cette session de navigation.
+    sessionStorage.setItem('v2_wizard_step', n);
   }
 
   function nextStep(){
@@ -1977,6 +1982,13 @@
   renderStartQuickOptions();
   setDefaultRaceDate();
   updateConstraintSummary();
+
+  // Restaure l'étape du wizard si elle a été persistée (ex: juste avant un
+  // rechargement forcé par le retour OAuth Strava) — évite de renvoyer
+  // l'utilisateur à l'étape 1 après un reload alors qu'il était déjà plus
+  // loin dans le wizard.
+  const etapeSauvegardee = parseInt(sessionStorage.getItem('v2_wizard_step') || '1', 10);
+  current = (etapeSauvegardee >= 1 && etapeSauvegardee <= totalSteps) ? etapeSauvegardee : 1;
   showStep(current);
 
   if ('serviceWorker' in navigator) {
