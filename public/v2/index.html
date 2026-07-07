@@ -933,6 +933,24 @@
         </div>
         <button class="btn-mini" onclick="sauvegarderPlanUI()">Confirmer la sauvegarde</button>
         <div id="sauvegardeMsg" style="margin-top:8px; font-size:13px;"></div>
+
+        <!-- Code de synchronisation entre appareils — évite d'avoir à aller
+             chercher manuellement l'id du Gist sur GitHub (retour de
+             Laurent le 7 juillet 2026 : la manip via github.com était trop
+             lourde). Le "code" est simplement l'id du Gist v2, présenté
+             sous une forme copiable/collable plutôt que de demander à
+             l'utilisateur d'aller le chercher lui-même. -->
+        <div style="margin-top:18px; padding-top:14px; border-top:1px solid rgba(238,240,234,0.12);">
+          <p class="sub" style="font-size:12px; margin-bottom:8px;">Synchroniser avec un autre appareil</p>
+          <div class="date-field" style="margin-bottom:8px;">
+            <input type="text" id="codeSyncInput" placeholder="Code de synchronisation (depuis un autre appareil)" style="font-size:14px; padding:14px;">
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn-mini" style="flex:1;" onclick="appliquerCodeSync()">Utiliser ce code</button>
+            <button class="btn-mini" style="flex:1;" onclick="copierCodeSync()">Copier mon code</button>
+          </div>
+          <div id="syncMsg" style="margin-top:8px; font-size:13px;"></div>
+        </div>
       </div>
 
       <!-- Actions avancées : repliées par défaut, moins utilisées au quotidien -->
@@ -1503,6 +1521,8 @@
   // ===========================================================================
   const getGithubToken = (...args) => Engine.getGithubToken(...args);
   const setGithubToken = (...args) => Engine.setGithubToken(...args);
+  const getV2GistId = (...args) => Engine.getV2GistId(...args);
+  const setV2GistId = (...args) => Engine.setV2GistId(...args);
   const chargerPlans = (...args) => Engine.chargerPlans(...args);
   const sauvegarderPlan = (...args) => Engine.sauvegarderPlan(...args);
   const supprimerPlan = (...args) => Engine.supprimerPlan(...args);
@@ -1543,6 +1563,67 @@
       // ajouter une suggestion sur le token qui n'a pas de sens ici.
       const estErreurChevauchement = e.message.includes('chevauche un plan déjà sauvegardé');
       msgEl.textContent = '❌ ' + e.message + (estErreurChevauchement ? '' : ' (vérifie que le token a bien le scope "gist")');
+      msgEl.style.color = 'var(--signal)';
+      console.error(e);
+    }
+  }
+
+  // Synchronisation entre appareils via un "code" (l'id du Gist v2, sans
+  // que l'utilisateur ait besoin de savoir ce que c'est ni d'aller le
+  // chercher manuellement sur GitHub). Ajouté le 7 juillet 2026 suite au
+  // retour de Laurent : sans ce champ, synchroniser un PC avec un mobile
+  // demandait d'aller chercher l'id du Gist manuellement sur github.com —
+  // jugé trop lourd pour un usage réel répété.
+  function copierCodeSync() {
+    const msgEl = document.getElementById('syncMsg');
+    const code = getV2GistId();
+    if (!code) {
+      msgEl.textContent = 'Aucun plan sauvegardé sur cet appareil pour l\'instant — sauvegarde-en un d\'abord.';
+      msgEl.style.color = 'var(--signal)';
+      return;
+    }
+    navigator.clipboard?.writeText(code).then(() => {
+      msgEl.textContent = '✅ Code copié — colle-le sur ton autre appareil, dans le même champ.';
+      msgEl.style.color = 'var(--pace)';
+    }).catch(() => {
+      // Repli si l'API clipboard n'est pas disponible (ex. contexte non
+      // sécurisé) : affiche le code directement pour copie manuelle
+      msgEl.textContent = 'Ton code : ' + code;
+      msgEl.style.color = 'var(--pace)';
+    });
+  }
+
+  async function appliquerCodeSync() {
+    const msgEl = document.getElementById('syncMsg');
+    const code = document.getElementById('codeSyncInput').value.trim();
+    if (!code) {
+      msgEl.textContent = 'Colle d\'abord un code de synchronisation.';
+      msgEl.style.color = 'var(--signal)';
+      return;
+    }
+    const tokenSaisi = document.getElementById('githubTokenInput').value.trim();
+    if (tokenSaisi) setGithubToken(tokenSaisi);
+    if (!getGithubToken()) {
+      msgEl.textContent = 'Renseigne d\'abord ton token GitHub ci-dessus (le même que sur ton autre appareil).';
+      msgEl.style.color = 'var(--signal)';
+      return;
+    }
+
+    msgEl.textContent = 'Synchronisation en cours…';
+    msgEl.style.color = 'rgba(238,240,234,0.5)';
+    setV2GistId(code);
+    try {
+      const plans = await chargerPlans();
+      if (plans.length === 0) {
+        msgEl.textContent = '⚠️ Code valide, mais aucun plan trouvé — vérifie que le token utilisé est bien le même que sur l\'autre appareil.';
+        msgEl.style.color = 'var(--signal)';
+        return;
+      }
+      msgEl.textContent = '✅ Synchronisé — ' + plans.length + ' plan' + (plans.length > 1 ? 's' : '') + ' retrouvé' + (plans.length > 1 ? 's' : '') + '.';
+      msgEl.style.color = 'var(--pace)';
+      await afficherPlansSauvegardes();
+    } catch (e) {
+      msgEl.textContent = '❌ ' + e.message;
       msgEl.style.color = 'var(--signal)';
       console.error(e);
     }
