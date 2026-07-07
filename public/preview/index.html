@@ -382,7 +382,7 @@ function globalPct() {
 function phaseOf(weekNum) { return PHASES.find(p=>p.weeks.includes(weekNum))||{color:"#e2e8f0",label:""}; }
 
 // ── Projections Riegel multi-distances ────────────────────────────────────
-function riegelProjections(time10k) {
+function riegelProjections(timeSurDistanceActuelle) {
   // La distance mise en avant (target: true) doit correspondre à la vraie
   // distance du plan actuellement affiché, pas toujours 10K — bug trouvé
   // le 7 juillet 2026, même famille que les allures fausses sur un plan
@@ -394,8 +394,18 @@ function riegelProjections(time10k) {
     { label:"Semi",  dist:21097,  target: distancePlanActuel === "Semi" },
     { label:"Marathon", dist:42195, target: distancePlanActuel === "Marathon" },
   ];
+
+  // predict10K() calcule maintenant une estimation sur DISTANCE_M_REFERENCE
+  // (la vraie distance du plan actuel), pas toujours 10000m fixe — corrigé
+  // le 7 juillet 2026 en même temps que ce fichier, pour rester cohérent
+  // avec SESSION_TARGETS (rendu dynamique le même jour, basé sur les
+  // allures du plan actuel). Le paramètre reçu ici est donc bien un temps
+  // sur DISTANCE_M_REFERENCE, pas toujours 10K — la formule Riegel doit
+  // projeter DEPUIS cette distance de référence, pas depuis 10000m fixe
+  // (sinon toutes les projections sont décalées dans le même sens sur un
+  // plan non-10K, symptôme remonté par Laurent).
   return DISTANCES.map(d => {
-    const t = time10k * Math.pow(d.dist / 10000, 1.06);
+    const t = timeSurDistanceActuelle * Math.pow(d.dist / DISTANCE_M_REFERENCE, 1.06);
     const pace = t / (d.dist / 1000);
     const h = Math.floor(t / 3600);
     const m = Math.floor((t % 3600) / 60);
@@ -1032,7 +1042,7 @@ function predict10K() {
   // ── 1. SPEC → allure directe ──────────────────────────────────────────────
   const specData = weightedAvgByEffortDuration("SPEC", 1);
   if (specData) {
-    const estimate10k = 10000 / specData.speed;
+    const estimate10k = DISTANCE_M_REFERENCE / specData.speed;
     estimates.push({ value: estimate10k, weight: 0.45 });
     const lastSpecDate = specData.runs.map(r=>r.start_date_local?.slice(0,10)).filter(Boolean).sort().pop();
     details.push({ label:`SPEC · ${specData.runs.length} séance${specData.runs.length>1?"s":""} · dernier ${lastSpecDate||"?"}`, value:fmtPace(specData.speed)+"/km → "+fmtTime(Math.round(estimate10k)) });
@@ -1043,7 +1053,7 @@ function predict10K() {
   if (seuilData && seuilData.runs.length >= 3) {
     const totalEffortTime = seuilData.laps.reduce((s,l) => s + l.distance/l.average_speed, 0);
     const totalEffortDist = seuilData.laps.reduce((s,l) => s + l.distance, 0);
-    const riegelSeuil = totalEffortTime * Math.pow(10000/totalEffortDist, 1.06);
+    const riegelSeuil = totalEffortTime * Math.pow(DISTANCE_M_REFERENCE/totalEffortDist, 1.06);
     estimates.push({ value: riegelSeuil, weight: 0.10 });
     details.push({ label:`SEUIL · ${seuilData.runs.length} séances · ${Math.round(totalEffortDist)}m effort`, value:fmtPace(seuilData.speed)+"/km → "+fmtTime(Math.round(riegelSeuil)) });
   }
@@ -1051,7 +1061,7 @@ function predict10K() {
   // ── 3. VMA → vitesse × 0.87 ──────────────────────────────────────────────
   const vmaData = weightedAvgByEffortDuration("VMA", 1);
   if (vmaData) {
-    const estimate10k = 10000 / (vmaData.speed * 0.87);
+    const estimate10k = DISTANCE_M_REFERENCE / (vmaData.speed * 0.87);
     estimates.push({ value: estimate10k, weight: 0.35 });
     const lastVmaDate = vmaData.runs.map(r=>r.start_date_local?.slice(0,10)).filter(Boolean).sort().pop();
     details.push({ label:`VMA · ${vmaData.runs.length} séance${vmaData.runs.length>1?"s":""} · dernier ${lastVmaDate||"?"}`, value:fmtPace(vmaData.speed)+"/km → "+fmtTime(Math.round(estimate10k)) });
