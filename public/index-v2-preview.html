@@ -47,25 +47,59 @@ input[type=text], input[type=number], input[type=password] {
   // étape 2). Paramètres repris du profil réel de Laurent. Exécuté en
   // script classique, donc garanti synchrone et terminé avant le script
   // suivant qui utilise PLAN.
-  window.__PLAN_GENERE__ = traduirePlanVersFormatV1(generatePlan(
-    { niveau: 'intermediaire', joursDisponiblesHabituels: [1,2,3,4,5,6], renforcementMusculaire: true },
-    { distance: '10K', refDistance: '10K', tempsReference: '50:21', objectif: '48:30', dateDebut: '2026-06-22', dateCourse: '2026-09-06', volumeActuel: 30, contraintesPonctuelles: [] }
-  ));
+  //
+  // Le plan BRUT (avant traduction v1) est conservé sous __PLAN_BRUT__ :
+  // contient les métadonnées (paramsOrigine.raceName/raceLocation/raceUrl,
+  // zoneFC.fcMax, paramsOrigine.tempsReference) qui n'existent pas dans le
+  // format traduit PLAN/ALL_SESSIONS — nécessaires pour ne plus coder ces
+  // valeurs en dur (docs/v2-methodologie/convergence-v1-v2.md, section 7bis).
+  window.__PLAN_BRUT__ = generatePlan(
+    { niveau: 'intermediaire', joursDisponiblesHabituels: [1,2,3,4,5,6], renforcementMusculaire: true, fcMaxConnue: 181 },
+    { distance: '10K', refDistance: '10K', tempsReference: '50:21', objectif: '48:30', dateDebut: '2026-06-22', dateCourse: '2026-09-06', volumeActuel: 30, contraintesPonctuelles: [], raceName: "10 km Gem'Aubagne", raceLocation: 'Aubagne', raceUrl: 'https://new.sportsnconnect.com/client/events/4qa4QCJ1DtZYPSzSCbjJJK-5-and-10-km-gemaubagne' }
+  );
+  window.__PLAN_GENERE__ = traduirePlanVersFormatV1(window.__PLAN_BRUT__);
 </script>
 
 <script>
 const STRAVA_CLIENT_ID = "260339";
 
 // ── Infos course ──────────────────────────────────────────────────────────
-const RACE_NAME = "10 km Gem\'Aubagne";
-const RACE_URL = "https://new.sportsnconnect.com/client/events/4qa4QCJ1DtZYPSzSCbjJJK-5-and-10-km-gemaubagne";
-const RACE_LOCATION = "Aubagne";
+// Lues depuis le plan chargé (paramsOrigine, cf. section 7bis du doc de
+// convergence) plutôt que codées en dur — repli sur une chaîne vide si le
+// plan n'a pas ces métadonnées (ex. ancien plan sauvegardé avant leur ajout
+// au wizard).
+const RACE_NAME = window.__PLAN_BRUT__?.paramsOrigine?.raceName || '';
+const RACE_URL = window.__PLAN_BRUT__?.paramsOrigine?.raceUrl || '';
+const RACE_LOCATION = window.__PLAN_BRUT__?.paramsOrigine?.raceLocation || '';
 
-const PHASES = [
-  { id:"construction", label:"Construction", weeks:[1,2,3,4,5], color:"#60a5fa" },
-  { id:"affutage",     label:"Affûtage",     weeks:[6,7,8,9],   color:"#eab308" },
-  { id:"pic",          label:"Pic de forme", weeks:[10,11],      color:"#f97316" },
-];
+// ── Phases ──────────────────────────────────────────────────────────────
+// Reconstruites depuis plan.phases (nombre de semaines par phase) plutôt
+// que des plages codées en dur — sinon incohérent avec un plan de durée
+// différente de 11 semaines. Correspondance de terminologie v2 -> v1
+// (déjà tranchée dans docs/v2-methodologie/convergence-v1-v2.md, section 3) :
+// Construction -> construction, Specifique -> affutage, Affutage -> pic.
+const NOM_PHASE_V1 = { 'Construction': 'construction', 'Specifique': 'affutage', 'Affutage': 'pic' };
+const LABEL_PHASE_V1 = { 'construction': 'Construction', 'affutage': 'Affûtage', 'pic': 'Pic de forme' };
+const COULEUR_PHASE_V1 = { 'construction': '#60a5fa', 'affutage': '#eab308', 'pic': '#f97316' };
+
+const PHASES = (() => {
+  const phasesBrutes = window.__PLAN_BRUT__?.phases;
+  if (!phasesBrutes) {
+    // Repli : plages historiques du plan de Laurent (11 semaines)
+    return [
+      { id:"construction", label:"Construction", weeks:[1,2,3,4,5], color:"#60a5fa" },
+      { id:"affutage",     label:"Affûtage",     weeks:[6,7,8,9],   color:"#eab308" },
+      { id:"pic",          label:"Pic de forme", weeks:[10,11],      color:"#f97316" },
+    ];
+  }
+  let semaineCourante = 1;
+  return phasesBrutes.map(p => {
+    const id = NOM_PHASE_V1[p.nom] || p.nom.toLowerCase();
+    const weeks = Array.from({ length: p.semaines }, (_, i) => semaineCourante + i);
+    semaineCourante += p.semaines;
+    return { id, label: LABEL_PHASE_V1[id] || p.nom, weeks, color: COULEUR_PHASE_V1[id] || '#60a5fa' };
+  });
+})();
 
 const STYPES = {
   EF:    { label:"Endurance fondamentale", color:"#60a5fa",  short:"EF"    },
@@ -89,7 +123,15 @@ const STYPES = {
 // objectif 48'30, départ 2026-06-22, course 2026-09-06, 30km/semaine).
 let PLAN = window.__PLAN_GENERE__;
 
-const ALL_SESSIONS = PLAN.flatMap(w => w.sessions.map((s,i) => ({...s, week:w.week, phase:w.phase, uid:`${w.week}-${i}`})));
+// Recalculable via recalculerAllSessions() plutôt que figée en const :
+// nécessaire pour la future sélection de plan (docs/v2-methodologie/
+// convergence-v1-v2.md, section 7) — si un autre plan est chargé après le
+// démarrage, ALL_SESSIONS doit être reconstruite depuis le nouveau PLAN,
+// pas rester sur l'ancien.
+function recalculerAllSessions() {
+  return PLAN.flatMap(w => w.sessions.map((s,i) => ({...s, week:w.week, phase:w.phase, uid:`${w.week}-${i}`})));
+}
+let ALL_SESSIONS = recalculerAllSessions();
 
 const INTERVAL_SESSION_DATES = new Set(
   ALL_SESSIONS.filter(s => ["VMA","SPEC","TEST","SEUIL"].includes(s.type)).map(s => s.date)
@@ -481,16 +523,31 @@ const SESSION_TARGETS = {
 const PACE_REFS = Object.fromEntries(
   Object.entries(SESSION_TARGETS).map(([k,v]) => [k, { effort:v.effort, tolerance:v.tolerance, recup:v.recup }])
 );
-// ── Zones FC cible (FC max 181 bpm Laurent) ──────────────────────────────
+// FC max lue depuis le plan chargé (zoneFC.fcMax, cf. section 7bis du doc de
+// convergence) plutôt que codée en dur — repli sur 181 (valeur historique
+// de Laurent) si le plan n'a pas cette donnée (profil sans fcMaxConnue).
+const FC_MAX = window.__PLAN_BRUT__?.zoneFC?.fcMax || 181;
+
+// Référence de performance connue (paramsOrigine.tempsReference du plan
+// chargé, cf. section 7bis du doc de convergence) plutôt que codée en dur.
+// Repli sur 3021s (50'21", valeur historique de Laurent) si absente.
+const BASE_TIME_REFERENCE = window.__PLAN_BRUT__?.paramsOrigine?.tempsReference
+  ? parseTimeToSeconds(window.__PLAN_BRUT__.paramsOrigine.tempsReference)
+  : 3021;
+
+// ── Zones FC cible ──────────────────────────────────────────────────────
+// Reconstruites depuis FC_MAX (pourcentages fixes : 65-75% EF/LONGUE,
+// 85-90% SPEC/TEST bas, 90-95% SEUIL/TEST haut, 90-100% VMA) plutôt que des
+// bornes bpm codées en dur — sinon ces bornes resteraient figées sur
+// l'ancien FC_MAX (181) même si un plan avec un profil différent est chargé.
 const FC_ZONES = {
-  EF:    { min:118, max:136, label:"65–75%", color:"#60a5fa" },
-  LONGUE:{ min:118, max:136, label:"65–75%", color:"#06b6d4" },
-  SPEC:  { min:154, max:163, label:"85–90%", color:"#a855f7" },
-  SEUIL: { min:163, max:172, label:"90–95%", color:"#eab308" },
-  VMA:   { min:163, max:181, label:"90–100%",color:"#f97316" },
-  TEST:  { min:154, max:172, label:"85–95%", color:"#f97316" },
+  EF:    { min: Math.round(FC_MAX*0.65), max: Math.round(FC_MAX*0.75), label:"65–75%", color:"#60a5fa" },
+  LONGUE:{ min: Math.round(FC_MAX*0.65), max: Math.round(FC_MAX*0.75), label:"65–75%", color:"#06b6d4" },
+  SPEC:  { min: Math.round(FC_MAX*0.85), max: Math.round(FC_MAX*0.90), label:"85–90%", color:"#a855f7" },
+  SEUIL: { min: Math.round(FC_MAX*0.90), max: Math.round(FC_MAX*0.95), label:"90–95%", color:"#eab308" },
+  VMA:   { min: Math.round(FC_MAX*0.90), max: FC_MAX,                  label:"90–100%",color:"#f97316" },
+  TEST:  { min: Math.round(FC_MAX*0.85), max: Math.round(FC_MAX*0.95), label:"85–95%", color:"#f97316" },
 };
-const FC_MAX = 181;
 
 function fcStatus(type, avgHr) {
   const zone = FC_ZONES[type];
@@ -709,7 +766,7 @@ function renderLapRow(lap, i, sessionType) {
 
 function predict10KAtDate(dateStr) {
   // Calcule l\'estimation 10K en ne prenant que les activités antérieures à dateStr
-  const BASE_TIME = 3021;
+  const BASE_TIME = BASE_TIME_REFERENCE;
   const runs = stravaActivities.filter(a => a.type === "Run" && a.start_date_local?.slice(0,10) <= dateStr);
   const estimates = [];
 
@@ -769,7 +826,7 @@ if (stravaActivities.length > 0 && (predHistory.length <= 1 || (predHistory[0] &
 }
 
 function predict10K() {
-  const BASE_TIME = 3021; // 50'21" Lavandou
+  const BASE_TIME = BASE_TIME_REFERENCE; // référence lue depuis le plan chargé
   const runs = stravaActivities.filter(a => a.type === "Run");
   const estimates = [];
   const details = [];
@@ -2382,7 +2439,7 @@ function renderStats() {
 
   if (predHistory.length >= 3 && projDaySpan >= 21) {
     const currentTime = pred.time;
-    const BASE_TIME_START = 3021; // 50'21" Lavandou
+    const BASE_TIME_START = BASE_TIME_REFERENCE; // référence lue depuis le plan chargé
     const gainMax = BASE_TIME_START - raceGoalTime; // gain théorique max
     const gainRealist = Math.round(gainMax * 0.85); // 85% du gain max
     const gainSoFar = BASE_TIME_START - currentTime;

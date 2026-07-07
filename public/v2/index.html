@@ -809,6 +809,17 @@
         <input type="date" id="raceDate">
       </div>
 
+      <div class="date-label" style="margin-top:16px;">Infos de la course (facultatif)</div>
+      <div class="date-field">
+        <input type="text" id="raceName" placeholder="Nom de la course">
+      </div>
+      <div class="date-field" style="margin-top:8px;">
+        <input type="text" id="raceLocation" placeholder="Lieu">
+      </div>
+      <div class="date-field" style="margin-top:8px;">
+        <input type="url" id="raceUrl" placeholder="Lien vers la page de la course">
+      </div>
+
       <div class="duration-card" id="durationCard">
         <div class="dc-weeks"><span id="dcWeeksNum">11</span><span class="dc-unit">semaines</span></div>
         <div class="dc-structure" id="dcStructure">Format standard — Construction / Affûtage / Pic</div>
@@ -1317,7 +1328,13 @@
       dateCourse: document.getElementById('raceDate').value,
       volumeActuel: isNaN(volumeActuel) ? 30 : volumeActuel,
       contraintesPonctuelles: contraintesSelected,
-      repriseDuree: contraintesSelected.includes('reprise') ? repriseDuree : undefined
+      repriseDuree: contraintesSelected.includes('reprise') ? repriseDuree : undefined,
+      // Infos de course, purement décoratives pour l'affichage — le moteur
+      // de calcul ne s'en sert pas, uniquement l'interface v1/preview
+      // (docs/v2-methodologie/convergence-v1-v2.md, section 7bis)
+      raceName: document.getElementById('raceName').value.trim() || undefined,
+      raceLocation: document.getElementById('raceLocation').value.trim() || undefined,
+      raceUrl: document.getElementById('raceUrl').value.trim() || undefined
     };
 
     return { profil, params };
