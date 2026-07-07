@@ -164,6 +164,16 @@ export const NOTES_PRATIQUES = {
     "Effort contrôlé — tu dois pouvoir tenir une phrase courte, pas plus.",
     "Vise la régularité plutôt que la vitesse sur cette séance."
   ],
+  // Sous-type précis, pas la famille — un fartlek alterne rapide/facile,
+  // contrairement aux notes génériques de la famille 'seuil' ci-dessus
+  // ("vise la régularité") qui n'ont pas de sens pour ce format alterné.
+  // Bug trouvé le 7 juillet 2026 : Laurent, en lisant sa séance fartlek
+  // réelle, ne comprenait pas pourquoi une note "régularité" accompagnait
+  // un contenu explicitement alterné ("4×2min rapide / 2min facile").
+  'fartlek': [
+    "Les portions rapides doivent être franches, pas juste \"un peu plus vite\" — c'est l'alternance qui fait le travail.",
+    "Relâche vraiment sur les portions faciles, pour repartir frais sur la suivante."
+  ],
   'vma': [
     "Récupération complète entre les répétitions — pas de course contre la montre sur la récup.",
     "La qualité de l'effort compte plus que le nombre de répétitions."
@@ -179,7 +189,9 @@ export const NOTES_PRATIQUES = {
  * de chaque séance du plan. Mute `semaines` en place, ne retourne rien.
  * Indépendant de injecterJalonsTransition (peut s'appliquer à la même
  * séance qu'un jalon de transition — les deux notes se cumulent alors dans
- * le contenu).
+ * le contenu). Vérifie d'abord une entrée dédiée au SOUS-TYPE exact (ex.
+ * 'fartlek'), avant de retomber sur la FAMILLE générique — permet des
+ * exceptions ciblées sans dupliquer toute la banque par sous-type.
  */
 export function injecterNotesPratiques(semaines) {
   const piocher = (cle) => {
@@ -196,9 +208,11 @@ export function injecterNotesPratiques(semaines) {
       if (seance.type === 'longue') {
         ajouterNote(seance, piocher('longue'));
       } else if (seance.type === 'qualite') {
-        const famille = FAMILLE_SOUS_TYPE[seance.sousType];
-        if (famille && NOTES_PRATIQUES[famille]) {
-          ajouterNote(seance, piocher(famille));
+        // Sous-type exact d'abord (ex. 'fartlek'), sinon repli sur la
+        // famille générique (ex. 'seuil')
+        const cle = NOTES_PRATIQUES[seance.sousType] ? seance.sousType : FAMILLE_SOUS_TYPE[seance.sousType];
+        if (cle && NOTES_PRATIQUES[cle]) {
+          ajouterNote(seance, piocher(cle));
         }
       }
     }
@@ -220,6 +234,13 @@ export const NOTES_RESSENTI = {
     "Effort contrôlé, 3-4 mots max si tu devais parler.",
     "Ça doit rester soutenu mais pas explosif."
   ],
+  // Sous-type précis, même principe que NOTES_PRATIQUES.fartlek — un
+  // fartlek alterne rapide/facile, "reste soutenu" (repère seuil générique)
+  // n'a pas de sens pour ce format alterné (bug trouvé le 7 juillet 2026).
+  'fartlek': [
+    "Sur les portions rapides, vise un effort proche du seuil — pas maximal, mais nettement plus soutenu que l'allure facile qui suit.",
+    "L'écart entre le rapide et le facile doit être net — c'est cet écart qui donne son intérêt au fartlek."
+  ],
   'vma': [
     "Effort proche du maximum sur chaque répétition, récup complète entre les deux.",
     "L'intensité prime — mieux vaut une répétition de moins mais bien exécutée."
@@ -229,7 +250,8 @@ export const NOTES_RESSENTI = {
 /**
  * Injecte un repère de ressenti (piochée aléatoirement) sur les séances de
  * famille seuil/vma. Indépendant des notes pratiques (2.3) : peut se
- * cumuler avec elles dans le même contenu.
+ * cumuler avec elles dans le même contenu. Vérifie d'abord une entrée
+ * dédiée au SOUS-TYPE exact, même principe que injecterNotesPratiques.
  */
 export function injecterRepereRessenti(semaines) {
   const piocher = (cle) => {
@@ -240,9 +262,9 @@ export function injecterRepereRessenti(semaines) {
   for (const semaine of semaines) {
     for (const seance of Object.values(semaine.assignment)) {
       if (seance.type !== 'qualite') continue;
-      const famille = FAMILLE_SOUS_TYPE[seance.sousType];
-      if (famille && NOTES_RESSENTI[famille] && seance.contenu) {
-        seance.contenu = `${seance.contenu} ${piocher(famille)}`;
+      const cle = NOTES_RESSENTI[seance.sousType] ? seance.sousType : FAMILLE_SOUS_TYPE[seance.sousType];
+      if (cle && NOTES_RESSENTI[cle] && seance.contenu) {
+        seance.contenu = `${seance.contenu} ${piocher(cle)}`;
       }
     }
   }

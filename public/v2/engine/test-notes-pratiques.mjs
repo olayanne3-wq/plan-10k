@@ -51,3 +51,16 @@ console.log('\n--- Test 6 : séance qualité allure-course reçoit une note fami
   const ok = NOTES_PRATIQUES['allure-course'].some(v => semaines[0].assignment[2].contenu.includes(v));
   console.log('Note allure-course présente :', ok ? 'OK' : 'ÉCHEC');
 }
+
+console.log('\n--- Test 7 : fartlek reçoit sa note dédiée, pas la note générique famille seuil (bug trouvé le 7 juillet 2026) ---');
+console.log('(Laurent, en lisant sa séance fartlek réelle sur un plan Semi, ne comprenait pas pourquoi');
+console.log(' une note "vise la régularité" accompagnait un contenu explicitement alterné rapide/facile)');
+{
+  const semaines = [creerSemaineTest({ 3: { type: 'qualite', sousType: 'fartlek', contenu: 'Séance fartlek' } })];
+  injecterNotesPratiques(semaines);
+  const contenuFinal = semaines[0].assignment[3].contenu;
+  const aNoteDediee = NOTES_PRATIQUES['fartlek'].some(v => contenuFinal.includes(v));
+  const aNoteGenerique = NOTES_PRATIQUES['seuil'].some(v => contenuFinal.includes(v));
+  console.log('Note fartlek dédiée présente :', aNoteDediee ? 'OK' : 'ÉCHEC');
+  console.log('Note générique seuil ABSENTE (pas de mélange) :', !aNoteGenerique ? 'OK' : 'ÉCHEC');
+}
