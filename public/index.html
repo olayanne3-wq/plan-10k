@@ -673,9 +673,18 @@ function fmtPace(speedMs) {
   return `${min}:${sec}`;
 }
 function fmtTime(seconds) {
-  const m = Math.floor(seconds / 60);
+  // Format heures/minutes/secondes au-delà de 60 minutes (pertinent pour un
+  // Semi/Marathon) — même correction que preview/index.html, appliquée ici
+  // par cohérence même si le PLAN codé en dur de ce fichier reste un 10K
+  // pour l'instant (cf. docs/v2-methodologie/convergence-v1-v2.md).
+  const totalMin = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60).toString().padStart(2,"0");
-  return `${m}'${s}"`;
+  if (totalMin >= 60) {
+    const h = Math.floor(totalMin / 60);
+    const m = (totalMin % 60).toString().padStart(2,"0");
+    return `${h}h${m}'${s}"`;
+  }
+  return `${totalMin}'${s}"`;
 }
 function weekPct(week) {
   const sess = week.sessions.filter(s=>s.type!=="REPOS"&&s.type!=="RACE");
@@ -3374,8 +3383,14 @@ function showRestoreMenu(week, slotIdx) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 function fmtTimeShort(secs) {
-  const m=Math.floor(secs/60), s2=secs%60;
-  return m+"min"+s2.toString().padStart(2,"0")+"s";
+  // Même correction que fmtTime (cf. commentaire associé) — format
+  // heures/minutes/secondes au-delà de 60 minutes.
+  const totalMin = Math.floor(secs/60), s2 = secs%60;
+  if (totalMin >= 60) {
+    const h = Math.floor(totalMin / 60), m = totalMin % 60;
+    return h+"h"+m.toString().padStart(2,"0")+"min"+s2.toString().padStart(2,"0")+"s";
+  }
+  return totalMin+"min"+s2.toString().padStart(2,"0")+"s";
 }
 
 function exportPdfRecap() {

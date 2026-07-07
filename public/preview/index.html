@@ -230,7 +230,28 @@ let gistMsg = "";
   if (urlToken || urlGist) { window.history.replaceState({}, "", window.location.pathname); }
 })();
 let predHistory = load(clePourPlan("lk_pred_history"), []); // [{date, time, confidence}]
-let raceGoalTime = load(clePourPlan("lk_race_goal"), 2910); // 48'30" en secondes
+
+// Référence de performance connue (paramsOrigine.tempsReference du plan
+// chargé, cf. section 7bis du doc de convergence) plutôt que codée en dur.
+// Repli sur 3021s (50'21", valeur historique de Laurent) si absente.
+// Déclarées ICI (avant raceGoalTime) plutôt que plus bas dans le fichier
+// comme précédemment : bug trouvé le 7 juillet 2026 — un plan Semi créé
+// par Laurent affichait toujours l'objectif du 10K (48'30") car
+// raceGoalTime utilise OBJECTIF_REFERENCE comme repli, mais cette dernière
+// était déclarée APRÈS (une const référencée avant sa déclaration lève une
+// ReferenceError en JS, "temporal dead zone" — pas juste undefined).
+const BASE_TIME_REFERENCE = window.__PLAN_BRUT__?.paramsOrigine?.tempsReference
+  ? parseTimeToSeconds(window.__PLAN_BRUT__.paramsOrigine.tempsReference)
+  : 3021;
+
+// Objectif chronométrique connu (paramsOrigine.objectif ou plan.objectif),
+// même principe que BASE_TIME_REFERENCE — repli sur 2910s (48'30", valeur
+// historique de Laurent) si absent.
+const OBJECTIF_REFERENCE = (window.__PLAN_BRUT__?.paramsOrigine?.objectif || window.__PLAN_BRUT__?.objectif)
+  ? parseTimeToSeconds(window.__PLAN_BRUT__.paramsOrigine?.objectif || window.__PLAN_BRUT__.objectif)
+  : 2910;
+
+let raceGoalTime = load(clePourPlan("lk_race_goal"), OBJECTIF_REFERENCE);
 let runnerWeight = load("lk_weight", null);
 let runnerHeight = load("lk_height", null);
 let runnerFcMax = load("lk_fc_max", 181);
@@ -324,9 +345,19 @@ function fmtPace(speedMs) {
   return `${min}:${sec}`;
 }
 function fmtTime(seconds) {
-  const m = Math.floor(seconds / 60);
+  // Format heures/minutes/secondes au-delà de 60 minutes (pertinent pour un
+  // Semi/Marathon, où l'objectif dépasse facilement l'heure — avant cette
+  // correction, un temps de 117min s'affichait "117'XX"" plutôt que
+  // "1h57'XX"", remonté par Laurent le 7 juillet 2026 en testant un plan
+  // Semi). Format court (m'ss") conservé sous 60 minutes, comme avant.
+  const totalMin = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60).toString().padStart(2,"0");
-  return `${m}'${s}"`;
+  if (totalMin >= 60) {
+    const h = Math.floor(totalMin / 60);
+    const m = (totalMin % 60).toString().padStart(2,"0");
+    return `${h}h${m}'${s}"`;
+  }
+  return `${totalMin}'${s}"`;
 }
 function weekPct(week) {
   const sess = week.sessions.filter(s=>s.type!=="REPOS"&&s.type!=="RACE");
@@ -601,20 +632,6 @@ const PACE_REFS = Object.fromEntries(
 // convergence) plutôt que codée en dur — repli sur 181 (valeur historique
 // de Laurent) si le plan n'a pas cette donnée (profil sans fcMaxConnue).
 const FC_MAX = window.__PLAN_BRUT__?.zoneFC?.fcMax || 181;
-
-// Référence de performance connue (paramsOrigine.tempsReference du plan
-// chargé, cf. section 7bis du doc de convergence) plutôt que codée en dur.
-// Repli sur 3021s (50'21", valeur historique de Laurent) si absente.
-const BASE_TIME_REFERENCE = window.__PLAN_BRUT__?.paramsOrigine?.tempsReference
-  ? parseTimeToSeconds(window.__PLAN_BRUT__.paramsOrigine.tempsReference)
-  : 3021;
-
-// Objectif chronométrique connu (paramsOrigine.objectif ou plan.objectif),
-// même principe que BASE_TIME_REFERENCE — repli sur 2910s (48'30", valeur
-// historique de Laurent) si absent.
-const OBJECTIF_REFERENCE = (window.__PLAN_BRUT__?.paramsOrigine?.objectif || window.__PLAN_BRUT__?.objectif)
-  ? parseTimeToSeconds(window.__PLAN_BRUT__.paramsOrigine?.objectif || window.__PLAN_BRUT__.objectif)
-  : 2910;
 
 // ── Zones FC cible ──────────────────────────────────────────────────────
 // Reconstruites depuis FC_MAX (pourcentages fixes : 65-75% EF/LONGUE,
@@ -3218,8 +3235,14 @@ function showRestoreMenu(week, slotIdx) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 function fmtTimeShort(secs) {
-  const m=Math.floor(secs/60), s2=secs%60;
-  return m+"min"+s2.toString().padStart(2,"0")+"s";
+  // Même correction que fmtTime (cf. commentaire associé) — format
+  // heures/minutes/secondes au-delà de 60 minutes.
+  const totalMin = Math.floor(secs/60), s2 = secs%60;
+  if (totalMin >= 60) {
+    const h = Math.floor(totalMin / 60), m = totalMin % 60;
+    return h+"h"+m.toString().padStart(2,"0")+"min"+s2.toString().padStart(2,"0")+"s";
+  }
+  return totalMin+"min"+s2.toString().padStart(2,"0")+"s";
 }
 
 function exportPdfRecap() {
