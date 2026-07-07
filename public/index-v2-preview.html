@@ -41,26 +41,57 @@ input[type=text], input[type=number], input[type=password] {
      docs/v2-methodologie/convergence-v1-v2.md, section 5). -->
 <script src="/v2-preview-scripts/plan-generator.classic.js"></script>
 <script src="/v2-preview-scripts/v1-bridge.classic.js"></script>
+<script src="/v2-preview-scripts/gist-sync.classic.js"></script>
 <script>
-  // Génère le plan avec le moteur v2 et le traduit vers le format attendu
-  // par le reste de ce fichier (chantier convergence v1/v2, section 5,
-  // étape 2). Paramètres repris du profil réel de Laurent. Exécuté en
-  // script classique, donc garanti synchrone et terminé avant le script
-  // suivant qui utilise PLAN.
+  // Charge (ou génère par défaut) le plan à afficher — chantier convergence
+  // v1/v2, section 7 (sélection de plan depuis v1). Async car chargerPlans()
+  // fait un appel réseau (fetch vers l'API GitHub Gist). Ce script ne fait
+  // que PRÉPARER les données dans window.__PLAN_BRUT__/__PLAN_GENERE__ ; le
+  // script principal (plus bas, qui définit render()/PLAN/ALL_SESSIONS)
+  // attend la promesse window.__PLAN_PRET__ avant de s'initialiser — cf. le
+  // bloc juste avant l'appel final à render() en fin de fichier.
   //
   // Le plan BRUT (avant traduction v1) est conservé sous __PLAN_BRUT__ :
   // contient les métadonnées (paramsOrigine.raceName/raceLocation/raceUrl,
   // zoneFC.fcMax, paramsOrigine.tempsReference) qui n'existent pas dans le
   // format traduit PLAN/ALL_SESSIONS — nécessaires pour ne plus coder ces
   // valeurs en dur (docs/v2-methodologie/convergence-v1-v2.md, section 7bis).
-  window.__PLAN_BRUT__ = generatePlan(
-    { niveau: 'intermediaire', joursDisponiblesHabituels: [1,2,3,4,5,6], renforcementMusculaire: true, fcMaxConnue: 181 },
-    { distance: '10K', refDistance: '10K', tempsReference: '50:21', objectif: '48:30', dateDebut: '2026-06-22', dateCourse: '2026-09-06', volumeActuel: 30, contraintesPonctuelles: [], raceName: "10 km Gem'Aubagne", raceLocation: 'Aubagne', raceUrl: 'https://new.sportsnconnect.com/client/events/4qa4QCJ1DtZYPSzSCbjJJK-5-and-10-km-gemaubagne' }
-  );
-  window.__PLAN_GENERE__ = traduirePlanVersFormatV1(window.__PLAN_BRUT__);
+  window.__PLAN_PRET__ = (async () => {
+    const idPlanChoisi = localStorage.getItem('v2_preview_plan_id');
+    let planBrut = null;
+    let plansDisponibles = [];
+
+    try {
+      plansDisponibles = await chargerPlans();
+      if (plansDisponibles.length > 0) {
+        planBrut = idPlanChoisi ? plansDisponibles.find(p => p.id === idPlanChoisi) : null;
+        if (!planBrut) planBrut = plansDisponibles[0]; // repli sur le premier plan disponible
+      }
+    } catch (e) {
+      console.warn('Chargement des plans depuis le Gist échoué, génération par défaut :', e.message);
+    }
+
+    if (!planBrut) {
+      // Repli : aucun plan trouvé dans le Gist (première utilisation, pas
+      // de token configuré, ou erreur réseau) — génère un plan par défaut
+      // avec les paramètres historiques de Laurent, pour ne jamais laisser
+      // un écran vide.
+      planBrut = generatePlan(
+        { niveau: 'intermediaire', joursDisponiblesHabituels: [1,2,3,4,5,6], renforcementMusculaire: true, fcMaxConnue: 181 },
+        { distance: '10K', refDistance: '10K', tempsReference: '50:21', objectif: '48:30', dateDebut: '2026-06-22', dateCourse: '2026-09-06', volumeActuel: 30, contraintesPonctuelles: [], raceName: "10 km Gem'Aubagne", raceLocation: 'Aubagne', raceUrl: 'https://new.sportsnconnect.com/client/events/4qa4QCJ1DtZYPSzSCbjJJK-5-and-10-km-gemaubagne' }
+      );
+    }
+
+    window.__PLAN_BRUT__ = planBrut;
+    window.__PLAN_GENERE__ = traduirePlanVersFormatV1(planBrut);
+    window.__PLANS_DISPONIBLES__ = plansDisponibles;
+  })();
 </script>
 
 <script>
+(async () => {
+await window.__PLAN_PRET__; // attend que le premier script ait chargé/généré le plan
+
 const STRAVA_CLIENT_ID = "260339";
 
 // ── Infos course ──────────────────────────────────────────────────────────
@@ -4041,8 +4072,14 @@ function render() {
 }
 
 // ── Vérification des fonctions critiques ────────────────────────────────────
+// Depuis l'encapsulation en IIFE async (section 7, sélection de plan), ces
+// fonctions ne sont plus sur window mais dans la portée locale de l'IIFE —
+// le check se fait donc directement par nom (eval prudent, seulement sur une
+// liste fixe de noms connus, jamais une entrée utilisateur).
 const CRITICAL_FNS = ['syncStrava','gistSave','gistLoad','predict10K','getEffortLaps','rebuildPredHistory','renderDashboard','renderWeeks','renderWeekDetail','el','badge'];
-const missingFns = CRITICAL_FNS.filter(fn => typeof window[fn] === 'undefined');
+const missingFns = CRITICAL_FNS.filter(fn => {
+  try { return typeof eval(fn) === 'undefined'; } catch { return true; }
+});
 if (missingFns.length > 0) {
   console.warn('⚠️ Fonctions manquantes:', missingFns.join(', '));
 }
@@ -4052,6 +4089,8 @@ render();
 if ('serviceWorker' in navigator) {
   window.addEventListener('load',()=>{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); });
 }
+
+})(); // fin de l'IIFE async qui attendait window.__PLAN_PRET__
 </script>
 </body>
 </html>
