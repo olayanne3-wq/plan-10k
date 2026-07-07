@@ -934,22 +934,19 @@
         <button class="btn-mini" onclick="sauvegarderPlanUI()">Confirmer la sauvegarde</button>
         <div id="sauvegardeMsg" style="margin-top:8px; font-size:13px;"></div>
 
-        <!-- Code de synchronisation entre appareils — évite d'avoir à aller
-             chercher manuellement l'id du Gist sur GitHub (retour de
-             Laurent le 7 juillet 2026 : la manip via github.com était trop
-             lourde). Le "code" est simplement l'id du Gist v2, présenté
-             sous une forme copiable/collable plutôt que de demander à
-             l'utilisateur d'aller le chercher lui-même. -->
+        <!-- Synchronisation entre appareils via QR code — même principe que
+             le mécanisme déjà existant dans preview/index.html (section
+             "Configurer sur un autre appareil"), plutôt que le système à 2
+             champs (token + code à copier-coller manuellement) tenté en
+             premier lieu le 7 juillet 2026. Laurent l'a trouvé trop
+             compliqué en usage réel (confusion entre les deux champs,
+             mauvaise valeur collée au mauvais endroit) — remplacé par un
+             lien unique encodant les deux informations, à scanner ou
+             ouvrir directement, sans manipulation manuelle. -->
         <div style="margin-top:18px; padding-top:14px; border-top:1px solid rgba(238,240,234,0.12);">
           <p class="sub" style="font-size:12px; margin-bottom:8px;">Synchroniser avec un autre appareil</p>
-          <div class="date-field" style="margin-bottom:8px;">
-            <input type="text" id="codeSyncInput" placeholder="Code de synchronisation (depuis un autre appareil)" style="font-size:14px; padding:14px;">
-          </div>
-          <div style="display:flex; gap:8px;">
-            <button class="btn-mini" style="flex:1;" onclick="appliquerCodeSync()">Utiliser ce code</button>
-            <button class="btn-mini" style="flex:1;" onclick="copierCodeSync()">Copier mon code</button>
-          </div>
-          <div id="syncMsg" style="margin-top:8px; font-size:13px;"></div>
+          <button class="btn-mini" style="width:100%;" onclick="genererQrSyncV2()">📱 Générer le QR code</button>
+          <div id="qrSyncV2Container" style="display:flex; justify-content:center; margin-top:10px;"></div>
         </div>
       </div>
 
@@ -1568,65 +1565,50 @@
     }
   }
 
-  // Synchronisation entre appareils via un "code" (l'id du Gist v2, sans
-  // que l'utilisateur ait besoin de savoir ce que c'est ni d'aller le
-  // chercher manuellement sur GitHub). Ajouté le 7 juillet 2026 suite au
-  // retour de Laurent : sans ce champ, synchroniser un PC avec un mobile
-  // demandait d'aller chercher l'id du Gist manuellement sur github.com —
-  // jugé trop lourd pour un usage réel répété.
-  function copierCodeSync() {
-    const msgEl = document.getElementById('syncMsg');
-    const code = getV2GistId();
-    if (!code) {
-      msgEl.textContent = 'Aucun plan sauvegardé sur cet appareil pour l\'instant — sauvegarde-en un d\'abord.';
-      msgEl.style.color = 'var(--signal)';
+  // Synchronisation entre appareils via QR code (même principe que le
+  // mécanisme déjà existant dans preview/index.html) — encode token +
+  // gistId dans un lien unique, à scanner ou ouvrir directement. Paramètre
+  // gistV2 (pas gist, déjà utilisé par preview/index.html pour un Gist de
+  // backup général différent, cf. docs/v2-methodologie/convergence-v1-v2.md).
+  function genererQrSyncV2() {
+    const token = getGithubToken();
+    const gistId = getV2GistId();
+    if (!token || !gistId) {
+      alert("Sauvegarde d'abord un plan sur cet appareil avant de générer le QR code.");
       return;
     }
-    navigator.clipboard?.writeText(code).then(() => {
-      msgEl.textContent = '✅ Code copié — colle-le sur ton autre appareil, dans le même champ.';
-      msgEl.style.color = 'var(--pace)';
-    }).catch(() => {
-      // Repli si l'API clipboard n'est pas disponible (ex. contexte non
-      // sécurisé) : affiche le code directement pour copie manuelle
-      msgEl.textContent = 'Ton code : ' + code;
-      msgEl.style.color = 'var(--pace)';
-    });
+    const url = window.location.origin + '/v2?token=' + encodeURIComponent(token) + '&gistV2=' + encodeURIComponent(gistId);
+    const qrDiv = document.getElementById('qrSyncV2Container');
+    qrDiv.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(url);
+    img.style.borderRadius = '8px';
+    qrDiv.appendChild(img);
   }
 
-  async function appliquerCodeSync() {
-    const msgEl = document.getElementById('syncMsg');
-    const code = document.getElementById('codeSyncInput').value.trim();
-    if (!code) {
-      msgEl.textContent = 'Colle d\'abord un code de synchronisation.';
-      msgEl.style.color = 'var(--signal)';
-      return;
+  // Récupère token + gistV2 depuis l'URL si présents (lien ouvert depuis un
+  // QR code scanné sur un autre appareil) — même principe que le mécanisme
+  // équivalent dans preview/index.html. Doit attendre que window.Engine soit
+  // chargé (événement engineReady) avant d'appeler setGithubToken/
+  // setV2GistId : ces wrappers font le lookup Engine.xxx au moment de
+  // l'appel, donc une exécution immédiate (avant que le <script
+  // type="module"> précédent n'ait fini de charger) planterait sur
+  // "Cannot read property of undefined" — même risque déjà documenté pour
+  // initialiserApresChargementEngine() un peu plus bas dans ce fichier.
+  function appliquerSyncDepuisUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get('token');
+    const urlGistV2 = params.get('gistV2');
+    if (urlToken) setGithubToken(urlToken);
+    if (urlGistV2) setV2GistId(urlGistV2);
+    if (urlToken || urlGistV2) {
+      window.history.replaceState({}, '', window.location.pathname);
     }
-    const tokenSaisi = document.getElementById('githubTokenInput').value.trim();
-    if (tokenSaisi) setGithubToken(tokenSaisi);
-    if (!getGithubToken()) {
-      msgEl.textContent = 'Renseigne d\'abord ton token GitHub ci-dessus (le même que sur ton autre appareil).';
-      msgEl.style.color = 'var(--signal)';
-      return;
-    }
-
-    msgEl.textContent = 'Synchronisation en cours…';
-    msgEl.style.color = 'rgba(238,240,234,0.5)';
-    setV2GistId(code);
-    try {
-      const plans = await chargerPlans();
-      if (plans.length === 0) {
-        msgEl.textContent = '⚠️ Code valide, mais aucun plan trouvé — vérifie que le token utilisé est bien le même que sur l\'autre appareil.';
-        msgEl.style.color = 'var(--signal)';
-        return;
-      }
-      msgEl.textContent = '✅ Synchronisé — ' + plans.length + ' plan' + (plans.length > 1 ? 's' : '') + ' retrouvé' + (plans.length > 1 ? 's' : '') + '.';
-      msgEl.style.color = 'var(--pace)';
-      await afficherPlansSauvegardes();
-    } catch (e) {
-      msgEl.textContent = '❌ ' + e.message;
-      msgEl.style.color = 'var(--signal)';
-      console.error(e);
-    }
+  }
+  if (window.Engine) {
+    appliquerSyncDepuisUrl();
+  } else {
+    document.addEventListener('engineReady', appliquerSyncDepuisUrl, { once: true });
   }
 
   // Préremplir le champ token s'il est déjà connu (ex. déjà configuré ailleurs)
