@@ -92,12 +92,57 @@ export async function ecrireListePlans(plans, storage = localStorage) {
   return data.id;
 }
 
+// ---------------------------------------------------------------------------
+// Non-chevauchement des dates entre plans (doc convergence-v1-v2.md, section
+// 7ter) — empêche la création d'un nouveau plan dont la plage de dates
+// (dateDebut -> dateCourse) chevauche celle d'un plan déjà sauvegardé.
+// Décisions actées le 6 juillet 2026 : intersection stricte (pas de marge de
+// tolérance), comportement bloquant (pas un simple avertissement) — cas le
+// plus simple et prévisible pour démarrer, à assouplir plus tard si un vrai
+// besoin de chevauchement volontaire apparaît en usage réel.
+// ---------------------------------------------------------------------------
+
+/**
+ * Détecte si deux plages de dates [debut, fin] se chevauchent (bornes
+ * incluses). Comparaison de chaînes ISO (YYYY-MM-DD), valide tant que les
+ * deux dates sont dans ce format.
+ */
+export function datesChevauchent(debutA, finA, debutB, finB) {
+  return debutA <= finB && debutB <= finA;
+}
+
+/**
+ * Trouve, parmi une liste de plans, celui qui chevauche la plage de dates
+ * donnée (hors le plan portant idAExclure, pour ne pas se comparer à
+ * soi-même lors d'une mise à jour). Retourne le premier plan trouvé en
+ * conflit, ou null si aucun chevauchement.
+ */
+export function trouverPlanEnConflit(plans, dateDebut, dateCourse, idAExclure) {
+  return plans.find(p =>
+    p.id !== idAExclure &&
+    p.dateDebut && p.dateCourse &&
+    datesChevauchent(dateDebut, dateCourse, p.dateDebut, p.dateCourse)
+  ) || null;
+}
+
 export async function sauvegarderPlan(plan, storage = localStorage) {
   const plansExistants = await chargerPlans(storage);
   const nouveauPlan = { ...plan, sauvegardeLe: new Date().toISOString() };
   // Remplace le plan existant (même id) plutôt que d'en créer un doublon —
   // nécessaire pour que le suivi de complétion se mette à jour en place
   const indexExistant = plansExistants.findIndex(p => p.id === plan.id);
+
+  // La vérification de chevauchement ne s'applique qu'à la création d'un
+  // NOUVEAU plan distinct — une mise à jour d'un plan déjà existant (même
+  // id) ne doit jamais être bloquée par elle-même.
+  if (indexExistant === -1 && plan.dateDebut && plan.dateCourse) {
+    const conflit = trouverPlanEnConflit(plansExistants, plan.dateDebut, plan.dateCourse, plan.id);
+    if (conflit) {
+      const nomConflit = conflit.nom || `${conflit.distance || '?'} — ${conflit.objectif || '?'}`;
+      throw new Error(`Ce plan (${plan.dateDebut} → ${plan.dateCourse}) chevauche un plan déjà sauvegardé : "${nomConflit}" (${conflit.dateDebut} → ${conflit.dateCourse}). Choisis d'autres dates, ou supprime/remplace le plan existant.`);
+    }
+  }
+
   const plans = indexExistant >= 0
     ? plansExistants.map((p, i) => i === indexExistant ? nouveauPlan : p)
     : [...plansExistants, nouveauPlan];

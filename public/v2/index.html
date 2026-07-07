@@ -1538,7 +1538,11 @@
       msgEl.style.color = 'var(--pace)';
       await afficherPlansSauvegardes();
     } catch (e) {
-      msgEl.textContent = '❌ Erreur : ' + e.message + ' (vérifie que le token a bien le scope "gist")';
+      // L'erreur de chevauchement de dates (doc convergence-v1-v2.md,
+      // section 7ter) a son propre message déjà explicite — ne pas y
+      // ajouter une suggestion sur le token qui n'a pas de sens ici.
+      const estErreurChevauchement = e.message.includes('chevauche un plan déjà sauvegardé');
+      msgEl.textContent = '❌ ' + e.message + (estErreurChevauchement ? '' : ' (vérifie que le token a bien le scope "gist")');
       msgEl.style.color = 'var(--signal)';
       console.error(e);
     }
