@@ -19,7 +19,7 @@ Document de suivi du chantier : faire produire par le moteur générique v2 (`pl
 | Sélection/génération de plan depuis v1 (section 7) | ⬜ Réflexion posée, rien codé | Réutiliser le wizard + le mécanisme multi-plans déjà existants en v2 (Gist), plutôt que dupliquer |
 | Variables non indexées sur le plan (section 7bis) | ✅ Implémenté | `RACE_NAME`, `PHASES`, `FC_MAX`, `BASE_TIME` lues depuis le plan chargé, avec repli sur les valeurs historiques |
 | Non-chevauchement des dates entre plans (section 7ter) | ⬜ Règle posée, rien codé | Vérification à faire dans `gist-sync.js` au moment de sauvegarder un plan, pas seulement côté UI |
-| localStorage partagé entre plans (section 7quater) | ⚠️ Écart critique identifié | 13 clés `lk_*` liées au plan (statuts, notes, résultat course...) partagées entre tous les plans — résidu visible après changement de plan via le sélecteur |
+| localStorage partagé entre plans (section 7quater) | ✅ Implémenté | Les 13 clés `lk_*` liées au plan sont préfixées par `plan.id` via `clePourPlan()` |
 | Limite VMA très fractionnées | ⬜ Contournée (garde-fou), pas résolue | Vraie solution = chantier v2.0 streams (jamais commencé) |
 
 ---
@@ -333,7 +333,11 @@ Symptôme remonté par Laurent en testant le sélecteur de plan (section 7, impl
 
 **Non tranché à ce stade** : le mécanisme exact de migration pour les utilisateurs ayant déjà des données sous les anciennes clés non préfixées (ne pas perdre l'historique existant de Laurent au moment de la bascule) ; si `lk_notes` et `lk_checklist` appartiennent vraiment au premier groupe (à vérifier plus précisément avant de les déplacer) ; si `lk_race_goal` devient réellement redondant avec `paramsOrigine.objectif` une fois indexé, ou s'il faut le garder comme donnée éditable séparée (l'utilisateur peut vouloir ajuster son objectif sans regénérer tout le plan).
 
-**Statut : écart critique identifié et classé, aucune implémentation commencée — bloquant pour un usage réel du sélecteur de plan (section 7) avec plusieurs plans actifs simultanément.**
+**Statut : implémenté le 6 juillet 2026 (commits 7a89149 puis b2be148).** Toutes les 13 clés du groupe "lié au plan" sont préfixées via `clePourPlan(cle)`, qui ajoute `_${plan.id}` si un plan actif existe (repli sur la clé non préfixée sinon). Validé en conditions réelles par Laurent sur `lk_statuses` avant de généraliser aux 12 autres. Les 12 clés du groupe "profil utilisateur/Strava/technique" n'ont volontairement pas été touchées, vérifié explicitement après coup.
+
+**Non traité, nouvel angle mort découvert en marge de ce travail** : la bannière post-course contient encore une date (`"2026-09-06"`) et une référence (`3021`) codées en dur, non couvertes ni par 7bis ni par 7quater — à traiter séparément, probablement en même temps qu'une éventuelle prochaine passe sur la section 7 (sélecteur de plan).
+
+**Non traité, limite de conception assumée pour l'instant** : la migration des anciennes clés non préfixées (données de Laurent avant ce commit) n'a pas été faite — elles restent accessibles sous leur ancien nom, mais un nouveau plan par défaut ne les récupère plus (comportement observé et validé par Laurent : "propre" plutôt que par migration automatique).
 
 Repère pour reprendre le travail sans avoir à fouiller l'historique git.
 
