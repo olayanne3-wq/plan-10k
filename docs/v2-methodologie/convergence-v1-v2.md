@@ -6,6 +6,21 @@ Document de suivi du chantier : faire produire par le moteur générique v2 (`pl
 
 ---
 
+## État d'avancement (synthèse, mise à jour du 6 juillet 2026)
+
+| Chantier | Statut | Détail |
+|---|---|---|
+| Écarts de contenu (2.1 à 2.7) | ✅ Tous implémentés et testés | Jalons de transition, notes pratiques, repères qualitatifs, cohérence semaine test, jour de course, météo — voir section 2 |
+| Désalignement des phases (section 3) | ✅ Tranché | v1 `affutage`→v2 `Specifique`, v1 `pic`→v2 `Affutage` ; pas de renommage du moteur, juste un repère de correspondance |
+| Étape 1 (générer un plan proche) | ✅ Validée sur les grandes masses | Pas de fidélité littérale jour par jour — décision assumée |
+| Étape 2 (adapter l'affichage v1) | 🔶 Bien avancée, sur copie de travail | `index-v2-preview.html` + `v1-bridge.js` fonctionnels ; prédiction de performance corrigée en plusieurs itérations (voir section 6) ; `index.html` réel non touché |
+| Étape 3 (migrer les statuts existants) | ⬜ Non commencée | `lk_statuses`/`hiddenSessions`/`swappedSessions` → `plan.statuses` |
+| Étape 4 (brancher l'adaptation) | ⬜ Non commencée | `analyserAdaptations`/`appliquerAdaptations` dans l'interface v1 |
+| Sélection/génération de plan depuis v1 (section 7) | ⬜ Réflexion posée, rien codé | Réutiliser le wizard v2 plutôt que dupliquer un formulaire |
+| Limite VMA très fractionnées | ⬜ Contournée (garde-fou), pas résolue | Vraie solution = chantier v2.0 streams (jamais commencé) |
+
+---
+
 ## 1. Principe directeur
 
 Pour chaque écart identifié entre v1 et v2, une décision est prise : **combler** (ajouter au moteur v2), **abandonner** (garder l'approche v2 plus simple), ou **reporter** (décision à prendre plus tard, dépend d'un autre chantier).
