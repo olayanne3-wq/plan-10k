@@ -17,6 +17,7 @@ Document de suivi du chantier : faire produire par le moteur générique v2 (`pl
 | Étape 3 (migrer les statuts existants) | ⬜ Non commencée | `lk_statuses`/`hiddenSessions`/`swappedSessions` → `plan.statuses` |
 | Étape 4 (brancher l'adaptation) | ⬜ Non commencée | `analyserAdaptations`/`appliquerAdaptations` dans l'interface v1 |
 | Sélection/génération de plan depuis v1 (section 7) | ⬜ Réflexion posée, rien codé | Réutiliser le wizard + le mécanisme multi-plans déjà existants en v2 (Gist), plutôt que dupliquer |
+| Variables non indexées sur le plan (section 7bis) | ⚠️ Écart critique identifié | `RACE_NAME`, `PHASES`, `FC_MAX`, `BASE_TIME` codés en dur — bug silencieux dès qu'on charge un plan vraiment différent, pas juste un affichage à corriger |
 | Limite VMA très fractionnées | ⬜ Contournée (garde-fou), pas résolue | Vraie solution = chantier v2.0 streams (jamais commencé) |
 
 ---
@@ -258,6 +259,25 @@ Actuellement, `index-v2-preview.html` génère le plan avec des paramètres cod�
 **Non tranché à ce stade** : le mécanisme exact de passage d'intention entre les deux pages ; la gestion du cas où aucun plan n'a encore été généré/sauvegardé (première utilisation) ; si `index-v2-preview.html` doit toujours utiliser le même token GitHub/Gist que le wizard v2 (probable, pour que les deux interfaces voient les mêmes plans) ou un espace dédié ; comment présenter visuellement le sélecteur de plans dans le style/design de l'interface v1 (différent de celui de v2).
 
 **Statut : réflexion posée, implémentation non commencée.**
+
+## 7bis. Variables non indexées sur le plan sélectionné (écart critique découvert le 6 juillet 2026)
+
+Question posée par Laurent en réfléchissant à la section 7 : est-ce que toutes les variables de `index-v2-preview.html` seront bien indexées sur le plan choisi, une fois la sélection multi-plans implémentée ? Réponse après vérification systématique : **non, pas du tout** — seule `PLAN` elle-même est en `let` (rechargeable). Tout le reste ci-dessous est soit calculé une seule fois au chargement, soit codé en dur, indépendamment de tout plan sélectionné.
+
+**Variables figées au chargement (calculées depuis `PLAN` une seule fois, ne se recalculent pas si `PLAN` change ensuite)** :
+- `ALL_SESSIONS` (`const`, ligne ~92) — si un autre plan est chargé après coup, cette liste resterait sur l'ancien plan
+
+**Constantes codées en dur, spécifiques au profil/plan de Laurent (Gem'Aubagne, 10K)** :
+- `RACE_NAME`, `RACE_URL`, `RACE_LOCATION` — nom/lien/lieu de la course, afficheraient toujours "10 km Gem'Aubagne" même avec un plan chargé pour une autre course/distance
+- `PHASES` — numéros de semaine codés en dur par phase (`weeks:[1,2,3,4,5]` etc.), suppose un plan de 11 semaines découpé exactement comme celui de Laurent ; un plan de durée différente casserait cet affichage
+- `FC_MAX = 181` — fréquence cardiaque maximale personnelle de Laurent, utilisée pour `FC_ZONES` ; devrait dépendre du profil de l'utilisateur, pas être une constante globale
+- `BASE_TIME` (dans `predict10K()`, 3021s = 50'21") — référence de performance connue de Laurent, utilisée comme ancre du garde-fou de prédiction (section 6) ; un plan pour un autre profil/objectif aurait besoin de sa propre référence
+
+**Ce que ça implique pour le chantier de la section 7** : la sélection de plan n'est pas seulement "recharger `PLAN` et `ALL_SESSIONS`" — c'est potentiellement faire dépendre du plan choisi (ou du profil associé) : les infos de course affichées, le découpage des phases par semaine, la FC max de référence, et la performance de référence pour la prédiction. Tant que l'app ne gère qu'un seul profil (Laurent) et une seule course cible à la fois, ce n'est pas bloquant en pratique — mais dès que la sélection multi-plans permettra de basculer entre deux plans réellement différents (ex: le "Semi octobre" évoqué en exemple section 7), ces variables figées produiraient un affichage incohérent (nom de course, zones FC, phases) sans qu'aucune erreur ne se déclenche — un bug silencieux, pas un crash visible.
+
+**Non tranché à ce stade** : si ces informations (course, FC max, référence de performance) doivent être stockées **dans** chaque plan sauvegardé (probable, le plus cohérent avec l'esprit multi-profil du produit final), ou si l'app doit rester mono-profil pour l'instant (un seul FC max, une seule course active à la fois) et seulement le contenu du plan change. Cette question rejoint la réflexion plus large sur l'authentification/les comptes utilisateurs (v2.5) — un vrai système multi-utilisateur suppose de toute façon que ces données deviennent des attributs du profil, pas des constantes de fichier.
+
+**Statut : écart identifié, aucune décision prise, à traiter avant ou en même temps que la section 7 (sélection de plan) — la sélection de plan sans résoudre ceci produirait un affichage incohérent.**
 
 ## 8. Fichiers du chantier
 
