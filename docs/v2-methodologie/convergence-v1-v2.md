@@ -19,6 +19,7 @@ Document de suivi du chantier : faire produire par le moteur générique v2 (`pl
 | Sélection/génération de plan depuis v1 (section 7) | ⬜ Réflexion posée, rien codé | Réutiliser le wizard + le mécanisme multi-plans déjà existants en v2 (Gist), plutôt que dupliquer |
 | Variables non indexées sur le plan (section 7bis) | ✅ Implémenté | `RACE_NAME`, `PHASES`, `FC_MAX`, `BASE_TIME` lues depuis le plan chargé, avec repli sur les valeurs historiques |
 | Non-chevauchement des dates entre plans (section 7ter) | ⬜ Règle posée, rien codé | Vérification à faire dans `gist-sync.js` au moment de sauvegarder un plan, pas seulement côté UI |
+| localStorage partagé entre plans (section 7quater) | ⚠️ Écart critique identifié | 13 clés `lk_*` liées au plan (statuts, notes, résultat course...) partagées entre tous les plans — résidu visible après changement de plan via le sélecteur |
 | Limite VMA très fractionnées | ⬜ Contournée (garde-fou), pas résolue | Vraie solution = chantier v2.0 streams (jamais commencé) |
 
 ---
@@ -299,7 +300,40 @@ Demande de Laurent : pour un même utilisateur, deux plans sauvegardés ne doive
 
 **Statut : règle métier posée, aucune implémentation commencée.**
 
-## 8. Fichiers du chantier
+## 7quater. localStorage partagé entre plans (écart critique découvert le 6 juillet 2026, en testant le sélecteur de plan)
+
+Symptôme remonté par Laurent en testant le sélecteur de plan (section 7, implémenté commits 1bf939a/23d70d8) : après avoir changé de plan, les semaines 1-2 affichaient des séances marquées comme validées alors qu'elles n'ont pas eu lieu — résidu du plan précédemment affiché. Cause : `statuses` (et d'autres données similaires) est chargé depuis `localStorage` sous une clé **fixe** (`"lk_statuses"`), partagée entre tous les plans, jamais indexée par `plan.id`. Même nature de problème que 7bis (variables non indexées sur le plan), mais côté `localStorage` plutôt que constantes de fichier — pas repéré lors de la recherche initiale de 7bis, qui ne cherchait que des `const`/valeurs codées en dur.
+
+**Inventaire complet des 25 clés `lk_*` utilisées dans `index-v2-preview.html`, classées** :
+
+*Liées au plan affiché (devraient être indexées par `plan.id`, actuellement partagées à tort)* :
+- `lk_statuses` — statuts ✅/⚠️/❌ par séance (uid)
+- `lk_hidden_sessions` — séances masquées par l'utilisateur
+- `lk_swapped_sessions` — swaps de séances (échange de deux jours)
+- `lk_session_notes` — notes libres par séance (uid)
+- `lk_notes` — liste de notes générales (pas encore vérifié si liée à une séance précise ou au plan dans son ensemble)
+- `lk_race_result` — résultat final de la course (temps réel)
+- `lk_race_goal` — objectif de temps (recoupe `paramsOrigine.objectif`, potentiellement redondant une fois indexé par plan)
+- `lk_race_horaires` — horaires dossard/départ, spécifiques à une course précise
+- `lk_race_parcours` — lien vers le parcours, spécifique à une course précise
+- `lk_pred_history` — historique des prédictions de performance (a du sens seulement dans le contexte d'un plan/objectif donné)
+- `lk_checklist` — checklist (probablement liée à la course/au plan, à vérifier)
+- `lk_last_rebuild` — date de dernière reconstruction de `predHistory`, liée à `lk_pred_history`
+- `lk_coach_msg` / `lk_coach_date` — message de coaching affiché, potentiellement contextualisé au plan
+
+*Profil utilisateur (à raison globales, indépendantes du plan)* :
+- `lk_weight`, `lk_height`, `lk_fc_max`, `lk_pps` — données physiologiques de la personne, pas du plan
+- `lk_github_token`, `lk_gist_id` — authentification, une seule par utilisateur
+
+*Strava/technique (à raison globales)* :
+- `lk_strava_token`, `lk_strava_refresh`, `lk_strava_expires`, `lk_strava_activities`, `lk_last_sync` — connexion et cache Strava, un seul compte Strava lié à l'utilisateur, pas au plan
+- `lk_weather_cache` — cache météo par date, indépendant du plan
+
+**Ce que ça implique** : contrairement à 7bis (résolu en modifiant des constantes de lecture), ce problème touche à la **persistance** — il faudrait soit préfixer chaque clé du premier groupe par l'id du plan actif (ex: `lk_statuses_${plan.id}`), soit restructurer le stockage en un seul objet par plan. Le deuxième groupe (profil) et troisième groupe (Strava/technique) ne doivent PAS être touchés — les indexer par erreur casserait leur fonction (ex: si `lk_strava_token` était indexé par plan, il faudrait se reconnecter à Strava à chaque changement de plan, ce qui n'a pas de sens).
+
+**Non tranché à ce stade** : le mécanisme exact de migration pour les utilisateurs ayant déjà des données sous les anciennes clés non préfixées (ne pas perdre l'historique existant de Laurent au moment de la bascule) ; si `lk_notes` et `lk_checklist` appartiennent vraiment au premier groupe (à vérifier plus précisément avant de les déplacer) ; si `lk_race_goal` devient réellement redondant avec `paramsOrigine.objectif` une fois indexé, ou s'il faut le garder comme donnée éditable séparée (l'utilisateur peut vouloir ajuster son objectif sans regénérer tout le plan).
+
+**Statut : écart critique identifié et classé, aucune implémentation commencée — bloquant pour un usage réel du sélecteur de plan (section 7) avec plusieurs plans actifs simultanément.**
 
 Repère pour reprendre le travail sans avoir à fouiller l'historique git.
 
