@@ -251,6 +251,10 @@ Actuellement, `index-v2-preview.html` génère le plan avec des paramètres cod�
 
 **Demande explicite de Laurent (6 juillet 2026)** : pouvoir sélectionner sur v1 le plan à afficher, parmi tous les plans déjà générés dans le wizard v2 — confirme que la dimension multi-plans identifiée ci-dessus n'est pas une simple possibilité technique, c'est une exigence du chantier, pas une option secondaire.
 
+**Décision d'emplacement — tranchée le 6 juillet 2026** : le sélecteur de plan (menu déroulant) doit apparaître **en haut du dashboard, toujours visible** — pas dans un menu/paramètres séparé. L'utilisateur doit savoir/choisir quel plan il regarde avant de voir quoi que ce soit sur ce plan, cohérent avec le fait que `renderDashboard()` (point d'entrée principal de l'affichage) doit désormais dépendre du plan sélectionné dès le début de son rendu.
+
+**Découverte annexe en explorant `renderDashboard()`** : la bannière post-course (affichée après le jour de course) contient elle aussi des valeurs codées en dur non couvertes par la résolution de 7bis — la date `"2026-09-06"` (ligne ~1021, condition d'affichage de la bannière) et `3021` (ligne ~1028, calcul du gain vs référence de départ). À traiter en même temps que l'implémentation du sélecteur, sous peine de laisser un nouvel angle mort du même type que 7bis.
+
 **Flux envisagé, à affiner avant implémentation** :
 1. Un bouton "Nouveau plan" sur l'interface v1 redirige vers le wizard v2 (`/v2`), avec un paramètre signalant l'intention de revenir vers v1 après génération (même principe que `state=v2` déjà utilisé pour le retour OAuth Strava)
 2. Une fois le plan généré dans le wizard v2, il est sauvegardé (mécanisme Gist déjà existant, cf. ci-dessus), puis redirection vers `index-v2-preview.html`
