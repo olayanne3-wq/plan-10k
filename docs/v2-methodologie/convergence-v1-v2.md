@@ -18,7 +18,7 @@ Document de suivi du chantier : faire produire par le moteur générique v2 (`pl
 | Étape 4 (brancher l'adaptation) | ⬜ Non commencée | `analyserAdaptations`/`appliquerAdaptations` dans l'interface v1 |
 | Sélection/génération de plan depuis v1 (section 7) | ⬜ Réflexion posée, rien codé | Réutiliser le wizard + le mécanisme multi-plans déjà existants en v2 (Gist), plutôt que dupliquer |
 | Variables non indexées sur le plan (section 7bis) | ✅ Implémenté | `RACE_NAME`, `PHASES`, `FC_MAX`, `BASE_TIME` lues depuis le plan chargé, avec repli sur les valeurs historiques |
-| Non-chevauchement des dates entre plans (section 7ter) | ⬜ Règle posée, rien codé | Vérification à faire dans `gist-sync.js` au moment de sauvegarder un plan, pas seulement côté UI |
+| Non-chevauchement des dates entre plans (section 7ter) | ✅ Implémenté | Intersection stricte, comportement bloquant — dans `gist-sync.js`, appliqué à toute nouvelle sauvegarde de plan |
 | localStorage partagé entre plans (section 7quater) | ✅ Implémenté | Les 13 clés `lk_*` liées au plan sont préfixées par `plan.id` via `clePourPlan()` |
 | Limite VMA très fractionnées | ⬜ Contournée (garde-fou), pas résolue | Vraie solution = chantier v2.0 streams (jamais commencé) |
 
@@ -298,7 +298,7 @@ Demande de Laurent : pour un même utilisateur, deux plans sauvegardés ne doive
 
 **Non tranché à ce stade** : la définition exacte de "chevauchement" (dates strictement inclusives, ou une marge de tolérance ?), le message d'erreur/avertissement à afficher à l'utilisateur, et si cette contrainte doit bloquer complètement la sauvegarde ou seulement avertir (l'utilisateur pourrait avoir une bonne raison de vouloir deux plans qui se chevauchent, ex: un plan de fond et un plan de course ponctuelle en parallèle — à valider si ce cas d'usage existe réellement avant de bloquer trop strictement).
 
-**Statut : règle métier posée, aucune implémentation commencée.**
+**Statut : implémenté le 6 juillet 2026 (commit de6e5fc).** Décisions tranchées : intersection stricte (bornes incluses, pas de tolérance), comportement bloquant (erreur explicite, pas un avertissement contournable). `datesChevauchent()`/`trouverPlanEnConflit()` ajoutées à `gist-sync.js`, intégrées dans `sauvegarderPlan()` — ne s'applique qu'à la création d'un nouveau plan distinct, jamais à la mise à jour d'un plan existant par son `id`. Message d'erreur mentionne le nom et les dates du plan en conflit. Cas d'usage "deux plans volontairement en parallèle" non validé à ce stade — à assouplir si ce besoin se confirme en usage réel.
 
 ## 7quater. localStorage partagé entre plans (écart critique découvert le 6 juillet 2026, en testant le sélecteur de plan)
 
