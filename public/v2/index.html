@@ -1975,19 +1975,29 @@
       // preview retrouve bien CE plan précis, pas un repli sur "le premier
       // disponible") puis redirige vers la preview v1. Demandé par Laurent
       // le 6 juillet 2026, cf. docs/v2-methodologie/convergence-v1-v2.md,
-      // section 7. Sauvegarde silencieuse si un token GitHub est déjà
-      // configuré ; sinon redirige quand même (la preview retombera sur son
-      // repli habituel plutôt que de bloquer l'utilisateur ici).
+      // section 7.
+      //
+      // Bug trouvé le 7 juillet 2026 : la sauvegarde échouait parfois
+      // silencieusement (ex. chevauchement de dates, section 7ter) sans que
+      // Laurent le voie, puis la redirection avait quand même lieu — la
+      // preview retombait alors sur un plan de repli sans rapport, avec un
+      // ancien résidu de statuts (section 7quater) qui refaisait surface.
+      // Corrigé : un échec de sauvegarde BLOQUE maintenant la redirection,
+      // avec un message d'erreur visible (même mécanisme que le vrai
+      // bouton "Sauvegarder").
       if (dernierPlanGenere && getGithubToken()) {
         try {
           await sauvegarderPlan(dernierPlanGenere);
         } catch (e) {
-          console.warn('Sauvegarde automatique avant redirection échouée :', e.message);
-          // Pas de blocage : si c'est un chevauchement de dates (section
-          // 7ter), le plan garde son id existant en mémoire côté preview
-          // via localStorage, mais ne sera pas retrouvé dans le Gist —
-          // la preview retombera sur son repli habituel, pas idéal mais
-          // pas bloquant non plus.
+          const msgEl = document.getElementById('sauvegardeMsg');
+          if (msgEl) {
+            msgEl.textContent = '❌ ' + e.message;
+            msgEl.style.color = 'var(--signal)';
+          } else {
+            alert('Impossible de sauvegarder le plan avant de continuer :\n\n' + e.message);
+          }
+          console.error('Sauvegarde automatique avant redirection échouée :', e.message);
+          return; // ne redirige pas : rester sur le wizard pour que Laurent voie l'erreur et puisse agir
         }
       }
       if (dernierPlanGenere?.id) {

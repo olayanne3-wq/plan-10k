@@ -80,6 +80,19 @@ input[type=text], input[type=number], input[type=password] {
         { niveau: 'intermediaire', joursDisponiblesHabituels: [1,2,3,4,5,6], renforcementMusculaire: true, fcMaxConnue: 181 },
         { distance: '10K', refDistance: '10K', tempsReference: '50:21', objectif: '48:30', dateDebut: '2026-06-22', dateCourse: '2026-09-06', volumeActuel: 30, contraintesPonctuelles: [], raceName: "10 km Gem'Aubagne", raceLocation: 'Aubagne', raceUrl: 'https://new.sportsnconnect.com/client/events/4qa4QCJ1DtZYPSzSCbjJJK-5-and-10-km-gemaubagne' }
       );
+      // Bug trouvé le 7 juillet 2026 : generatePlan() (le moteur pur)
+      // n'assigne jamais d'id — seul le wizard v2 le fait
+      // (crypto.randomUUID()) après génération. Sans id ici, clePourPlan()
+      // retombe sur la clé lk_statuses NON préfixée (ancien résidu global,
+      // cf. section 7quater), invisible tant qu'un vrai plan avec id est
+      // utilisé mais qui refait surface dès qu'on retombe sur ce repli
+      // (ex: sauvegarde échouée silencieusement à cause d'un chevauchement
+      // de dates, section 7ter — le plan n'atteint jamais le Gist, l'id
+      // écrit dans localStorage devient introuvable, repli sur ce plan par
+      // défaut SANS id). Un id stable et déterministe (pas aléatoire, pour
+      // que ce plan de repli garde toujours la même clé d'une session à
+      // l'autre) évite ce retour silencieux vers l'ancienne clé globale.
+      planBrut.id = 'plan-repli-defaut';
     }
 
     window.__PLAN_BRUT__ = planBrut;
@@ -3993,7 +4006,18 @@ function validateReason(session, stravaRun) {
 }
 
 function matchActivitiesToPlan(activities) {
-  const runs = activities.filter(a=>a.type==="Run");
+  // Ne compare qu'aux activités depuis le début du plan actuellement affiché
+  // — même principe que le filtre déjà appliqué à predict10K()/
+  // predict10KAtDate (docs/v2-methodologie/convergence-v1-v2.md, section
+  // 7bis/7quater) : le cache stravaActivities est partagé entre tous les
+  // plans (volontairement, pour éviter de re-synchroniser Strava à chaque
+  // nouveau plan), donc sans ce filtre une activité liée à un plan
+  // précédent peut se retrouver comparée à tort à une séance du plan
+  // actuel qui tombe sur la même date calendaire.
+  const dateDebutPlan = window.__PLAN_BRUT__?.dateDebut;
+  const runs = activities.filter(a =>
+    a.type==="Run" && (!dateDebutPlan || a.start_date_local?.slice(0,10) >= dateDebutPlan)
+  );
   ALL_SESSIONS.forEach(s => {
     if (s.type==="REPOS"||s.type==="RACE") return;
     const match = runs.find(r=>r.start_date_local?.slice(0,10)===s.date);
