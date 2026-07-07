@@ -177,9 +177,19 @@ function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); 
 // ══════════════════════════════════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════════════════════════════════
+// Préfixe une clé localStorage par l'id du plan actif (docs/v2-methodologie/
+// convergence-v1-v2.md, section 7quater) — nécessaire pour que les données
+// liées à un plan précis (statuts, notes, etc.) ne se mélangent pas entre
+// plans différents. Repli sur la clé non préfixée si aucun plan n'a d'id
+// (compatibilité avec le tout premier chargement, avant migration complète).
+function clePourPlan(cle) {
+  const idPlan = window.__PLAN_BRUT__?.id;
+  return idPlan ? `${cle}_${idPlan}` : cle;
+}
+
 let view = "dashboard";
 let selectedWeek = 1;
-let statuses = load("lk_statuses", {});
+let statuses = load(clePourPlan("lk_statuses"), {});
 let hiddenSessions = load("lk_hidden_sessions", {}); // {uid: true}
 let swappedSessions = load("lk_swapped_sessions", {}); // {uid: swapUid} swap bidirectionnel
 let notesList = load("lk_notes", []);
@@ -2001,7 +2011,7 @@ function renderWeekDetail(weekNum) {
       SOPTS.forEach(opt=>{
         const cur=statuses[uid]||"—";
         const b=el("button",{style:{background:cur===opt?SCOLORS[opt]+"33":"#232738",border:`1px solid ${cur===opt?SCOLORS[opt]:"#2e3347"}`,borderRadius:"6px",padding:"5px 10px",cursor:"pointer",color:cur===opt?SCOLORS[opt]:"#475569",fontSize:"15px",fontWeight:cur===opt?"700":"400"}},opt==="—"?"–":opt);
-        b.addEventListener("click",()=>{ statuses[uid]=opt; save("lk_statuses",statuses); gistSave(true); render(); });
+        b.addEventListener("click",()=>{ statuses[uid]=opt; save(clePourPlan("lk_statuses"),statuses); gistSave(true); render(); });
         statusRow.appendChild(b);
       });
       card.appendChild(statusRow);
@@ -3752,7 +3762,7 @@ async function gistLoad() {
       if (parsed.stravaActivities?.length) { stravaActivities=parsed.stravaActivities; save("lk_strava_activities",stravaActivities); }
       if (parsed.predHistory?.length) { predHistory=parsed.predHistory; save("lk_pred_history",predHistory); }
       if (parsed.sessionNotes) { sessionNotes=parsed.sessionNotes; save("lk_session_notes",sessionNotes); }
-      save("lk_statuses",statuses); save("lk_notes",notesList);
+      save(clePourPlan("lk_statuses"),statuses); save("lk_notes",notesList);
       gistMsg="☁️ Données restaurées"; render(); setTimeout(()=>{gistMsg="";render();},4000);
     }
   } catch(e) {
@@ -3781,7 +3791,7 @@ async function gistForceRestore() {
     if (parsed.raceHoraires) { raceHoraires=parsed.raceHoraires; save("lk_race_horaires",raceHoraires); }
     if (parsed.raceParcoursUrl) { raceParcoursUrl=parsed.raceParcoursUrl; save("lk_race_parcours",raceParcoursUrl); }
     if (parsed.checklistItems) { checklistItems=parsed.checklistItems; save("lk_checklist",checklistItems); }
-    save("lk_statuses",statuses); save("lk_notes",notesList);
+    save(clePourPlan("lk_statuses"),statuses); save("lk_notes",notesList);
     gistMsg="✅ Restauré · "+(parsed.savedAt?new Date(parsed.savedAt).toLocaleDateString("fr-FR"):"");
     render(); setTimeout(()=>{gistMsg="";render();},4000);
   } catch(e) { gistMsg="❌ Erreur restauration"; render(); setTimeout(()=>{gistMsg="";render();},3000); }
@@ -3951,7 +3961,7 @@ function matchActivitiesToPlan(activities) {
       }
     }
   });
-  save("lk_statuses",statuses);
+  save(clePourPlan("lk_statuses"),statuses);
 }
 
 // Auto-synchro Strava si token valide et dernière synchro > 1h
