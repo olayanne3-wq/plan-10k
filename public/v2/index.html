@@ -1584,6 +1584,26 @@
     img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(url);
     img.style.borderRadius = '8px';
     qrDiv.appendChild(img);
+
+    // Bouton pour copier le LIEN texte, pas seulement l'image du QR code —
+    // nécessaire pour synchroniser vers un appareil qui ne peut pas scanner
+    // physiquement l'écran du premier (typiquement mobile -> PC, le PC
+    // n'ayant généralement pas de caméra orientée vers un écran de
+    // téléphone). Cas réel rencontré par Laurent le 7 juillet 2026 : sans
+    // ce bouton, seule l'URL de l'IMAGE du QR code (api.qrserver.com) était
+    // copiable en pratique, pas le lien de destination qu'elle encode.
+    const btnCopierLien = document.createElement('button');
+    btnCopierLien.className = 'btn-mini';
+    btnCopierLien.style.cssText = 'width:100%; margin-top:10px;';
+    btnCopierLien.textContent = '🔗 Copier le lien (si tu ne peux pas scanner)';
+    btnCopierLien.onclick = () => {
+      navigator.clipboard?.writeText(url).then(() => {
+        btnCopierLien.textContent = '✅ Lien copié — colle-le dans le navigateur de l\'autre appareil';
+      }).catch(() => {
+        prompt('Copie ce lien manuellement :', url);
+      });
+    };
+    qrDiv.parentElement.appendChild(btnCopierLien);
   }
 
   // Récupère token + gistV2 depuis l'URL si présents (lien ouvert depuis un
