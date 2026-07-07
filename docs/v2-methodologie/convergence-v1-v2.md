@@ -378,6 +378,6 @@ Tous doivent passer sans "ÉCHEC" dans la sortie. Si un test échoue après une 
 
 **Test visuel du wizard/génération v2** : `https://plan-10k-alpha.vercel.app/v2`
 
-**Test visuel de la preview v1 branchée sur v2** : `https://plan-10k-alpha.vercel.app/index-v2-preview.html` — vérifier notamment que la section "Sources" de la prédiction affiche des projections cohérentes entre elles (une allure plus rapide doit donner une meilleure projection, jamais l'inverse — sinon, symptôme du bug de détection VMA documenté en section 6).
+**Test visuel de la preview v1 branchée sur v2** : `https://plan-10k-alpha.vercel.app/preview/index.html` — vérifier notamment que la section "Sources" de la prédiction affiche des projections cohérentes entre elles (une allure plus rapide doit donner une meilleure projection, jamais l'inverse — sinon, symptôme du bug de détection VMA documenté en section 6).
 
 **Ne jamais tester sur** `https://plan-10k-alpha.vercel.app/` (= `index.html`, l'outil réel de Laurent, non concerné par ce chantier tant qu'il n'est pas explicitement validé et basculé).
