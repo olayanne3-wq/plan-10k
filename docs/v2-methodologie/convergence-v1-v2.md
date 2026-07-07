@@ -121,7 +121,7 @@ Les deux natures de note se traitent différemment :
 | Début phase Spécifique | "Début de la phase spécifique : place aux séances à allure course." / "On rentre dans le dur — les séances vont maintenant coller à ton allure objectif." |
 | Dernières séances avant course | "Dernières séances avant le jour J — reste tranquille." / "Presque prêt. Ces derniers jours ne servent qu'à arriver frais." |
 
-- **Statut : non commencé** (implémentation de la détection + banque de variantes dans le moteur).
+- **Statut : implémenté et testé (commit `dd42011`).** Documentation détaillée (règles de détection, banque complète, écart avec l'intention initiale sur la semaine test) dans un document dédié : [`jalons-narratifs.md`](./jalons-narratifs.md).
 
 ### 2.6 Cohérence narrative de la semaine entière autour de la séance test
 
