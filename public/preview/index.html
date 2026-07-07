@@ -3554,7 +3554,9 @@ function renderSettings() {
         {label:"Taille", id:"inp-taille", type:"number", unit:"cm", val:runnerHeight||""},
         {label:"FC max", id:"inp-fcmax", type:"number", unit:"bpm", val:runnerFcMax||181},
         {label:"separator"},
-        {label:"Objectif", id:"inp-goal", type:"text", unit:fmtPace(DISTANCE_M_REFERENCE/raceGoalTime)+"/km", val:Math.floor(raceGoalTime/60)+":"+(raceGoalTime%60).toString().padStart(2,"0"), color:"#f97316"},
+        {label:"Objectif", id:"inp-goal", type:"text", unit:fmtPace(DISTANCE_M_REFERENCE/raceGoalTime)+"/km", val: raceGoalTime >= 3600
+          ? Math.floor(raceGoalTime/3600)+":"+Math.floor((raceGoalTime%3600)/60).toString().padStart(2,"0")+":"+(raceGoalTime%60).toString().padStart(2,"0")
+          : Math.floor(raceGoalTime/60)+":"+(raceGoalTime%60).toString().padStart(2,"0"), color:"#f97316"},
         {label:"PPS", id:"pps-input", type:"text", unit:"", val:runnerPps||"", width:"160px"},
       ];
       rows.forEach((r,i)=>{
@@ -3839,7 +3841,14 @@ function renderSettings() {
     const fcmax = document.getElementById("inp-fcmax"); if(fcmax) { runnerFcMax=parseInt(fcmax.value)||181; save("lk_fc_max",runnerFcMax); }
     const pps = document.getElementById("pps-input"); if(pps) { runnerPps=pps.value.trim(); save("lk_pps",runnerPps); }
     const goal = document.getElementById("inp-goal"); if(goal) {
-      const parts=goal.value.split(":"); if(parts.length===2){const s=parseInt(parts[0])*60+parseInt(parts[1]); if(!isNaN(s)&&s>0){raceGoalTime=s;save(clePourPlan("lk_race_goal"),raceGoalTime);}}
+      // Accepte "M:SS" (sous l'heure) et "H:MM:SS" (au-delà) — même
+      // correction que fmtTime/fmtTimeShort (cf. commentaire associé),
+      // pertinent pour un objectif Semi/Marathon qui dépasse l'heure.
+      const parts=goal.value.split(":").map(Number);
+      let s = null;
+      if (parts.length===2 && !isNaN(parts[0]) && !isNaN(parts[1])) s = parts[0]*60+parts[1];
+      else if (parts.length===3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) s = parts[0]*3600+parts[1]*60+parts[2];
+      if (s!==null && s>0) { raceGoalTime=s; save(clePourPlan("lk_race_goal"),raceGoalTime); }
     }
     gistSave(true);
     saveBtn.textContent = "✅ Paramètres enregistrés !";

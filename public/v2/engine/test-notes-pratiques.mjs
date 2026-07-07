@@ -52,15 +52,18 @@ console.log('\n--- Test 6 : séance qualité allure-course reçoit une note fami
   console.log('Note allure-course présente :', ok ? 'OK' : 'ÉCHEC');
 }
 
-console.log('\n--- Test 7 : fartlek reçoit sa note dédiée, pas la note générique famille seuil (bug trouvé le 7 juillet 2026) ---');
-console.log('(Laurent, en lisant sa séance fartlek réelle sur un plan Semi, ne comprenait pas pourquoi');
-console.log(' une note "vise la régularité" accompagnait un contenu explicitement alterné rapide/facile)');
+console.log('\n--- Test 7 : seuil-2min (ex-fartlek) reçoit sa note dédiée, pas la note générique famille seuil ---');
+console.log('(bug trouvé le 7 juillet 2026 : Laurent, en lisant sa séance réelle sur un plan Semi,');
+console.log(' ne comprenait pas pourquoi une note "vise la régularité" accompagnait un contenu');
+console.log(' explicitement alterné rapide/facile — le sous-type était alors nommé "fartlek", un nom');
+console.log(' impropre corrigé le même jour : un vrai fartlek est non-structuré/basé sur le ressenti,');
+console.log(' pas un protocole précis de répétitions comme celui-ci)');
 {
-  const semaines = [creerSemaineTest({ 3: { type: 'qualite', sousType: 'fartlek', contenu: 'Séance fartlek' } })];
+  const semaines = [creerSemaineTest({ 3: { type: 'qualite', sousType: 'seuil-2min', contenu: 'Séance seuil-2min' } })];
   injecterNotesPratiques(semaines);
   const contenuFinal = semaines[0].assignment[3].contenu;
-  const aNoteDediee = NOTES_PRATIQUES['fartlek'].some(v => contenuFinal.includes(v));
+  const aNoteDediee = NOTES_PRATIQUES['seuil-2min'].some(v => contenuFinal.includes(v));
   const aNoteGenerique = NOTES_PRATIQUES['seuil'].some(v => contenuFinal.includes(v));
-  console.log('Note fartlek dédiée présente :', aNoteDediee ? 'OK' : 'ÉCHEC');
+  console.log('Note seuil-2min dédiée présente :', aNoteDediee ? 'OK' : 'ÉCHEC');
   console.log('Note générique seuil ABSENTE (pas de mélange) :', !aNoteGenerique ? 'OK' : 'ÉCHEC');
 }

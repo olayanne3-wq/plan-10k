@@ -150,7 +150,7 @@ export function injecterJalonsTransition(semaines) {
 // traité à part (2.6, cohérence narrative de la semaine test).
 const FAMILLE_SOUS_TYPE = {
   'seuil-court': 'seuil', 'seuil': 'seuil', 'seuil-negatif': 'seuil',
-  'tempo-court': 'seuil', 'fartlek': 'seuil',
+  'tempo-court': 'seuil', 'seuil-2min': 'seuil',
   'i-30-30': 'vma', 'i-3min': 'vma', 'vitesse': 'vma', 'pyramidale': 'vma', 'cotes': 'vma',
   'allure-course': 'allure-course', 'allure-course-court': 'allure-course'
 };
@@ -164,13 +164,17 @@ export const NOTES_PRATIQUES = {
     "Effort contrôlé — tu dois pouvoir tenir une phrase courte, pas plus.",
     "Vise la régularité plutôt que la vitesse sur cette séance."
   ],
-  // Sous-type précis, pas la famille — un fartlek alterne rapide/facile,
-  // contrairement aux notes génériques de la famille 'seuil' ci-dessus
-  // ("vise la régularité") qui n'ont pas de sens pour ce format alterné.
-  // Bug trouvé le 7 juillet 2026 : Laurent, en lisant sa séance fartlek
-  // réelle, ne comprenait pas pourquoi une note "régularité" accompagnait
-  // un contenu explicitement alterné ("4×2min rapide / 2min facile").
-  'fartlek': [
+  // Sous-type précis, pas la famille — un seuil-2min alterne rapide/facile
+  // (répétitions de 2min au seuil, récup courte), les notes génériques de
+  // la famille 'seuil' ci-dessus ("vise la régularité") supposent un effort
+  // continu, pas adaptées à ce format répété.
+  // Bug trouvé le 7 juillet 2026 : Laurent, en lisant sa séance (alors
+  // appelée "fartlek" — nom impropre, corrigé le même jour : un vrai
+  // fartlek est non-structuré/basé sur le ressenti, cf. littérature,
+  // alors que cette séance est un protocole précis de répétitions 2min),
+  // ne comprenait pas pourquoi une note "régularité" accompagnait un
+  // contenu explicitement alterné.
+  'seuil-2min': [
     "Les portions rapides doivent être franches, pas juste \"un peu plus vite\" — c'est l'alternance qui fait le travail.",
     "Relâche vraiment sur les portions faciles, pour repartir frais sur la suivante."
   ],
@@ -190,7 +194,7 @@ export const NOTES_PRATIQUES = {
  * Indépendant de injecterJalonsTransition (peut s'appliquer à la même
  * séance qu'un jalon de transition — les deux notes se cumulent alors dans
  * le contenu). Vérifie d'abord une entrée dédiée au SOUS-TYPE exact (ex.
- * 'fartlek'), avant de retomber sur la FAMILLE générique — permet des
+ * 'seuil-2min'), avant de retomber sur la FAMILLE générique — permet des
  * exceptions ciblées sans dupliquer toute la banque par sous-type.
  */
 export function injecterNotesPratiques(semaines) {
@@ -208,7 +212,7 @@ export function injecterNotesPratiques(semaines) {
       if (seance.type === 'longue') {
         ajouterNote(seance, piocher('longue'));
       } else if (seance.type === 'qualite') {
-        // Sous-type exact d'abord (ex. 'fartlek'), sinon repli sur la
+        // Sous-type exact d'abord (ex. 'seuil-2min'), sinon repli sur la
         // famille générique (ex. 'seuil')
         const cle = NOTES_PRATIQUES[seance.sousType] ? seance.sousType : FAMILLE_SOUS_TYPE[seance.sousType];
         if (cle && NOTES_PRATIQUES[cle]) {
@@ -234,12 +238,14 @@ export const NOTES_RESSENTI = {
     "Effort contrôlé, 3-4 mots max si tu devais parler.",
     "Ça doit rester soutenu mais pas explosif."
   ],
-  // Sous-type précis, même principe que NOTES_PRATIQUES.fartlek — un
-  // fartlek alterne rapide/facile, "reste soutenu" (repère seuil générique)
-  // n'a pas de sens pour ce format alterné (bug trouvé le 7 juillet 2026).
-  'fartlek': [
+  // Sous-type précis, même principe que NOTES_PRATIQUES.seuil-2min — un
+  // seuil-2min alterne rapide/facile, "reste soutenu" (repère seuil
+  // générique) n'a pas de sens pour ce format alterné (bug trouvé le
+  // 7 juillet 2026, cf. commentaire ci-dessus sur le renommage fartlek ->
+  // seuil-2min).
+  'seuil-2min': [
     "Sur les portions rapides, vise un effort proche du seuil — pas maximal, mais nettement plus soutenu que l'allure facile qui suit.",
-    "L'écart entre le rapide et le facile doit être net — c'est cet écart qui donne son intérêt au fartlek."
+    "L'écart entre le rapide et le facile doit être net — c'est cet écart qui donne son intérêt à cette séance."
   ],
   'vma': [
     "Effort proche du maximum sur chaque répétition, récup complète entre les deux.",
@@ -855,7 +861,7 @@ const ROTATION_SOUS_TYPE = {
   },
   'Semi': {
     Reacclimatation: [],
-    Construction: ['tempo-court', 'fartlek'],
+    Construction: ['tempo-court', 'seuil-2min'],
     Specifique: ['seuil', 'i-3min', 'allure-course', 'seuil', 'seuil-negatif', 'allure-course', 'seuil', 'i-3min', 'allure-course', 'seuil-negatif', 'i-3min', 'pyramidale'],
     Affutage: ['allure-course-court', 'seuil-court']
   },
@@ -984,7 +990,7 @@ export function genererContenuQualite({ distance, phase, semaineDansPhase, index
       // de base restent largement majoritaires dans la rotation
       const paliers = [2, 3, 4, 3, 2];
       const totalMin = paliers.reduce((a, b) => a + b, 0);
-      kmCorps = kmDepuisMinutes(totalMin, I); // récup ignorée dans l'estimation km (comme i-30-30/fartlek)
+      kmCorps = kmDepuisMinutes(totalMin, I); // récup ignorée dans l'estimation km (comme i-30-30/seuil-2min)
       contenuCorps = `Pyramidale ${paliers.join('-')}min @ ${formatPace(I)} (VMA), récup égale au temps de l'effort`;
       break;
     }
@@ -1003,12 +1009,12 @@ export function genererContenuQualite({ distance, phase, semaineDansPhase, index
       contenuCorps = `${duree}min continu @ ${formatPace(T)} (Seuil léger)`;
       break;
     }
-    case 'fartlek': {
+    case 'seuil-2min': {
       const reps = ajuster(reduireSelonNiveauProgression(4, 1, 8, semaineDansPhase), 3);
       // Portions rapides comptées à l'allure T, portions faciles ignorées dans
       // l'estimation km (approximation assumée, comme pour i-30-30)
       kmCorps = kmDepuisMinutes(reps * 2, T);
-      contenuCorps = `${reps}×2min rapide (${formatPace(T)}) / 2min facile, en continu (fartlek)`;
+      contenuCorps = `${reps}×2min @ ${formatPace(T)} (Seuil), récup 2min`;
       break;
     }
     default: {
