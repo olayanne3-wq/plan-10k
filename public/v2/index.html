@@ -1673,7 +1673,12 @@
       .slice()
       .sort((a, b) => new Date(b.sauvegardeLe) - new Date(a.sauvegardeLe))
       .map(p => {
-        const date = p.sauvegardeLe ? new Date(p.sauvegardeLe).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+        // Date de DÉBUT du plan (dateDebut), pas la date de sauvegarde
+        // (sauvegardeLe) — remonté par Laurent le 7 juillet 2026 : les
+        // deux plans affichaient la même date "7 juil. 2026" (moment où il
+        // avait sauvegardé les deux, la même session), impossible de les
+        // distinguer alors que leurs vraies dates de début diffèrent.
+        const date = p.dateDebut ? new Date(p.dateDebut+"T00:00:00").toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
         const nbFaites = Object.keys(p.statuses || {}).length;
         const titre = p.nom || `${p.distance} — ${p.objectif}`;
         return `<div class="bib-row">
