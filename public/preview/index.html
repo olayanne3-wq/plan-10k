@@ -957,6 +957,59 @@ function predict10KAtDate(dateStr) {
   return Math.round(BASE_TIME * lavWeight + weighted * (1 - lavWeight));
 }
 
+// Nettoyage des notes météo dupliquées (bug corrigé le 7 juillet 2026,
+// commit 1776ac7 — enrichirSeanceAvecMeteo() n'était pas idempotente,
+// verifierMeteoSeanceDemain() appelée à chaque régénération/rechargement du
+// plan dans le wizard pouvait empiler la même note plusieurs fois). Action
+// ponctuelle de rattrapage pour les plans déjà affectés, pas un mécanisme
+// permanent — le vrai correctif vit dans weather.js, ceci ne fait que
+// nettoyer ce qui est déjà écrit dans un plan existant.
+//
+// NOTE_CHALEUR recopiée en dur ici plutôt qu'importée de weather.js (non
+// chargé côté preview) — action de rattrapage ponctuelle, pas une
+// dépendance à maintenir en synchronisation permanente avec le module.
+const NOTE_CHALEUR_A_NETTOYER = "Chaleur annoncée pour demain — ralentis l'allure si besoin, l'important est de finir la séance, pas de tenir un chrono.";
+
+async function nettoyerNotesMeteoDupliquees() {
+  const msgEl = document.getElementById('syncMsg');
+  if (!window.__PLAN_BRUT__?.semaines) return;
+
+  let nbCorrigees = 0;
+  window.__PLAN_BRUT__.semaines.forEach(semaine => {
+    Object.values(semaine.assignment).forEach(seance => {
+      if (!seance.contenu || !seance.contenu.includes(NOTE_CHALEUR_A_NETTOYER)) return;
+      // Compte les occurrences avant nettoyage
+      const occurrences = seance.contenu.split(NOTE_CHALEUR_A_NETTOYER).length - 1;
+      if (occurrences <= 1) return; // rien à nettoyer, une seule occurrence est normale
+      // Retire toutes les occurrences puis en réinjecte une seule, à la fin
+      const contenuSansNote = seance.contenu.split(NOTE_CHALEUR_A_NETTOYER).join('').trim();
+      seance.contenu = `${contenuSansNote} ${NOTE_CHALEUR_A_NETTOYER}`;
+      nbCorrigees++;
+    });
+  });
+
+  if (nbCorrigees === 0) {
+    if (msgEl) { msgEl.textContent = 'Aucune note dupliquée trouvée.'; msgEl.style.color = 'rgba(238,240,234,0.5)'; }
+    return;
+  }
+
+  // Re-traduit le plan brut corrigé vers le format v1 affiché, et sauvegarde
+  window.__PLAN_GENERE__ = traduirePlanVersFormatV1(window.__PLAN_BRUT__);
+  PLAN = window.__PLAN_GENERE__;
+  ALL_SESSIONS = recalculerAllSessions();
+
+  try {
+    if (getGithubToken && getGithubToken() && sauvegarderPlan) {
+      await sauvegarderPlan(window.__PLAN_BRUT__);
+    }
+  } catch (e) {
+    console.warn('Nettoyage effectué localement, sauvegarde échouée :', e.message);
+  }
+
+  if (msgEl) { msgEl.textContent = '✅ ' + nbCorrigees + ' séance(s) nettoyée(s).'; msgEl.style.color = '#22c55e'; }
+  render();
+}
+
 function rebuildPredHistory() {
   if (!stravaActivities.length || isRebuilding) return;
   isRebuilding = true; render();
@@ -3613,6 +3666,9 @@ function renderSettings() {
             el("button",{style:{background:"#a855f711",border:"1px solid #a855f733",borderRadius:"8px",padding:"8px",color:"#a855f7",fontSize:"14px",cursor:"pointer",fontWeight:"600"},
               onClick:()=>{ localStorage.removeItem(clePourPlan("lk_pred_history")); predHistory=[]; rebuildPredHistory(); render(); }
             },"🔄 Forcer recalcul de l\'historique"+(lastRebuildDate?" · dernier : "+lastRebuildDate:"")),
+            el("button",{style:{background:"#eab30811",border:"1px solid #eab30833",borderRadius:"8px",padding:"8px",color:"#eab308",fontSize:"14px",cursor:"pointer",fontWeight:"600"},
+              onClick:()=>nettoyerNotesMeteoDupliquees()
+            },"🧹 Nettoyer les notes météo dupliquées"),
             el("button",{style:{background:"none",border:"none",color:"#e2e8f0",fontSize:"14px",cursor:"pointer",padding:"0"},
               onClick:()=>{ stravaToken=null;stravaRefresh=null;stravaExpires=0;stravaActivities=[];save("lk_strava_token",null);save("lk_strava_refresh",null);save("lk_strava_expires",0);save("lk_strava_activities",[]);render(); }
             },"🔓 Déconnecter Strava")
