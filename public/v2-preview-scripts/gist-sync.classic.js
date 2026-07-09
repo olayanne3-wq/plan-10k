@@ -31,6 +31,15 @@ async function chargerPlans(storage = localStorage) {
   const token = getGithubToken(storage);
   const gistId = getV2GistId(storage);
   if (!token || !gistId) return [];
+  // DIAGNOSTIC TEMPORAIRE (7 juillet 2026) — Laurent signale un 401
+  // persistant malgré un token vérifié valide (classic, scope gist, non
+  // expiré, "never used" sur GitHub). alert() plutôt que console.log car
+  // le diagnostic par console s'est avéré difficile à naviguer sur mobile.
+  // Affiche les 8 premiers caractères du token réellement utilisé pour
+  // cet appel précis — à retirer une fois la cause trouvée.
+  if (typeof window !== 'undefined' && window.alert) {
+    window.alert('DIAGNOSTIC — token utilisé (8 premiers caractères) : "' + token.slice(0, 8) + '" (longueur totale : ' + token.length + ')\nGist ID : ' + gistId);
+  }
   try {
     const resp = await fetch('https://api.github.com/gists/' + gistId, {
       headers: { Authorization: 'token ' + token }
