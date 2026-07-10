@@ -932,19 +932,21 @@ function genererContenuQualite({ distance, phase, semaineDansPhase, indexQualite
   const ajuster = (valeur, floor) =>
     facteurReductionCorps < 1 ? Math.max(floor, Math.round(valeur * facteurReductionCorps)) : valeur;
 
-  let contenuCorps, kmCorps;
+  let contenuCorps, kmCorps, structureIntervalles;
 
   switch (sousType) {
     case 'seuil-court': {
       const reps = ajuster(reduireSelonNiveauProgression(3, 1, 5, semaineDansPhase), 2);
       kmCorps = kmDepuisMinutes(reps * 6, T);
       contenuCorps = `${reps}×6min @ ${formatPace(T)} (Seuil), récup 90s`;
+      structureIntervalles = { blocs: [{ repetitions: reps, dureeEffortSec: 6*60, allure: formatPace(T), dureeRecupSec: 90 }] };
       break;
     }
     case 'seuil': {
       const reps = ajuster(reduireSelonNiveauProgression(3, 1, 5, semaineDansPhase), 2);
       kmCorps = kmDepuisMinutes(reps * 8, T);
       contenuCorps = `${reps}×8min @ ${formatPace(T)} (Seuil), récup 2min`;
+      structureIntervalles = { blocs: [{ repetitions: reps, dureeEffortSec: 8*60, allure: formatPace(T), dureeRecupSec: 2*60 }] };
       break;
     }
     case 'i-30-30': {
@@ -953,36 +955,42 @@ function genererContenuQualite({ distance, phase, semaineDansPhase, indexQualite
       // l'estimation km (approximation assumée) ; récup inter-séries fixée à 3min
       kmCorps = kmDepuisMinutes(series * 8 * 0.5, I);
       contenuCorps = `${series} séries de 8×30s-30s @ ${formatPace(I)} (VMA), récup 3min entre les séries`;
+      structureIntervalles = { blocs: [{ repetitions: 8, dureeEffortSec: 30, allure: formatPace(I), dureeRecupSec: 30 }], nbSeries: series, recupEntreSeriesSec: 3*60 };
       break;
     }
     case 'i-3min': {
       const reps = ajuster(reduireSelonNiveauProgression(4, 1, 6, semaineDansPhase), 2);
       kmCorps = kmDepuisMinutes(reps * 3, I);
       contenuCorps = `${reps}×3min @ ${formatPace(I)} (VMA), récup 2min`;
+      structureIntervalles = { blocs: [{ repetitions: reps, dureeEffortSec: 3*60, allure: formatPace(I), dureeRecupSec: 2*60 }] };
       break;
     }
     case 'vitesse': {
       const reps = ajuster(reduireSelonNiveauProgression(6, 1, 10, semaineDansPhase), 3);
       kmCorps = reps * 0.3; // distance directement connue (300m)
       contenuCorps = `${reps}×300m @ ${formatPace(V)} (Vitesse), récupération complète`;
+      structureIntervalles = { blocs: [{ repetitions: reps, distanceEffortM: 300, allure: formatPace(V), dureeRecupSec: null, recupLabel: 'complète' }] };
       break;
     }
     case 'cotes': {
       const reps = ajuster(reduireSelonNiveauProgression(6, 1, 10, semaineDansPhase), 3);
       kmCorps = kmDepuisMinutes(reps * 0.5, V); // approximation : allure proche du V
       contenuCorps = `${reps}×30s en côte (effort soutenu), récupération trot`;
+      structureIntervalles = { blocs: [{ repetitions: reps, dureeEffortSec: 30, allure: 'effort soutenu (côte)', dureeRecupSec: null, recupLabel: 'trot' }] };
       break;
     }
     case 'allure-course': {
       const reps = ajuster(reduireSelonNiveauProgression(3, 1, 5, semaineDansPhase), 2);
       kmCorps = kmDepuisMinutes(reps * 5, C);
       contenuCorps = `${reps}×5min @ ${formatPace(C)} (allure course), récup 2min`;
+      structureIntervalles = { blocs: [{ repetitions: reps, dureeEffortSec: 5*60, allure: formatPace(C), dureeRecupSec: 2*60 }] };
       break;
     }
     case 'allure-course-court': {
       const reps = ajuster(reduireSelonNiveauProgression(2, 1, 3, semaineDansPhase), 1);
       kmCorps = kmDepuisMinutes(reps * 3, C);
       contenuCorps = `${reps}×3min @ ${formatPace(C)} (allure course), récup 2min`;
+      structureIntervalles = { blocs: [{ repetitions: reps, dureeEffortSec: 3*60, allure: formatPace(C), dureeRecupSec: 2*60 }] };
       break;
     }
     case 'pyramidale': {
@@ -992,6 +1000,7 @@ function genererContenuQualite({ distance, phase, semaineDansPhase, indexQualite
       const totalMin = paliers.reduce((a, b) => a + b, 0);
       kmCorps = kmDepuisMinutes(totalMin, I); // récup ignorée dans l'estimation km (comme i-30-30/seuil-2min)
       contenuCorps = `Pyramidale ${paliers.join('-')}min @ ${formatPace(I)} (VMA), récup égale au temps de l'effort`;
+      structureIntervalles = { blocs: paliers.map(p => ({ repetitions: 1, dureeEffortSec: p*60, allure: formatPace(I), dureeRecupSec: p*60 })) };
       break;
     }
     case 'seuil-negatif': {
@@ -1001,12 +1010,17 @@ function genererContenuQualite({ distance, phase, semaineDansPhase, indexQualite
       const paceBloc2 = T - (T - I) * 0.3; // 30% du chemin vers l'allure VMA
       kmCorps = kmDepuisMinutes(dureeBloc, T) + kmDepuisMinutes(dureeBloc, paceBloc2);
       contenuCorps = `${dureeBloc}min @ ${formatPace(T)} (Seuil) puis ${dureeBloc}min @ ${formatPace(paceBloc2)} (Seuil soutenu), enchaînés sans récup`;
+      structureIntervalles = { blocs: [
+        { repetitions: 1, dureeEffortSec: dureeBloc*60, allure: formatPace(T), dureeRecupSec: 0 },
+        { repetitions: 1, dureeEffortSec: dureeBloc*60, allure: formatPace(paceBloc2), dureeRecupSec: 0 },
+      ] };
       break;
     }
     case 'tempo-court': {
       const duree = ajuster(reduireSelonNiveauProgression(20, 5, 35, semaineDansPhase), 10);
       kmCorps = kmDepuisMinutes(duree, T);
       contenuCorps = `${duree}min continu @ ${formatPace(T)} (Seuil léger)`;
+      structureIntervalles = { blocs: [{ repetitions: 1, dureeEffortSec: duree*60, allure: formatPace(T), dureeRecupSec: 0 }] };
       break;
     }
     case 'seuil-2min': {
@@ -1015,11 +1029,13 @@ function genererContenuQualite({ distance, phase, semaineDansPhase, indexQualite
       // l'estimation km (approximation assumée, comme pour i-30-30)
       kmCorps = kmDepuisMinutes(reps * 2, T);
       contenuCorps = `${reps}×2min @ ${formatPace(T)} (Seuil), récup 2min`;
+      structureIntervalles = { blocs: [{ repetitions: reps, dureeEffortSec: 2*60, allure: formatPace(T), dureeRecupSec: 2*60 }] };
       break;
     }
     default: {
       kmCorps = kmDepuisMinutes(24, T);
       contenuCorps = `3×8min @ ${formatPace(T)} (Seuil), récup 2min`;
+      structureIntervalles = { blocs: [{ repetitions: 3, dureeEffortSec: 8*60, allure: formatPace(T), dureeRecupSec: 2*60 }] };
     }
   }
 
@@ -1038,7 +1054,18 @@ function genererContenuQualite({ distance, phase, semaineDansPhase, indexQualite
 
   const contenu = `Échauffement ${DUREE_ECHAUFFEMENT_MIN}min @ ${formatPace(E)} (EF) + ${contenuCorps} + Retour au calme ${DUREE_RETOUR_CALME_MIN}min @ ${formatPace(E)} (EF)`;
 
-  return { sousType, contenu, kmEstime };
+  // structureIntervalles : capturée au moment de la génération (blocs avec
+  // répétitions/durées/allures réels), pas reparsée depuis le texte de
+  // contenu — même principe déjà appliqué à kmEstime (section 7bis du doc
+  // de convergence, reparser du texte s'est avéré fragile plusieurs fois
+  // cette session). Sert à afficher "à programmer sur ta montre" (2.8,
+  // demandé par Laurent le 8 juillet 2026) et, plus tard, à comparer les
+  // laps réels d'une activité Strava à ce qui était attendu.
+  structureIntervalles.echauffementSec = DUREE_ECHAUFFEMENT_MIN * 60;
+  structureIntervalles.retourCalmeSec = DUREE_RETOUR_CALME_MIN * 60;
+  structureIntervalles.allureEchauffement = formatPace(E);
+
+  return { sousType, contenu, kmEstime, structureIntervalles };
 }
 
 // Durée max raisonnable par séance, au-delà de laquelle on plafonne plutôt que
@@ -1536,7 +1563,7 @@ function generatePlan(profil, params) {
       const dechargeSemaine = volumesParSemaine[semaineGlobale - 1]?.estDecharge ?? false;
       for (const [jour, seance] of Object.entries(assignment)) {
         if (seance.type === 'qualite') {
-          const { sousType, contenu, kmEstime } = genererContenuQualite({
+          const { sousType, contenu, kmEstime, structureIntervalles } = genererContenuQualite({
             distance: params.distance,
             phase: phase.nom,
             semaineDansPhase: i,
@@ -1549,6 +1576,7 @@ function generatePlan(profil, params) {
           seance.sousType = sousType;
           seance.contenu = contenu;
           seance.kmEstime = kmEstime;
+          seance.structureIntervalles = structureIntervalles;
           kmQualiteTotal += kmEstime;
         }
       }
@@ -1774,7 +1802,7 @@ function appliquerAdaptations(plan) {
 
     for (const seance of Object.values(semaine.assignment)) {
       if (seance.type !== 'qualite') continue;
-      const { sousType, contenu, kmEstime } = genererContenuQualite({
+      const { sousType, contenu, kmEstime, structureIntervalles } = genererContenuQualite({
         distance: plan.paramsOrigine.distance,
         phase: semaine.phase,
         semaineDansPhase,
@@ -1787,6 +1815,7 @@ function appliquerAdaptations(plan) {
       seance.sousType = sousType;
       seance.contenu = contenu;
       seance.kmEstime = kmEstime;
+      seance.structureIntervalles = structureIntervalles;
       kmQualiteTotal += kmEstime;
     }
 

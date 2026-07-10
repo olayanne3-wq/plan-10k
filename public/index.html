@@ -1646,6 +1646,7 @@ function renderDashboard() {
             ) : null
           ) : null,
           s.notes ? el("div",{style:{color:"#60a5facc",fontSize:"14px",fontStyle:"italic",marginBottom:"8px"}},"💡 "+s.notes) : null,
+          s.structureIntervalles?renderBoutonStructureAProgrammer(s.structureIntervalles):null,
           !isRest ? coachEl : null,
           // Bloc détail repliable après le coach
           (()=>{
@@ -2066,6 +2067,68 @@ function renderWeeks() {
 const SOPTS=["—","✅","❌","⚠️","😴"];
 const SCOLORS={"—":"#475569","✅":"#22c55e","❌":"#ef4444","⚠️":"#eab308","😴":"#60a5fa"};
 
+// Formatage lisible de la structure à programmer sur la montre (section
+// 2.8 du doc de convergence, demandé par Laurent le 8 juillet 2026) —
+// structureIntervalles est capturée au moment de la génération du plan
+// (kmEstime/blocs réels, pas reparsés depuis le texte), même principe déjà
+// appliqué à kmEstime.
+function fmtDureeCourte(sec) {
+  if (sec == null) return null;
+  const m = Math.floor(sec / 60), s = sec % 60;
+  if (m === 0) return s + "s";
+  if (s === 0) return m + "min";
+  return m + "min" + s + "s";
+}
+function renderStructureAProgrammer(structure) {
+  if (!structure || !structure.blocs) return null;
+  const lignes = [];
+  lignes.push("Échauffement : " + fmtDureeCourte(structure.echauffementSec) + " à " + structure.allureEchauffement);
+  if (structure.blocs.length === 1 && structure.blocs[0].repetitions > 1 && !structure.nbSeries) {
+    const b = structure.blocs[0];
+    const effort = b.dureeEffortSec ? fmtDureeCourte(b.dureeEffortSec) : b.distanceEffortM + "m";
+    const recup = b.dureeRecupSec != null ? fmtDureeCourte(b.dureeRecupSec) : (b.recupLabel || "—");
+    lignes.push(b.repetitions + " × (" + effort + " à " + b.allure + " / récup " + recup + ")");
+  } else if (structure.nbSeries) {
+    const b = structure.blocs[0];
+    lignes.push(structure.nbSeries + " séries de " + b.repetitions + " × (" + fmtDureeCourte(b.dureeEffortSec) + " à " + b.allure + " / récup " + fmtDureeCourte(b.dureeRecupSec) + ")");
+    lignes.push("Récup entre séries : " + fmtDureeCourte(structure.recupEntreSeriesSec));
+  } else {
+    structure.blocs.forEach((b, i) => {
+      const effort = b.dureeEffortSec ? fmtDureeCourte(b.dureeEffortSec) : b.distanceEffortM + "m";
+      lignes.push("Bloc " + (i+1) + " : " + effort + " à " + b.allure + (b.dureeRecupSec ? " puis récup " + fmtDureeCourte(b.dureeRecupSec) : ""));
+    });
+  }
+  lignes.push("Retour au calme : " + fmtDureeCourte(structure.retourCalmeSec) + " à " + structure.allureEchauffement);
+  return lignes;
+}
+
+// Bouton "à programmer" réutilisable (dashboard : séance du jour/prochaine,
+// et détail semaine) — replié par défaut, dans un tap, pour ne pas
+// surcharger l'affichage principal de la carte (demandé par Laurent le
+// 8 juillet 2026, section 2.8 du doc de convergence).
+function renderBoutonStructureAProgrammer(structure) {
+  const lignes = renderStructureAProgrammer(structure);
+  if (!lignes) return null;
+  const progBlock = el("div",{style:{display:"none",background:"#232738",borderRadius:"8px",padding:"10px 12px",marginBottom:"8px",border:"1px solid #2e3347"}},
+    ...lignes.map(l => el("div",{class:"muted",style:{fontSize:"13px",lineHeight:"1.6"}},l))
+  );
+  let progOpen = false;
+  const progBtn = el("button",{style:{
+    width:"100%",marginBottom:"8px",background:"none",border:"1px solid #2e3347",
+    borderRadius:"8px",padding:"6px",color:"#64748b",fontSize:"12px",cursor:"pointer"
+  }},"📱 À programmer sur ta montre");
+  progBtn.addEventListener("click",(e)=>{
+    e.stopPropagation();
+    progOpen = !progOpen;
+    progBlock.style.display = progOpen ? "block" : "none";
+    progBtn.textContent = progOpen ? "📱 Masquer" : "📱 À programmer sur ta montre";
+  });
+  const progWrapper = document.createElement("div");
+  progWrapper.appendChild(progBtn);
+  progWrapper.appendChild(progBlock);
+  return progWrapper;
+}
+
 function renderWeekDetail(weekNum) {
   const week=PLAN.find(w=>w.week===weekNum);
   if (!week) return el("div",{},"—");
@@ -2131,6 +2194,7 @@ function renderWeekDetail(weekNum) {
         effSess.cooldown?el("div",{class:"muted",style:{fontSize:"13px"}},"◀ "+effSess.cooldown):null
       ):null,
       effSess.notes?el("div",{style:{color:"#60a5facc",fontSize:"14px",marginBottom:"8px",fontStyle:"italic"}},"💡 "+effSess.notes):null,
+      effSess.structureIntervalles?renderBoutonStructureAProgrammer(effSess.structureIntervalles):null,
       stravaRun?el("div",{style:{background:"#fc4c0211",border:"1px solid #fc4c0233",borderRadius:"8px",padding:"8px 10px",marginBottom:"8px"}},
         el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}},
           el("span",{class:"muted",style:{fontSize:"13px"}},

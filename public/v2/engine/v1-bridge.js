@@ -126,6 +126,10 @@ export function traduirePlanVersFormatV1(plan) {
       // au lieu de 40km réels). kmEstime est la source de vérité du
       // moteur, pas un texte à reparser.
       const kmEstime = seance?.kmEstime ?? 0;
+      // structureIntervalles : propagée pour l'affichage "à programmer sur
+      // ta montre" (2.8, demandé le 8 juillet 2026) — undefined pour
+      // REPOS/RACE/EF/LONGUE (seules les séances qualité en ont une)
+      const structureIntervalles = seance?.structureIntervalles;
 
       if (!seance || type === 'REPOS') {
         return { day: jourNom, date: dateStr, type: 'REPOS', warmup: '', session: seance?.contenu || 'Repos', cooldown: '', notes: '', kmEstime: 0 };
@@ -135,7 +139,7 @@ export function traduirePlanVersFormatV1(plan) {
       }
       if (seance.type === 'qualite') {
         const { warmup, session, cooldown, notes } = parserContenuQualite(seance.contenu);
-        return { day: jourNom, date: dateStr, type, warmup, session, cooldown, notes, kmEstime };
+        return { day: jourNom, date: dateStr, type, warmup, session, cooldown, notes, kmEstime, structureIntervalles };
       }
       // ef ou longue
       const { session, notes } = parserContenuEfOuLongue(seance.contenu);
