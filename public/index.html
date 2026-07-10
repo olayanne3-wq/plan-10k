@@ -1353,30 +1353,46 @@ function predict10K() {
     }
   }
 
-  // ── Pondération Lavandou selon qualité des données ────────────────────────
+  // ── Pondération Lavandou selon le TEMPS écoulé (pas la quantité de
+  // données) ────────────────────────────────────────────────────────────
+  // Bug de conception trouvé le 8 juillet 2026 : l'ancien système (paliers
+  // selon le nombre de séances intensives disponibles) traitait injustement
+  // deux coureurs différemment selon leur FRÉQUENCE d'entraînement — un
+  // coureur qui fait une VMA toutes les semaines atteint "5 séances" en
+  // 5 semaines, un autre qui en fait une toutes les 2 semaines met 10
+  // semaines pour la même confiance, même si son entraînement est
+  // parfaitement valide. La pertinence de la référence de base diminue
+  // naturellement avec le TEMPS qui passe (la forme évolue avec les
+  // semaines d'entraînement), pas avec un comptage brut de séances.
+  //
+  // Décroissance linéaire de 90% (semaine 1) à 10% (semaine 8+), avec un
+  // garde-fou : si aucune séance intensive (VMA/SPEC) dans les 3 dernières
+  // semaines, le poids ne descend jamais sous 50% peu importe où on en est
+  // dans la décroissance — évite qu'une pause/blessure fasse s'effondrer le
+  // poids de la référence sans vraies données récentes pour la remplacer.
   const hasVma   = vmaData !== null && !vmaData._exclu;
   const hasSpec  = specData !== null && !specData._exclu;
   const hasSeuil = seuilData !== null && seuilData.laps.length > 0 && !seuilData._exclu;
 
-  // Compter le total de séances intensives disponibles
-  const nVmaSessions = hasVma ? vmaData.runs.length : 0;
-  const nSpecSessions = hasSpec ? specData.runs.length : 0;
-  const nIntensive = nVmaSessions + nSpecSessions;
+  const semainesEcoulees = window.__PLAN_BRUT__?.dateDebut
+    ? Math.floor((new Date(today()) - new Date(window.__PLAN_BRUT__.dateDebut)) / (7*86400000)) + 1
+    : 1;
+  const POIDS_DEPART = 0.90, POIDS_PLANCHER = 0.10, DUREE_DECROISSANCE_SEMAINES = 8;
+  const progression = Math.min(Math.max((semainesEcoulees - 1) / (DUREE_DECROISSANCE_SEMAINES - 1), 0), 1);
+  let lavendouWeight = POIDS_DEPART - progression * (POIDS_DEPART - POIDS_PLANCHER);
 
-  let lavendouWeight;
-  if (hasVma && hasSpec && nIntensive >= 5) {
-    lavendouWeight = 0.10; // Beaucoup de données → peu de Lavandou
-  } else if (hasVma && hasSpec && nIntensive >= 3) {
-    lavendouWeight = 0.20; // Données suffisantes
-  } else if (hasVma && hasSpec) {
-    lavendouWeight = 0.30; // VMA + SPEC mais peu de séances
-  } else if (hasVma || hasSpec) {
-    lavendouWeight = 0.50; // Une seule source intensive
-  } else if (hasSeuil) {
-    lavendouWeight = 0.70;
-  } else {
-    lavendouWeight = 1.00;
-  }
+  // Garde-fou : dernière séance VMA ou SPEC dans les 3 dernières semaines ?
+  const dateLimiteRecente = new Date(new Date(today()).getTime() - 21*86400000).toISOString().slice(0,10);
+  const dateVmaRecente = hasVma ? vmaData.runs.some(r => r.start_date_local?.slice(0,10) >= dateLimiteRecente) : false;
+  const dateSpecRecente = hasSpec ? specData.runs.some(r => r.start_date_local?.slice(0,10) >= dateLimiteRecente) : false;
+  const donneesRecentes = dateVmaRecente || dateSpecRecente;
+  if (!donneesRecentes) lavendouWeight = Math.max(lavendouWeight, 0.50);
+
+  // Repli sur le seuil si ni VMA ni SPEC n'existent du tout (même esprit
+  // que l'ancien palier "hasSeuil -> 0.70" — une source plus faible mérite
+  // un poids de référence plus élevé, peu importe le temps écoulé)
+  if (!hasVma && !hasSpec && hasSeuil) lavendouWeight = Math.max(lavendouWeight, 0.70);
+  if (!hasVma && !hasSpec && !hasSeuil) lavendouWeight = 1.00;
 
   let estimate = BASE_TIME;
   let confidence = 30;
