@@ -1328,17 +1328,21 @@ function renderSelecteurPlan() {
     select.appendChild(el("option",{value:"",disabled:"",selected:""},"Aucun plan sauvegardé (plan par défaut affiché)"));
   }
 
-  // Lien vers le wizard v2 pour créer un nouveau plan (demandé par Laurent
+  // Bouton vers le wizard v2 pour créer un nouveau plan (demandé par Laurent
   // le 6 juillet 2026, docs/v2-methodologie/convergence-v1-v2.md, section
   // 7) — un vrai <a target="_blank">, pas une option de <select> avec
   // window.open() en JS : Laurent a signalé que window.open() ne
   // fonctionnait pas du tout depuis la PWA installée (probablement bloqué
   // silencieusement par le navigateur en contexte standalone, les popups
   // JS étant traités différemment d'une vraie navigation déclenchée par un
-  // clic direct sur un élément <a>).
+  // clic direct sur un élément <a>). Rendu plus visible le 8 juillet 2026
+  // (vrai bouton avec bordure/fond, pas juste un lien texte discret) —
+  // Laurent trouvait la navigation entre l'app et le wizard peu visible.
   const lienNouveauPlan = el("a",{href:"/v2",target:"_blank",style:{
-    display:"block",marginTop:"6px",color:"#f97316",fontSize:"13px",
-    fontWeight:"600",textDecoration:"none"
+    display:"block",marginTop:"8px",textAlign:"center",
+    background:"#f9731611",border:"1px solid #f9731633",borderRadius:"8px",
+    padding:"8px",color:"#f97316",fontSize:"14px",fontWeight:"700",
+    textDecoration:"none",cursor:"pointer"
   }},"➕ Créer un nouveau plan");
 
   return el("div",{style:{padding:"8px 0"}}, select, lienNouveauPlan);

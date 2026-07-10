@@ -621,6 +621,12 @@
 <body>
 <div class="phone">
 
+  <!-- Bouton retour vers l'app, visible à chaque étape (pas seulement à la
+       fin via "Terminer") — demandé par Laurent le 8 juillet 2026, qui
+       n'avait aucun moyen de revenir à l'app en cours de route dans le
+       wizard, seulement à la toute fin du processus. -->
+  <button id="btnRetourApp" style="display:block;width:calc(100% - 32px);margin:12px 16px 0;padding:8px;text-align:center;background:#23273811;border:1px solid #2e334733;border-radius:8px;color:#94a3b8;font-size:13px;font-weight:600;cursor:pointer;">← Retour à l'app</button>
+
   <div class="track" id="track"></div>
   <div class="stepmeta">
     <span class="num" id="stepNum">ÉTAPE 1</span>
@@ -1010,6 +1016,15 @@
 <script>
   const totalSteps = 9;
   let current = 1;
+
+  // Retour vers l'app (demandé par Laurent le 8 juillet 2026) — confirmation
+  // seulement si l'utilisateur a déjà avancé au-delà de l'étape 1 (progression
+  // réelle qui serait perdue), pas de confirmation superflue si on vient
+  // juste d'ouvrir le wizard sans rien avoir renseigné.
+  document.getElementById('btnRetourApp').addEventListener('click', () => {
+    if (current > 1 && !confirm("Quitter le wizard ? Ta progression sur ce plan ne sera pas conservée.")) return;
+    location.href = '/';
+  });
 
   const distanceMeta = {
     "5":   { label:"5K",       name:"Ton dernier 5K",   refDefault:{h:0,m:22,s:30}, objDefault:{h:0,m:21,s:0},  unit:"min:sec" },
