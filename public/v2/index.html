@@ -19,7 +19,7 @@
     --signal:#FF5A34;
     --signal-dim:#3A241C;
     --pace:#2F6E5F;
-    --pace-soft:#DCE9E3;
+    --pace-soft:#1C2E28;
     --line: rgba(238,240,234,0.14);
     --longue:#4C7EE0;
     --longue-soft:#1E2A44;
@@ -50,8 +50,8 @@
   }
   .statut-tag:active{ background:rgba(238,240,234,0.15); }
   .day-detail{
-    font-size:11.5px; color:rgba(238,240,234,0.5);
-    margin-top:4px; padding-left:2px; line-height:1.4;
+    font-size:13px; color:rgba(238,240,234,0.6);
+    margin-top:6px; padding-left:2px; line-height:1.55;
   }
   .phase-header{
     font-family:'Space Grotesk',sans-serif;
@@ -64,9 +64,15 @@
   .semaine-header{
     display:flex; align-items:center; justify-content:space-between;
     font-family:'JetBrains Mono',monospace;
-    font-size:12px; color:rgba(238,240,234,0.55);
-    margin:14px 0 6px 0;
+    font-size:13px; font-weight:600; color:rgba(238,240,234,0.75);
+    margin:14px 0 8px 0;
+    padding:10px 12px;
+    border-radius:10px;
+    background:rgba(238,240,234,0.04);
+    border:1px solid var(--line);
+    transition:background 0.15s ease;
   }
+  .semaine-header:active{ background:rgba(238,240,234,0.08); }
   .semaine-header .decharge-tag{
     color:var(--signal);
     font-weight:600;
@@ -1417,7 +1423,26 @@
 
   const DAY_NAMES_COURT = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
 
-  function renderSemaineHtml(semaine, jourCourseIndex, derniereSemaineNum) {
+  // Détermine le numéro de semaine correspondant à aujourd'hui (ou la
+  // prochaine à venir si le plan démarre dans le futur) — pour savoir
+  // quelle semaine déplier par défaut (demandé par Laurent le 8 juillet
+  // 2026 : le mur de texte de 11-17 semaines toutes dépliées d'un coup
+  // rendait l'écran de résultats difficile à parcourir).
+  function semaineActuelleOuProchaine(plan) {
+    if (!plan?.dateDebut || !plan.semaines?.length) return plan?.semaines?.[0]?.semaineNum ?? 1;
+    const aujourdhui = new Date();
+    const aujourdhuiStr = new Date(Date.UTC(aujourdhui.getFullYear(), aujourdhui.getMonth(), aujourdhui.getDate())).toISOString().slice(0,10);
+    const debut = new Date(plan.dateDebut + 'T00:00:00Z');
+    if (aujourdhuiStr < plan.dateDebut) return plan.semaines[0].semaineNum; // plan futur : 1ère semaine
+    for (const semaine of plan.semaines) {
+      const finSemaine = new Date(debut);
+      finSemaine.setUTCDate(debut.getUTCDate() + (semaine.semaineNum - plan.semaines[0].semaineNum) * 7 + 6);
+      if (aujourdhuiStr <= finSemaine.toISOString().slice(0,10)) return semaine.semaineNum;
+    }
+    return plan.semaines[plan.semaines.length - 1].semaineNum; // plan déjà terminé : dernière semaine
+  }
+
+  function renderSemaineHtml(semaine, jourCourseIndex, derniereSemaineNum, deplieeParDefaut) {
     const estDerniereSemaine = semaine.semaineNum === derniereSemaineNum;
     const rows = DAY_NAMES_COURT.map((d, i) => {
       if (estDerniereSemaine && i === jourCourseIndex) {
@@ -1449,8 +1474,23 @@
 
     const dechargeTag = semaine.estDechargeSemaine ? '<span class="decharge-tag">décharge</span>' : '';
     const adapteeTag = semaine.estAdaptee ? '<span class="decharge-tag" style="color:var(--pace);">adaptée</span>' : '';
-    const header = `<div class="semaine-header"><span>Semaine ${semaine.semaineNum} — ${semaine.volumeCibleKm ?? '—'}km</span>${dechargeTag}${adapteeTag}</div>`;
-    return `${header}<div class="week">${rows}</div>`;
+    // Repli par défaut (demandé le 8 juillet 2026) : seule la semaine
+    // actuelle/prochaine démarre dépliée, les autres repliées — l'en-tête
+    // reste cliquable pour dérouler/replier n'importe quelle semaine.
+    const chevron = deplieeParDefaut ? '▾' : '▸';
+    const header = `<div class="semaine-header" onclick="toggleSemaine(${semaine.semaineNum})" style="cursor:pointer;">
+      <span><span id="chevron-${semaine.semaineNum}" style="display:inline-block; width:14px;">${chevron}</span>Semaine ${semaine.semaineNum} — ${semaine.volumeCibleKm ?? '—'}km</span>${dechargeTag}${adapteeTag}</div>`;
+    return `${header}<div class="week" id="week-${semaine.semaineNum}" style="${deplieeParDefaut ? '' : 'display:none;'}">${rows}</div>`;
+  }
+
+  // Bascule le repli d'une semaine au clic sur son en-tête.
+  function toggleSemaine(semaineNum) {
+    const weekEl = document.getElementById('week-'+semaineNum);
+    const chevronEl = document.getElementById('chevron-'+semaineNum);
+    if (!weekEl || !chevronEl) return;
+    const ouvert = weekEl.style.display !== 'none';
+    weekEl.style.display = ouvert ? 'none' : '';
+    chevronEl.textContent = ouvert ? '▸' : '▾';
   }
 
   function rafraichirPlanComplet() {
@@ -1460,6 +1500,7 @@
     const derniereSemaineNum = dernierPlanGenere.semaines.length
       ? dernierPlanGenere.semaines[dernierPlanGenere.semaines.length - 1].semaineNum
       : null;
+    const semaineADeplier = semaineActuelleOuProchaine(dernierPlanGenere);
 
     const planDiv = document.getElementById('resPlanComplet');
     let html = '';
@@ -1469,7 +1510,7 @@
         html += `<div class="phase-header">${semaine.phase}</div>`;
         dernierePhaseLoc = semaine.phase;
       }
-      html += renderSemaineHtml(semaine, jourCourseIndex, derniereSemaineNum);
+      html += renderSemaineHtml(semaine, jourCourseIndex, derniereSemaineNum, semaine.semaineNum === semaineADeplier);
     });
     planDiv.innerHTML = html;
   }
