@@ -900,22 +900,56 @@ function getEffortLaps(activity) {
 
 // Laps à utiliser pour L'AFFICHAGE de suivi (pas la prédiction de
 // performance) — distinct de getEffortLaps() ci-dessus. Bug trouvé le
-// 8 juillet 2026 : Laurent programme fidèlement ses séances sur sa montre
-// (structureIntervalles reflète exactement ce qui a été programmé), donc
-// TOUS les laps entre échauffement et retour au calme sont de vraies
-// répétitions — il n'y a plus besoin de deviner lesquelles sont "de
-// l'effort" par une tolérance de vitesse (±15%, cf. getEffortLaps).
-// Ce filtrage, pensé pour la prédiction (où on veut exclure les valeurs
-// aberrantes), EXCLUAIT à tort une répétition ratée de l'affichage —
-// décalant la numérotation de toutes les répétitions suivantes et cachant
-// justement l'info la plus utile (une répétition ratée).
+// 8 juillet 2026 : Laurent programme fidèlement ses séances sur sa montre,
+// qui crée un lap DISTINCT pour chaque phase (effort, récup courte
+// intra-répétition, récup longue inter-séries) — les laps alternent
+// simplement effort/récup/effort/récup, avec une récup longue à la place
+// de la récup normale à la fin de chaque série (sauf la dernière).
 //
-// Quand structureIntervalles existe pour la séance du jour, retourne TOUS
-// les laps du milieu (hors échauffement/RAC), dans l'ordre, sans filtrage.
-// Sinon (ancien plan sans structureIntervalles), retombe sur
-// getEffortLaps() pour compatibilité.
+// Deux tentatives précédentes rejetées par Laurent avant cette version :
+// 1) garder tous les laps du milieu sans distinction (mélangeait effort et
+//    récup) ; 2) filtrer par durée (ne fonctionne pas quand effort et
+//    récup ont la même durée, ex. un 30-30 où les deux durent 30s).
+//
+// La bonne approche, directe : l'ORDRE des laps suit exactement la
+// structure programmée — un effort, puis une récup, en boucle, avec la
+// récup longue remplaçant la dernière récup de chaque série (sauf la
+// dernière série). Pas besoin de deviner : on sait exactement à quels
+// indices les efforts se trouvent, un par un.
 function getLapsAffichage(activity, structureIntervalles) {
   if (!activity.laps || activity.laps.length < 4) return [];
+  if (structureIntervalles?.blocs?.length === 1 && structureIntervalles.blocs[0].dureeRecupSec != null) {
+    const middle = activity.laps.slice(1, -2);
+    const bloc = structureIntervalles.blocs[0];
+    const repsParSerie = bloc.repetitions || 1;
+    const nbSeries = structureIntervalles.nbSeries || 1;
+    const efforts = [];
+    let curseur = 0;
+    for (let serie = 0; serie < nbSeries; serie++) {
+      for (let rep = 0; rep < repsParSerie; rep++) {
+        if (curseur >= middle.length) break;
+        efforts.push(middle[curseur]); // lap d'effort
+        curseur++;
+        const derniereRepDeLaSerie = rep === repsParSerie - 1;
+        const derniereSerie = serie === nbSeries - 1;
+        // Après le dernier effort d'une série (sauf la toute dernière
+        // série du plan), un seul lap de récup suit — la récup LONGUE
+        // inter-séries, qui remplace la récup courte normale (pas les
+        // deux à la suite). Après un effort "normal" (pas le dernier de
+        // sa série), la récup courte suit, un seul lap aussi. Dans les
+        // deux cas, un seul lap de récup à sauter — sauf après la toute
+        // dernière répétition du plan entier, où il n'y a plus de récup
+        // du tout à sauter (le prochain lap est déjà le retour au calme,
+        // déjà exclu par slice(1,-2)).
+        const dernierEffortDuPlan = derniereRepDeLaSerie && derniereSerie;
+        if (!dernierEffortDuPlan) curseur++; // saute le lap de récup (courte ou longue, un seul dans les deux cas)
+      }
+    }
+    return efforts;
+  }
+  // Structure à blocs multiples sans répétitions groupées (ex. pyramidale,
+  // seuil-négatif) : chaque bloc EST déjà un seul effort continu, pas
+  // d'alternance à gérer — tous les laps du milieu sont bien des efforts.
   if (structureIntervalles?.blocs) {
     return activity.laps.slice(1, -2);
   }
