@@ -9,20 +9,23 @@
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="theme-color" content="#f97316">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#14181C;
-    --ink-soft:#2A3138;
-    --paper:#EEF0EA;
-    --paper-dim:#DCDFD5;
-    --signal:#FF5A34;
-    --signal-dim:#3A241C;
-    --pace:#2F6E5F;
-    --pace-soft:#1C2E28;
-    --line: rgba(238,240,234,0.14);
-    --longue:#4C7EE0;
-    --longue-soft:#1E2A44;
+    --ink:#0f1117;
+    --ink-soft:#1a1d27;
+    --paper:#f1f5f9;
+    --paper-dim:#2e3347;
+    --signal:#f97316;
+    --signal-dim:#f9731622;
+    --pace:#22c55e;
+    --pace-soft:#22c55e22;
+    --line: #2e3347;
+    --longue:#06b6d4;
+    --longue-soft:#06b6d422;
+    --vma:#f97316;
+    --spec:#a855f7;
+    --ef:#60a5fa;
   }
   .week{ display:flex; flex-direction:column; gap:8px; }
   .day-row{
@@ -31,7 +34,7 @@
     border:1px solid var(--line); background:rgba(238,240,234,0.02);
   }
   .day-row .dname{
-    font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:12px; font-weight:600;
     color:rgba(238,240,234,0.5); width:34px; flex-shrink:0;
   }
   .badge{
@@ -39,16 +42,19 @@
     padding:8px 12px; border-radius:9px; font-size:13px; font-weight:600;
   }
   .badge.qualite{ background:var(--signal-dim); color:var(--signal); }
+  .badge.vma{ background:#f9731622; color:#f97316; }
+  .badge.seuil{ background:#22c55e22; color:#22c55e; }
+  .badge.spec{ background:#a855f722; color:#a855f7; }
   .badge.ef{ background:var(--pace-soft); color:var(--pace); }
   .badge.longue{ background:var(--longue-soft); color:var(--longue); }
   .badge.repos{ background:transparent; color:rgba(238,240,234,0.35); font-weight:500; }
-  .badge .tag{ font-family:'JetBrains Mono',monospace; font-size:10px; opacity:.8; }
+  .badge .tag{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:10px; opacity:.8; }
   .day-detail{
     font-size:13px; color:rgba(238,240,234,0.6);
     margin-top:6px; padding-left:2px; line-height:1.55;
   }
   .phase-header{
-    font-family:'Space Grotesk',sans-serif;
+    font-family:'Inter',sans-serif;
     font-size:16px; font-weight:700;
     color:var(--paper);
     margin:22px 0 10px 0;
@@ -57,7 +63,7 @@
   }
   .semaine-header{
     display:flex; align-items:center; justify-content:space-between;
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:13px; font-weight:600; color:rgba(238,240,234,0.75);
     margin:14px 0 8px 0;
     padding:10px 12px;
@@ -93,7 +99,8 @@
   body{
     background:var(--ink);
     color:var(--paper);
-    font-family:'Manrope',sans-serif;
+    font-family:'Inter',-apple-system,'Helvetica Neue',Arial,sans-serif;
+    font-variant-numeric:tabular-nums;
     display:flex;
     justify-content:center;
     min-height:100vh;
@@ -137,7 +144,7 @@
     justify-content:space-between;
     align-items:baseline;
     padding:12px 20px 0 20px;
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
   }
   .stepmeta .num{ font-size:12px; color:var(--signal); letter-spacing:.06em; }
   .stepmeta .total{ font-size:12px; color:rgba(238,240,234,0.4); }
@@ -148,7 +155,7 @@
     overflow-y:auto;
   }
   .eyebrow{
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:11px;
     letter-spacing:.14em;
     text-transform:uppercase;
@@ -160,7 +167,7 @@
     margin-bottom:14px;
   }
   h1{
-    font-family:'Space Grotesk',sans-serif;
+    font-family:'Inter',sans-serif;
     font-size:26px;
     line-height:1.18;
     font-weight:700;
@@ -224,7 +231,7 @@
   }
 
   .block-label{
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:11px;
     letter-spacing:.08em;
     text-transform:uppercase;
@@ -252,7 +259,7 @@
     background:var(--signal-dim);
   }
   .dist .km{
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:24px;
     font-weight:600;
     color:var(--paper);
@@ -265,7 +272,7 @@
   .dist.selected .km{ color:var(--signal); }
   .dist .tag{
     position:absolute; top:12px; right:12px;
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:10px;
     color:rgba(238,240,234,0.35);
     letter-spacing:.05em;
@@ -277,7 +284,7 @@
     align-items:baseline;
     justify-content:center;
     gap:6px;
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     background:rgba(238,240,234,0.04);
     border:1px solid var(--line);
     border-radius:16px;
@@ -288,7 +295,7 @@
     background:none;
     border:none;
     color:var(--paper);
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:40px;
     font-weight:600;
     width:2.1ch;
@@ -300,7 +307,7 @@
   .helper-row{
     display:flex; justify-content:space-between;
     font-size:12px; color:rgba(238,240,234,0.45);
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     padding:0 4px;
   }
   .helper-row b{ color:var(--pace); font-weight:600; }
@@ -319,7 +326,7 @@
     display:flex;flex-direction:column;
     align-items:center;justify-content:center;
     gap:4px;
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:11px;
     color:rgba(238,240,234,0.5);
     cursor:pointer;
@@ -331,7 +338,7 @@
 
   .count-badge{
     display:inline-flex; align-items:center; gap:6px;
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:12px; color:var(--pace);
     background:var(--pace-soft);
     padding:5px 10px; border-radius:20px;
@@ -350,7 +357,7 @@
     padding:15px;
     border-radius:14px;
     border:none;
-    font-family:'Manrope',sans-serif;
+    font-family:'Inter',sans-serif;
     font-weight:700;
     font-size:15px;
     cursor:pointer;
@@ -373,7 +380,7 @@
   }
 
   .date-label{
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:11.5px;
     text-transform:uppercase;
     letter-spacing:.06em;
@@ -389,7 +396,7 @@
     padding:7px 12px;
     border-radius:20px;
     border:1px solid var(--line);
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:11.5px;
     color:rgba(238,240,234,0.55);
     cursor:pointer;
@@ -412,7 +419,7 @@
     margin-bottom:12px;
   }
   .strava-badge{
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:11px;
     color:var(--pace);
     background:var(--pace-soft);
@@ -420,7 +427,7 @@
     border-radius:20px;
   }
   .strava-period{
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:11px;
     color:rgba(238,240,234,0.4);
   }
@@ -429,7 +436,7 @@
     margin-bottom:14px;
   }
   .strava-value span:first-child{
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:34px;
     font-weight:700;
     color:var(--paper);
@@ -451,7 +458,7 @@
     border:none;
     outline:none;
     color:var(--paper);
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:17px;
     font-weight:600;
     padding:16px 14px;
@@ -467,7 +474,7 @@
     gap:16px;
   }
   .dc-weeks{
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-weight:700;
     font-size:30px;
     color:var(--signal);
@@ -477,7 +484,7 @@
   }
   .dc-weeks .dc-unit{
     display:block;
-    font-family:'Manrope',sans-serif;
+    font-family:'Inter',sans-serif;
     font-weight:600;
     font-size:11px;
     color:rgba(238,240,234,0.45);
@@ -495,7 +502,7 @@
 
   /* Alt distance estimation */
   .alt-toggle{
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:12px;
     color:var(--pace);
     text-decoration:underline;
@@ -528,7 +535,7 @@
     padding:9px 4px;
     border-radius:10px;
     border:1px solid var(--line);
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:12.5px;
     font-weight:600;
     color:rgba(238,240,234,0.6);
@@ -552,7 +559,7 @@
     border:1.5px solid var(--pace);
     background:transparent;
     color:var(--pace);
-    font-family:'Manrope',sans-serif;
+    font-family:'Inter',sans-serif;
     font-weight:700;
     font-size:13px;
     cursor:pointer;
@@ -578,7 +585,7 @@
     position:absolute; top:-12px; right:16px;
     background:var(--signal);
     color:var(--ink);
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:11px; font-weight:700;
     padding:4px 10px; border-radius:20px;
     letter-spacing:.04em;
@@ -592,7 +599,7 @@
   .bib-row:last-child{ border-bottom:none; }
   .bib-row .k{ font-size:13px; color:rgba(238,240,234,0.5); }
   .bib-row .v{
-    font-family:'JetBrains Mono',monospace;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
     font-size:14.5px; font-weight:600;
     color:var(--paper);
     text-align:right;
@@ -1447,7 +1454,13 @@
       if (!a) { badgeClass = 'repos'; label = 'Repos'; }
       else if (a.type === 'longue') { badgeClass = 'longue'; label = 'Sortie longue'; detail = a.contenu; }
       else if (a.type === 'qualite') {
-        badgeClass = 'qualite'; label = a.estTest ? '🎯 Test' : 'Qualité'; detail = a.contenu;
+        // Distingue VMA/SEUIL/SPEC par leur vraie couleur, cohérent avec
+        // STYPES de l'app principale (index.html) — demandé par Laurent le
+        // 8 juillet 2026 pour que la direction artistique du wizard
+        // corresponde à celle de l'app.
+        const famille = a.estTest ? 'spec' : PlanGenerator.FAMILLE_SOUS_TYPE[a.sousType];
+        badgeClass = famille === 'vma' ? 'vma' : famille === 'seuil' ? 'seuil' : famille === 'allure-course' ? 'spec' : 'qualite';
+        label = a.estTest ? '🎯 Test' : 'Qualité'; detail = a.contenu;
         const r = a.restrictionsAllure;
         if (r && !a.estTest) label += ` <span class="tag">${r.repli5KDouleurChronique ? 'repli I' : (r.interdireV ? 'sans V' : '') + (r.interdireI ? ' sans I' : '')}</span>`;
       }

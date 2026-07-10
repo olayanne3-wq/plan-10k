@@ -148,7 +148,7 @@ export function injecterJalonsTransition(semaines) {
 // Regroupe un sousType de séance qualité (cf. ROTATION_SOUS_TYPE) en famille
 // pour le choix de la banque de notes. 'test' n'a pas de note pratique ici :
 // traité à part (2.6, cohérence narrative de la semaine test).
-const FAMILLE_SOUS_TYPE = {
+export const FAMILLE_SOUS_TYPE = {
   'seuil-court': 'seuil', 'seuil': 'seuil', 'seuil-negatif': 'seuil',
   'tempo-court': 'seuil', 'seuil-2min': 'seuil',
   'i-30-30': 'vma', 'i-3min': 'vma', 'vitesse': 'vma', 'pyramidale': 'vma', 'cotes': 'vma',
