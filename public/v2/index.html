@@ -1458,7 +1458,7 @@
         // STYPES de l'app principale (index.html) — demandé par Laurent le
         // 8 juillet 2026 pour que la direction artistique du wizard
         // corresponde à celle de l'app.
-        const famille = a.estTest ? 'spec' : PlanGenerator.FAMILLE_SOUS_TYPE[a.sousType];
+        const famille = a.estTest ? 'spec' : Engine.FAMILLE_SOUS_TYPE[a.sousType];
         badgeClass = famille === 'vma' ? 'vma' : famille === 'seuil' ? 'seuil' : famille === 'allure-course' ? 'spec' : 'qualite';
         label = a.estTest ? '🎯 Test' : 'Qualité'; detail = a.contenu;
         const r = a.restrictionsAllure;
