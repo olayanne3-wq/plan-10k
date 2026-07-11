@@ -4858,7 +4858,36 @@ if (missingFns.length > 0) {
 render();
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load',()=>{ navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(()=>{}); });
+  // Mécanisme de mise à jour forcée (demandé par Laurent le 8 juillet 2026)
+  // — un ancien service worker (installé avant une mise à jour) peut rester
+  // actif indéfiniment sur un appareil sans jamais se mettre à jour de
+  // lui-même, surtout en PWA installée où les navigateurs vérifient
+  // rarement les mises à jour de façon proactive. Symptôme observé :
+  // l'ancien plan v1 (codé en dur, avant la bascule du 7 juillet) réapparu
+  // sur un smartphone alors que le PC affichait déjà la bonne version.
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(reg => {
+      // Force une vérification de mise à jour dès le chargement, plutôt que
+      // d'attendre que le navigateur le fasse spontanément (peut prendre
+      // des heures/jours en PWA installée).
+      reg.update();
+      // Vérifie aussi périodiquement pendant que l'app reste ouverte (utile
+      // pour une session longue, ex. pendant un entraînement).
+      setInterval(() => reg.update(), 60 * 60 * 1000); // toutes les heures
+    }).catch(() => {});
+
+    // Dès qu'un nouveau service worker prend le contrôle de la page (une
+    // mise à jour vient de s'activer), recharge automatiquement — sans ça,
+    // l'utilisateur resterait sur l'ancienne version de la page déjà
+    // chargée même si le nouveau service worker est bien actif en arrière-
+    // plan, jusqu'à sa prochaine vraie fermeture/réouverture de l'app.
+    let dejaRecharge = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (dejaRecharge) return;
+      dejaRecharge = true;
+      location.reload();
+    });
+  });
 }
 
 })(); // fin de l'IIFE async qui attendait window.__PLAN_PRET__
