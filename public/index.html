@@ -4091,7 +4091,14 @@ function renderSettings() {
 
   const versionSection = (function buildVersionSection() {
     const VERSIONS = [
-      { ver:"v2.0", title:"Moteur générique multi-distances", current:true, notes:[
+      { ver:"v2.1", title:"Adaptation dynamique & fiabilité des données", current:true, notes:[
+        "🔄 Adaptation automatique du plan après des séances difficiles (avec ta confirmation)",
+        "⚖️ Référence de temps pondérée progressivement dans le temps, plus juste",
+        "✅ Calcul de réussite, allures et cadence des fractionnés basés sur la vraie structure programmée",
+        "🎨 Wizard harmonisé visuellement avec l'app (couleurs, police, logo)",
+        "🐛 Nombreuses corrections de fiabilité sur le suivi Strava",
+      ]},
+      { ver:"v2.0", title:"Moteur générique multi-distances", current:false, notes:[
         "🎯 Nouveau moteur : plans générés pour 5K/10K/Semi/Marathon (plus seulement 10K)",
         "📱 Sélecteur de plan multi-appareils (synchronisation par QR code)",
         "🏁 Wizard de configuration dédié, séparé de l'app principale",
