@@ -162,6 +162,21 @@ const STYPES = {
   RACE:  { label:"Course",                 color:"#f97316",  short:"RACE"  },
 };
 
+// Options de statut de séance (✅/❌/⚠️/😴) — déplacées ici le 8 juillet
+// 2026, tout en haut du fichier avec les autres constantes globales
+// (ReferenceError trouvé : "Cannot access 'SOPTS' before initialization").
+// Ces constantes vivaient plus bas dans le fichier (section "Détail
+// semaine"), ce qui fonctionnait tant que renderStatusRow() n'était
+// utilisée QUE dans renderWeekDetail() — mais depuis son extraction pour
+// aussi être utilisée dans la carte "Aujourd'hui" du dashboard (commit
+// 824d565), rebuildPredHistory() (appelée très tôt, ligne ~1217, avant que
+// le fichier ait fini de s'exécuter jusqu'à la déclaration de SOPTS)
+// pouvait déclencher render() -> renderDashboard() -> renderStatusRow()
+// avant que SOPTS n'existe encore (temporal dead zone d'une const, à la
+// différence d'une déclaration de fonction qui est hoisted).
+const SOPTS=["—","✅","❌","⚠️","😴"];
+const SCOLORS={"—":"#475569","✅":"#22c55e","❌":"#ef4444","⚠️":"#eab308","😴":"#60a5fa"};
+
 // ── Allures de référence (sec/km) ──
 // EF : 6:20/km = 380 s/km
 // Longue : 6:20/km = 380 s/km
@@ -2320,8 +2335,6 @@ function renderWeeks() {
 // ══════════════════════════════════════════════════════════════════════════════
 // DÉTAIL SEMAINE
 // ══════════════════════════════════════════════════════════════════════════════
-const SOPTS=["—","✅","❌","⚠️","😴"];
-const SCOLORS={"—":"#475569","✅":"#22c55e","❌":"#ef4444","⚠️":"#eab308","😴":"#60a5fa"};
 
 // Formatage lisible de la structure à programmer sur la montre (section
 // 2.8 du doc de convergence, demandé par Laurent le 8 juillet 2026) —
