@@ -1659,6 +1659,13 @@
     // jamais visuellement sur son smartphone, cause exacte non identifiée
     // faute d'accès aux outils développeur mobile.
     const btnCopierLien = document.getElementById('btnCopierLienSyncV2');
+    // DIAGNOSTIC TEMPORAIRE (11 juillet 2026) — Laurent signale que le
+    // bouton "Copier le lien" n'apparaît toujours pas malgré deux
+    // corrections précédentes (bouton statique, mise à jour forcée du
+    // service worker). alert() pour voir précisément ce qui se passe sur
+    // son vrai appareil, faute d'accès aux outils développeur mobile — à
+    // retirer une fois la cause trouvée.
+    alert('DIAGNOSTIC — bouton trouvé : ' + (btnCopierLien ? 'OUI' : 'NON') + (btnCopierLien ? ' (display actuel : "' + btnCopierLien.style.display + '")' : ''));
     if (btnCopierLien) {
       btnCopierLien.style.display = 'block';
       btnCopierLien.textContent = '🔗 Copier le lien (si tu ne peux pas scanner)';
