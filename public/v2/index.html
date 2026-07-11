@@ -985,6 +985,17 @@
           <p class="sub" style="font-size:12px; margin-bottom:8px;">Synchroniser avec un autre appareil</p>
           <button class="btn-mini" style="width:100%;" onclick="genererQrSyncV2()">📱 Générer le QR code</button>
           <div id="qrSyncV2Container" style="display:flex; justify-content:center; margin-top:10px;"></div>
+          <!-- Bouton "Copier le lien" rendu STATIQUE (toujours présent dans le
+               HTML, pas créé dynamiquement en JS) — Laurent signale le 11
+               juillet 2026 : le QR code s'affichait bien, mais le bouton
+               "Copier le lien" (auparavant créé par appendChild() juste
+               après) n'apparaissait jamais visuellement sur son smartphone,
+               cause exacte non identifiée (pas d'accès aux outils
+               développeur mobile pour diagnostiquer). Plutôt que de
+               continuer à chercher la vraie cause sans pouvoir observer
+               l'erreur, le bouton est rendu statique pour éliminer
+               complètement ce risque, peu importe la cause réelle. -->
+          <button id="btnCopierLienSyncV2" class="btn-mini" style="width:100%; margin-top:10px; display:none;" onclick="copierLienSyncV2()">🔗 Copier le lien (si tu ne peux pas scanner)</button>
         </div>
       </div>
 
@@ -1616,6 +1627,8 @@
   // gistId dans un lien unique, à scanner ou ouvrir directement. Paramètre
   // gistV2 (pas gist, déjà utilisé par index.html pour un Gist de
   // backup général différent, cf. docs/v2-methodologie/convergence-v1-v2.md).
+  let derniereUrlSyncV2 = null; // mémorisée pour le bouton "Copier le lien" statique
+
   function genererQrSyncV2() {
     const token = getGithubToken();
     const gistId = getV2GistId();
@@ -1624,6 +1637,7 @@
       return;
     }
     const url = window.location.origin + '/v2?token=' + encodeURIComponent(token) + '&gistV2=' + encodeURIComponent(gistId);
+    derniereUrlSyncV2 = url;
     const qrDiv = document.getElementById('qrSyncV2Container');
     qrDiv.innerHTML = '';
     const img = document.createElement('img');
@@ -1638,18 +1652,27 @@
     // téléphone). Cas réel rencontré par Laurent le 7 juillet 2026 : sans
     // ce bouton, seule l'URL de l'IMAGE du QR code (api.qrserver.com) était
     // copiable en pratique, pas le lien de destination qu'elle encode.
-    const btnCopierLien = document.createElement('button');
-    btnCopierLien.className = 'btn-mini';
-    btnCopierLien.style.cssText = 'width:100%; margin-top:10px;';
-    btnCopierLien.textContent = '🔗 Copier le lien (si tu ne peux pas scanner)';
-    btnCopierLien.onclick = () => {
-      navigator.clipboard?.writeText(url).then(() => {
-        btnCopierLien.textContent = '✅ Lien copié — colle-le dans le navigateur de l\'autre appareil';
-      }).catch(() => {
-        prompt('Copie ce lien manuellement :', url);
-      });
-    };
-    qrDiv.parentElement.appendChild(btnCopierLien);
+    //
+    // Rendu STATIQUE le 11 juillet 2026 (bouton déjà présent dans le HTML,
+    // juste affiché ici) plutôt que créé dynamiquement par appendChild() —
+    // Laurent signale que le bouton créé dynamiquement n'apparaissait
+    // jamais visuellement sur son smartphone, cause exacte non identifiée
+    // faute d'accès aux outils développeur mobile.
+    const btnCopierLien = document.getElementById('btnCopierLienSyncV2');
+    if (btnCopierLien) {
+      btnCopierLien.style.display = 'block';
+      btnCopierLien.textContent = '🔗 Copier le lien (si tu ne peux pas scanner)';
+    }
+  }
+
+  function copierLienSyncV2() {
+    if (!derniereUrlSyncV2) return;
+    const btnCopierLien = document.getElementById('btnCopierLienSyncV2');
+    navigator.clipboard?.writeText(derniereUrlSyncV2).then(() => {
+      if (btnCopierLien) btnCopierLien.textContent = '✅ Lien copié — colle-le dans le navigateur de l\'autre appareil';
+    }).catch(() => {
+      prompt('Copie ce lien manuellement :', derniereUrlSyncV2);
+    });
   }
 
   // Récupère token + gistV2 depuis l'URL si présents (lien ouvert depuis un
