@@ -911,7 +911,7 @@ function resoudreSousType(sousType, restrictionsAllure) {
  * Génère la structure concrète d'une séance qualité (texte affichable).
  * alluresSec : allures en secondes/km (sortie de computeAllures, avant formatage)
  */
-function genererContenuQualite({ distance, phase, semaineDansPhase, indexQualiteSemaine, alluresSec, restrictionsAllure, tauxAffutage = 1, estDechargeSemaine = false, nbApparitionsParSousType = {} }) {
+function genererContenuQualite({ distance, phase, semaineDansPhase, indexQualiteSemaine, alluresSec, restrictionsAllure, tauxAffutage = 1, estDechargeSemaine = false, nbApparitionsParSousType = {}, niveau = 'intermediaire' }) {
   const rotation = ROTATION_SOUS_TYPE[distance]?.[phase] ?? ['seuil'];
   if (rotation.length === 0) return { sousType: null, contenu: 'EF (réacclimatation, pas de qualité cette semaine)', kmEstime: 0 };
 
@@ -980,7 +980,20 @@ function genererContenuQualite({ distance, phase, semaineDansPhase, indexQualite
       // 4) au-delà (3 séries de 8), reste stable — plus grand saut mesuré
       //    sur toute la séquence : 25% (le tout premier pas 4->5, minimal
       //    possible vu la petite base de départ)
-      const REPS_MAX_I3030 = 8, SERIES_MAX_I3030 = 3, REPS_DEPART_I3030 = 4, REPS_DEPART_NOUVELLE_SERIE_I3030 = 5;
+      const REPS_PARAMS_PAR_NIVEAU = {
+        // Base de départ et plafond de répétitions par niveau (v2.2,
+        // demandé par Laurent le 11 juillet 2026) — vérifié contre la
+        // littérature (peakvo2trainer.com, runstreet.com) : les débutants
+        // devraient démarrer plus bas et progresser plus prudemment que les
+        // coureurs confirmés, cohérent avec le principe de surcharge
+        // progressive déjà appliqué (section 2.2, commit 71e9495) mais
+        // jusqu'ici identique pour tous les niveaux.
+        debutant:     { depart: 3, max: 7 },
+        intermediaire:{ depart: 4, max: 8 },
+        confirme:     { depart: 5, max: 9 },
+      };
+      const { depart: REPS_DEPART_I3030, max: REPS_MAX_I3030 } = REPS_PARAMS_PAR_NIVEAU[niveau] || REPS_PARAMS_PAR_NIVEAU.intermediaire;
+      const SERIES_MAX_I3030 = 3, REPS_DEPART_NOUVELLE_SERIE_I3030 = REPS_DEPART_I3030 + 1;
       let series = 1, repsParSerie = REPS_DEPART_I3030;
       const nbApparitions = nbApparitionsParSousType['i-30-30'] ?? 0;
       for (let iter = 0; iter < nbApparitions; iter++) {
@@ -1628,7 +1641,8 @@ function generatePlan(profil, params) {
             restrictionsAllure: seance.restrictionsAllure,
             tauxAffutage: tauxAffutageSemaine,
             estDechargeSemaine: dechargeSemaine,
-            nbApparitionsParSousType
+            nbApparitionsParSousType,
+            niveau: profil.niveau
           });
           seance.sousType = sousType;
           seance.contenu = contenu;
@@ -1885,7 +1899,8 @@ function appliquerAdaptations(plan) {
         restrictionsAllure: seance.restrictionsAllure,
         tauxAffutage: 1,
         estDechargeSemaine: true, // réutilise le même levier de réduction (facteur 0.75, sections 22/26)
-        nbApparitionsParSousType
+        nbApparitionsParSousType,
+        niveau: plan.profilOrigine?.niveau
       });
       seance.sousType = sousType;
       seance.contenu = contenu;
@@ -1992,7 +2007,8 @@ function regenererStructuresIntervalles(plan) {
         restrictionsAllure: seance.restrictionsAllure,
         tauxAffutage: semaine.tauxAffutage ?? 1,
         estDechargeSemaine: semaine.estDecharge ?? false,
-        nbApparitionsParSousType: { ...nbApparitionsParSousType, [seance.sousType]: Math.max(0, (nbApparitionsParSousType[seance.sousType] ?? 1) - 1) }
+        nbApparitionsParSousType: { ...nbApparitionsParSousType, [seance.sousType]: Math.max(0, (nbApparitionsParSousType[seance.sousType] ?? 1) - 1) },
+        niveau: plan.profilOrigine?.niveau
       });
 
       // Garde-fou : n'applique la structure que si le sous-type recalculé

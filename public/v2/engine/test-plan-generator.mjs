@@ -115,3 +115,25 @@ console.log(' impose d\'augmenter UNE seule variable à la fois)');
   // Vérifie que la toute première apparition ne démarre PAS déjà à 8 répétitions
   console.log('Première apparition ne démarre pas au plafond (8 reps) :', apparitionsI3030[0]?.reps < 8 ? 'OK' : 'ÉCHEC');
 }
+
+console.log('\n--- Influence du niveau du coureur sur la progression VMA (v2.2, demandé le 11 juillet 2026) ---');
+console.log('(Laurent a repéré que profil.niveau n\'avait AUCUNE influence sur les séances qualité —');
+console.log(' vérifié contre la littérature : débutants doivent démarrer plus bas et progresser plus');
+console.log(' prudemment que les coureurs confirmés)');
+{
+  const parReps = (contenu) => {
+    const m = contenu.match(/(\d+)×30s-30s/);
+    return m ? parseInt(m[1]) : null;
+  };
+  const premiereRepParNiveau = {};
+  ['debutant', 'intermediaire', 'confirme'].forEach(niveau => {
+    const p = generatePlan({ ...profil, niveau }, params);
+    for (const s of p.semaines) {
+      const a = Object.values(s.assignment).find(a => a.sousType === 'i-30-30');
+      if (a) { premiereRepParNiveau[niveau] = parReps(a.contenu); break; }
+    }
+  });
+  console.log('Première répétition par niveau :', JSON.stringify(premiereRepParNiveau));
+  console.log('Débutant < Intermédiaire < Confirmé :',
+    (premiereRepParNiveau.debutant < premiereRepParNiveau.intermediaire && premiereRepParNiveau.intermediaire < premiereRepParNiveau.confirme) ? 'OK' : 'ÉCHEC');
+}
