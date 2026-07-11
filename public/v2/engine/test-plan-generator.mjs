@@ -78,3 +78,40 @@ console.log(' rétroactif sur son plan Semi déjà existant plutôt que de le re
   const nbSecondAppel = regenererStructuresIntervalles(planPourTest);
   console.log('Second appel idempotent (0 mise à jour) :', nbSecondAppel === 0 ? 'OK' : 'ÉCHEC (valeur: ' + nbSecondAppel + ')');
 }
+
+console.log('\n--- Progression VMA i-30-30 (section 2.2, v2.2, décidé le 8 juillet 2026) ---');
+console.log('(Laurent a repéré que la séance passait directement de "2 séries de 8" à "3 séries');
+console.log(' de 8" — un saut de +50% du volume en une semaine, aucune progression des répétitions');
+console.log(' par série. Vérifié contre plusieurs sources : le principe de "surcharge progressive"');
+console.log(' impose d\'augmenter UNE seule variable à la fois)');
+{
+  const paramsLong = { distance: '10K', refDistance: '10K', tempsReference: '50:21', objectif: '48:30', dateDebut: '2026-07-07', dateCourse: '2026-11-01', volumeActuel: 30, contraintesPonctuelles: [] };
+  const planLong = generatePlan(profil, paramsLong);
+  const apparitionsI3030 = [];
+  planLong.semaines.forEach(s => {
+    Object.values(s.assignment).forEach(a => {
+      if (a.sousType === 'i-30-30') {
+        const m = a.contenu.match(/(\d+) séries de (\d+)×30s-30s|(\d+)×30s-30s/);
+        const series = m ? (m[1] ? parseInt(m[1]) : 1) : null;
+        const reps = m ? parseInt(m[2] || m[3]) : null;
+        apparitionsI3030.push({ semaine: s.semaineNum, series, reps, total: series*reps, decharge: s.estDechargeSemaine });
+      }
+    });
+  });
+  console.log('Apparitions i-30-30 :', apparitionsI3030.map(a => `S${a.semaine}${a.decharge?'(D)':''}: ${a.series}×${a.reps} (${a.total})`).join(', '));
+
+  // Vérifie qu'aucun saut de plus de 30% du total ne se produit d'une
+  // apparition à l'autre — hors transitions impliquant une décharge (avant
+  // ou après), qui réduisent/rétablissent volontairement le volume et ne
+  // sont pas concernées par la logique de progression elle-même
+  let progressionDouce = true;
+  for (let i = 1; i < apparitionsI3030.length; i++) {
+    if (apparitionsI3030[i-1].decharge || apparitionsI3030[i].decharge) continue; // transition avec décharge, pas concernée
+    const avant = apparitionsI3030[i-1].total, apres = apparitionsI3030[i].total;
+    if (apres > avant * 1.30) { progressionDouce = false; console.log('Saut détecté entre S'+apparitionsI3030[i-1].semaine+' ('+avant+') et S'+apparitionsI3030[i].semaine+' ('+apres+')'); }
+  }
+  console.log('Aucun saut brutal (>30%) hors transitions de décharge :', progressionDouce ? 'OK' : 'ÉCHEC');
+
+  // Vérifie que la toute première apparition ne démarre PAS déjà à 8 répétitions
+  console.log('Première apparition ne démarre pas au plafond (8 reps) :', apparitionsI3030[0]?.reps < 8 ? 'OK' : 'ÉCHEC');
+}

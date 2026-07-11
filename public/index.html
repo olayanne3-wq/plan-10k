@@ -2362,12 +2362,12 @@ function renderStructureAProgrammer(structure) {
   if (!structure || !structure.blocs) return null;
   const lignes = [];
   lignes.push("Échauffement : " + fmtDureeCourte(structure.echauffementSec) + " à " + structure.allureEchauffement);
-  if (structure.blocs.length === 1 && structure.blocs[0].repetitions > 1 && !structure.nbSeries) {
+  if (structure.blocs.length === 1 && structure.blocs[0].repetitions > 1 && (!structure.nbSeries || structure.nbSeries <= 1)) {
     const b = structure.blocs[0];
     const effort = b.dureeEffortSec ? fmtDureeCourte(b.dureeEffortSec) : b.distanceEffortM + "m";
     const recup = b.dureeRecupSec != null ? fmtDureeCourte(b.dureeRecupSec) : (b.recupLabel || "—");
     lignes.push(b.repetitions + " × (" + effort + " à " + b.allure + " / récup " + recup + ")");
-  } else if (structure.nbSeries) {
+  } else if (structure.nbSeries > 1) {
     const b = structure.blocs[0];
     lignes.push(structure.nbSeries + " séries de " + b.repetitions + " × (" + fmtDureeCourte(b.dureeEffortSec) + " à " + b.allure + " / récup " + fmtDureeCourte(b.dureeRecupSec) + ")");
     lignes.push("Récup entre séries : " + fmtDureeCourte(structure.recupEntreSeriesSec));

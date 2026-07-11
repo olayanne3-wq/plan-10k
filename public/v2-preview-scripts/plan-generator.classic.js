@@ -911,7 +911,7 @@ function resoudreSousType(sousType, restrictionsAllure) {
  * Génère la structure concrète d'une séance qualité (texte affichable).
  * alluresSec : allures en secondes/km (sortie de computeAllures, avant formatage)
  */
-function genererContenuQualite({ distance, phase, semaineDansPhase, indexQualiteSemaine, alluresSec, restrictionsAllure, tauxAffutage = 1, estDechargeSemaine = false }) {
+function genererContenuQualite({ distance, phase, semaineDansPhase, indexQualiteSemaine, alluresSec, restrictionsAllure, tauxAffutage = 1, estDechargeSemaine = false, nbApparitionsParSousType = {} }) {
   const rotation = ROTATION_SOUS_TYPE[distance]?.[phase] ?? ['seuil'];
   if (rotation.length === 0) return { sousType: null, contenu: 'EF (réacclimatation, pas de qualité cette semaine)', kmEstime: 0 };
 
@@ -950,12 +950,53 @@ function genererContenuQualite({ distance, phase, semaineDansPhase, indexQualite
       break;
     }
     case 'i-30-30': {
-      const series = ajuster(reduireSelonNiveauProgression(2, 1, 3, semaineDansPhase), 1);
-      // 8×30s effort par série ; on ignore les 30s de récup intra-série dans
-      // l'estimation km (approximation assumée) ; récup inter-séries fixée à 3min
-      kmCorps = kmDepuisMinutes(series * 8 * 0.5, I);
-      contenuCorps = `${series} séries de 8×30s-30s @ ${formatPace(I)} (VMA), récup 3min entre les séries`;
-      structureIntervalles = { blocs: [{ repetitions: 8, dureeEffortSec: 30, allure: formatPace(I), dureeRecupSec: 30 }], nbSeries: series, recupEntreSeriesSec: 3*60 };
+      // Correctif du 8 juillet 2026 (v2.2, méthodologie) : l'ancienne version
+      // fixait les répétitions à 8 dès la 1ère apparition et ne faisait
+      // progresser QUE le nombre de séries (1→2→3) — cassait le principe de
+      // "surcharge progressive" (augmenter UNE seule variable à la fois,
+      // confirmé par plusieurs sources : NQ Physio, Medical News Today,
+      // Marathon Handbook) et produisait un saut brutal de +50% du volume
+      // total en une semaine au passage de 2 à 3 séries (16→24 répétitions),
+      // repéré par Laurent en conditions réelles sur son propre plan.
+      //
+      // Deux tentatives intermédiaires rejetées avant cette version, testées
+      // par calcul isolé avant de committer : 1) faire progresser les
+      // répétitions puis les séries en gardant les répétitions au plafond
+      // pour les nouvelles séries — laissait un saut de +100% au passage
+      // 1→2 séries (8 -> 16) ; 2) une formule à base de modulo imbriqué pour
+      // que chaque nouvelle série redémarre aussi à un niveau réduit — trop
+      // complexe, plusieurs bugs de calcul trouvés en testant (le plafond
+      // final ne se stabilisait pas correctement).
+      //
+      // Version retenue : simulation par boucle explicite, plus simple et
+      // vérifiable. Progression basée sur le nombre de fois que cette
+      // séance est déjà apparue dans le plan (pas semaineDansPhase, qui
+      // reset à chaque changement de phase — la progression continue même
+      // si la VMA revient après une pause dans la rotation) :
+      // 1) 1ère série : répétitions montent de 4 à 8 (+1 par apparition)
+      // 2) une fois 8 atteint, une 2e série démarre à 5 répétitions,
+      //    remonte à son tour à 8
+      // 3) une fois les 2 séries à 8, une 3e série démarre à 5, remonte à 8
+      // 4) au-delà (3 séries de 8), reste stable — plus grand saut mesuré
+      //    sur toute la séquence : 25% (le tout premier pas 4->5, minimal
+      //    possible vu la petite base de départ)
+      const REPS_MAX_I3030 = 8, SERIES_MAX_I3030 = 3, REPS_DEPART_I3030 = 4, REPS_DEPART_NOUVELLE_SERIE_I3030 = 5;
+      let series = 1, repsParSerie = REPS_DEPART_I3030;
+      const nbApparitions = nbApparitionsParSousType['i-30-30'] ?? 0;
+      for (let iter = 0; iter < nbApparitions; iter++) {
+        if (repsParSerie < REPS_MAX_I3030) repsParSerie++;
+        else if (series < SERIES_MAX_I3030) { series++; repsParSerie = REPS_DEPART_NOUVELLE_SERIE_I3030; }
+      }
+      repsParSerie = ajuster(repsParSerie, 4);
+      series = ajuster(series, 1);
+      // 30s effort par répétition ; on ignore les 30s de récup intra-série
+      // dans l'estimation km (approximation assumée) ; récup inter-séries
+      // fixée à 3min (seulement pertinente si series > 1)
+      kmCorps = kmDepuisMinutes(series * repsParSerie * 0.5, I);
+      contenuCorps = series > 1
+        ? `${series} séries de ${repsParSerie}×30s-30s @ ${formatPace(I)} (VMA), récup 3min entre les séries`
+        : `${repsParSerie}×30s-30s @ ${formatPace(I)} (VMA)`;
+      structureIntervalles = { blocs: [{ repetitions: repsParSerie, dureeEffortSec: 30, allure: formatPace(I), dureeRecupSec: 30 }], nbSeries: series, recupEntreSeriesSec: series > 1 ? 3*60 : undefined };
       break;
     }
     case 'i-3min': {
@@ -1555,6 +1596,11 @@ function generatePlan(profil, params) {
   const semaines = [];
   const warningsSemaines = [];
   let semaineGlobale = 0;
+  // Compteur d'apparitions par sous-type, utilisé pour la progression
+  // continue sur tout le plan (section 2.2 v2.2, voir commentaire dans le
+  // case 'i-30-30' de genererContenuQualite) — persiste à travers toute la
+  // boucle des semaines, incrémenté après chaque séance qualité générée.
+  const nbApparitionsParSousType = {};
   for (const phase of phasesAvecReacclimatation) {
     for (let i = 0; i < phase.semaines; i++) {
       semaineGlobale++;
@@ -1581,12 +1627,14 @@ function generatePlan(profil, params) {
             alluresSec: allSeconds,
             restrictionsAllure: seance.restrictionsAllure,
             tauxAffutage: tauxAffutageSemaine,
-            estDechargeSemaine: dechargeSemaine
+            estDechargeSemaine: dechargeSemaine,
+            nbApparitionsParSousType
           });
           seance.sousType = sousType;
           seance.contenu = contenu;
           seance.kmEstime = kmEstime;
           seance.structureIntervalles = structureIntervalles;
+          if (sousType) nbApparitionsParSousType[sousType] = (nbApparitionsParSousType[sousType] ?? 0) + 1;
           kmQualiteTotal += kmEstime;
         }
       }
@@ -1807,6 +1855,22 @@ function appliquerAdaptations(plan) {
     const phaseInfo = bornesPhases.find(b => b.nom === semaine.phase && semaineNum > b.debut && semaineNum <= b.fin);
     const semaineDansPhase = phaseInfo ? semaineNum - phaseInfo.debut - 1 : 0;
 
+    // Reconstitue le compteur d'apparitions depuis l'historique déjà présent
+    // dans le plan (les semaines précédentes ont déjà leur sousType assigné,
+    // contrairement à une génération initiale) — nécessaire pour que la
+    // progression VMA (i-30-30, section 2.2 v2.2) continue correctement même
+    // lors d'une adaptation ponctuelle d'une seule semaine, pas de tout le
+    // plan.
+    const nbApparitionsParSousType = {};
+    for (const s of plan.semaines) {
+      if (s.semaineNum >= semaineNum) break;
+      for (const sce of Object.values(s.assignment)) {
+        if (sce.type === 'qualite' && sce.sousType) {
+          nbApparitionsParSousType[sce.sousType] = (nbApparitionsParSousType[sce.sousType] ?? 0) + 1;
+        }
+      }
+    }
+
     const nouveauVolume = Math.round(semaine.volumeCibleKm * 0.75 * 10) / 10;
     let kmQualiteTotal = 0;
 
@@ -1820,7 +1884,8 @@ function appliquerAdaptations(plan) {
         alluresSec,
         restrictionsAllure: seance.restrictionsAllure,
         tauxAffutage: 1,
-        estDechargeSemaine: true // réutilise le même levier de réduction (facteur 0.75, sections 22/26)
+        estDechargeSemaine: true, // réutilise le même levier de réduction (facteur 0.75, sections 22/26)
+        nbApparitionsParSousType
       });
       seance.sousType = sousType;
       seance.contenu = contenu;
@@ -1894,12 +1959,18 @@ function regenererStructuresIntervalles(plan) {
   });
 
   let nbMisesAJour = 0;
+  const nbApparitionsParSousType = {};
   for (const semaine of plan.semaines) {
     const phaseInfo = bornesPhases.find(b => b.nom === semaine.phase && semaine.semaineNum > b.debut && semaine.semaineNum <= b.fin);
     const semaineDansPhase = phaseInfo ? semaine.semaineNum - phaseInfo.debut - 1 : 0;
 
     for (const seance of Object.values(semaine.assignment)) {
-      if (seance.type !== 'qualite' || seance.structureIntervalles) continue; // déjà présente, rien à faire
+      if (seance.type !== 'qualite') continue;
+      // Compte l'apparition AVANT le "continue" ci-dessous, pour rester
+      // cohérent même sur les séances déjà pourvues d'une structure —
+      // sinon le compteur se désynchroniserait de l'historique réel du plan
+      if (seance.sousType) nbApparitionsParSousType[seance.sousType] = (nbApparitionsParSousType[seance.sousType] ?? 0) + 1;
+      if (seance.structureIntervalles) continue; // déjà présente, rien à faire
 
       // La séance test (estTest: true) utilise genererContenuTest(), pas
       // genererContenuQualite() — traitée séparément, sinon le garde-fou
@@ -1920,7 +1991,8 @@ function regenererStructuresIntervalles(plan) {
         alluresSec,
         restrictionsAllure: seance.restrictionsAllure,
         tauxAffutage: semaine.tauxAffutage ?? 1,
-        estDechargeSemaine: semaine.estDecharge ?? false
+        estDechargeSemaine: semaine.estDecharge ?? false,
+        nbApparitionsParSousType: { ...nbApparitionsParSousType, [seance.sousType]: Math.max(0, (nbApparitionsParSousType[seance.sousType] ?? 1) - 1) }
       });
 
       // Garde-fou : n'applique la structure que si le sous-type recalculé
