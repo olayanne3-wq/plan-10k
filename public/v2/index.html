@@ -2276,7 +2276,23 @@
       // scope explicite : ce service worker ne doit contrôler que /v2,
       // jamais v1 (racine) — cache et cycle de vie indépendants entre
       // les deux versions.
-      navigator.serviceWorker.register('/v2/sw.js', { scope: '/v2/' }).catch(() => {});
+      // Mécanisme de mise à jour forcée (même correctif que index.html,
+      // commit 507f304, jamais reproduit ici jusqu'au 11 juillet 2026) —
+      // Laurent signale un bouton "Copier le lien" introuvable sur son
+      // smartphone malgré plusieurs corrections poussées côté serveur : le
+      // vrai problème n'était pas le code lui-même, mais le service worker
+      // du wizard qui servait encore une ancienne version en cache, sans
+      // aucun mécanisme de détection/application forcée de mise à jour.
+      navigator.serviceWorker.register('/v2/sw.js', { scope: '/v2/' }).then(reg => {
+        reg.update();
+        setInterval(() => reg.update(), 60 * 60 * 1000);
+      }).catch(() => {});
+      let dejaRechargeV2 = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (dejaRechargeV2) return;
+        dejaRechargeV2 = true;
+        location.reload();
+      });
     });
   }
 </script>

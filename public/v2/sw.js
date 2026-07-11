@@ -1,4 +1,4 @@
-const CACHE = "plan10k-v2-v1";
+const CACHE = "plan10k-v2-v2";
 const ASSETS = ["/v2", "/v2/manifest.json"];
 
 self.addEventListener("install", e => {
