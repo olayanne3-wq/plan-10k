@@ -1756,6 +1756,22 @@
       msgEl.style.color = 'var(--signal)';
       return;
     }
+
+    // Fusion intelligente (même correctif que regenererAvecNouvelObjectif(),
+    // demandé par Laurent le 11 juillet 2026) : les semaines déjà PASSÉES
+    // gardent leur vrai contenu original — même sans changement de
+    // paramètres, une régénération complète pioche de nouvelles notes
+    // pratiques aléatoirement (injecterNotesPratiques), donc le texte des
+    // semaines déjà réalisées changerait sans raison à chaque analyse.
+    const semaineCharnierePropre = semaineActuelleOuProchaine(planActuel);
+    planPropre.semaines = planPropre.semaines.map(semaineNouvelle => {
+      if (semaineNouvelle.semaineNum < semaineCharnierePropre) {
+        const semaineAncienne = planActuel.semaines.find(s => s.semaineNum === semaineNouvelle.semaineNum);
+        return semaineAncienne || semaineNouvelle;
+      }
+      return semaineNouvelle;
+    });
+
     planPropre.id = planActuel.id;
     planPropre.nom = planActuel.nom;
     planPropre.statuses = planActuel.statuses;
@@ -1816,13 +1832,35 @@
       return;
     }
 
+    // Fusion intelligente (demandée par Laurent le 11 juillet 2026) : les
+    // semaines déjà PASSÉES (avant la semaine actuelle/prochaine) gardent
+    // leur vrai contenu original, seules les semaines à partir de la
+    // semaine actuelle sont remplacées par le nouveau plan régénéré.
+    // Avant cette correction, generatePlan() régénérait TOUT le plan de
+    // zéro, y compris les allures affichées sur des séances déjà faites —
+    // une séance déjà réalisée à l'ancienne allure objectif se voyait
+    // réafficher rétroactivement avec la nouvelle allure, une vraie
+    // incohérence avec ce que Laurent avait vraiment fait.
+    const semaineCharniere = semaineActuelleOuProchaine(plan);
+    nouveauPlan.semaines = nouveauPlan.semaines.map(semaineNouvelle => {
+      if (semaineNouvelle.semaineNum < semaineCharniere) {
+        const semaineAncienne = plan.semaines.find(s => s.semaineNum === semaineNouvelle.semaineNum);
+        return semaineAncienne || semaineNouvelle; // repli sur la nouvelle si l'ancien plan n'a pas cette semaine (rare)
+      }
+      return semaineNouvelle;
+    });
+    // allures/zoneFC restent celles du nouveau plan (dérivées de
+    // paramsOrigine, cohérentes avec les nouvelles semaines) — seul le
+    // contenu détaillé des semaines déjà passées est préservé tel quel.
+
     // Garder le même id (mise à jour en place si sauvegardé, pas de doublon),
-    // le nom éventuel, et repartir d'un suivi de complétion vierge — les
-    // statuts de l'ancien objectif n'ont plus vraiment de sens sur un plan
-    // dont les séances ont pu changer.
+    // le nom éventuel, et CONSERVER les statuts déjà enregistrés (plus de
+    // remise à zéro systématique) — cohérent avec la préservation du
+    // contenu des semaines passées : les statuts de ces séances gardent
+    // tout leur sens, puisque leur contenu n'a pas changé.
     nouveauPlan.id = plan.id;
     nouveauPlan.nom = plan.nom;
-    nouveauPlan.statuses = {};
+    nouveauPlan.statuses = plan.statuses || {};
     nouveauPlan.profilOrigine = plan.profilOrigine;
     nouveauPlan.paramsOrigine = nouveauxParams;
 
