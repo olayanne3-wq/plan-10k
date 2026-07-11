@@ -4531,7 +4531,26 @@ async function gistForceRestore() {
   } catch(e) { gistMsg="❌ Erreur restauration"; render(); setTimeout(()=>{gistMsg="";render();},3000); }
 }
 
-if (githubToken && gistId) {
+// Bug de fond trouvé le 11 juillet 2026 : ce mécanisme historique (restaurer
+// automatiquement les statuts depuis plan10k_backup.json, le Gist de
+// backup v1, conçu à l'époque pour un seul plan sans notion de multi-plans)
+// écrasait aveuglément statuses avec les vieux statuts globaux du backup
+// v1, dès que statuses était vide pour le plan affiché — peu importe le
+// vrai plan sélectionné. Laurent a créé un nouveau plan (septembre), vidé
+// manuellement ses statuts (localStorage.removeItem), et ce mécanisme les a
+// aussitôt réécrasés avec les statuts de SON AUTRE plan (juillet), présents
+// dans ce vieux Gist de backup. Confirmé : le Gist des plans v2 lui-même
+// (plan10k_v2_plans.json) contenait bien "statuses": {} pour le nouveau
+// plan, la contamination venait uniquement de ce mécanisme de restauration
+// historique.
+//
+// Corrigé : ce mécanisme ne s'applique plus que sur le plan de repli sans
+// vrai id (id === 'plan-repli-defaut', cf. commentaire section 7quater plus
+// haut dans ce fichier) — un vrai plan v2 (avec un id généré par
+// crypto.randomUUID()) n'a plus jamais ses statuts remplacés par ce vieux
+// mécanisme, sa vraie source de vérité étant exclusivement le Gist des
+// plans v2 (déjà correctement préfixé par plan.id).
+if (githubToken && gistId && window.__PLAN_BRUT__?.id === 'plan-repli-defaut') {
   const hasLocalData = Object.keys(statuses).length > 0 || stravaActivities.length > 0;
   if (!hasLocalData) {
     // Pas de données locales → restauration automatique
