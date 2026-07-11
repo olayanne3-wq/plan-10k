@@ -1,4 +1,4 @@
-import { generatePlan, regenererStructuresIntervalles } from './plan-generator.js';
+import { generatePlan, regenererStructuresIntervalles, genererContenuQualite, computeAllures } from './plan-generator.js';
 
 const profil = {
   niveau: 'intermediaire',
@@ -178,4 +178,39 @@ console.log(' pour chacun, en cherchant sur plusieurs distances pour être sûr 
     console.log(st + ' : debutant=' + v.debutant + ' intermediaire=' + v.intermediaire + ' confirme=' + v.confirme, ok ? 'OK' : 'ÉCHEC');
   });
   console.log('Tous les sous-types rencontrés respectent debutant < intermediaire < confirme :', tousOk ? 'OK' : 'ÉCHEC');
+}
+
+console.log('\n--- Structure pyramidale par niveau (v2.2, 11 juillet 2026) ---');
+console.log('(vérifié contre la littérature, runbikecalc.com : demi-pyramide (montée seulement)');
+console.log(' pour les débutants, pyramide complète (montée-descente) pour intermédiaire/confirmé —');
+console.log(' pyramidale n\'apparaît qu\'en toute fin de rotation (position 12/12), forcée ici en');
+console.log(' passant directement semaineDansPhase=11 plutôt qu\'en cherchant dans un vrai plan complet)');
+{
+  const alluresSecTest = computeAllures({
+    refTimeSeconds: 50*60+21, refDistanceKm: 10,
+    objectifTimeSeconds: 48*60+30, distanceCibleKm: 5
+  });
+  const resultats = {};
+  ['debutant', 'intermediaire', 'confirme'].forEach(niveau => {
+    const r = genererContenuQualite({
+      distance: '5K', phase: 'Specifique', semaineDansPhase: 11, indexQualiteSemaine: 0,
+      alluresSec: alluresSecTest, niveau
+    });
+    resultats[niveau] = r;
+  });
+  console.log('Débutant :', resultats.debutant.sousType, '-', resultats.debutant.contenu.match(/Pyramidale[^,]+/)?.[0]);
+  console.log('Intermédiaire :', resultats.intermediaire.sousType, '-', resultats.intermediaire.contenu.match(/Pyramidale[^,]+/)?.[0]);
+  console.log('Confirmé :', resultats.confirme.sousType, '-', resultats.confirme.contenu.match(/Pyramidale[^,]+/)?.[0]);
+
+  const tousPyramidale = ['debutant','intermediaire','confirme'].every(n => resultats[n].sousType === 'pyramidale');
+  console.log('Les 3 niveaux donnent bien le sous-type pyramidale :', tousPyramidale ? 'OK' : 'ÉCHEC');
+
+  const debutantEstDemiPyramide = resultats.debutant.contenu.includes('(montée)');
+  console.log('Débutant est bien une demi-pyramide (montée seulement) :', debutantEstDemiPyramide ? 'OK' : 'ÉCHEC');
+
+  const intermediaireInchange = resultats.intermediaire.contenu.includes('2-3-4-3-2min');
+  console.log('Intermédiaire reste inchangé (2-3-4-3-2min, non-régression) :', intermediaireInchange ? 'OK' : 'ÉCHEC');
+
+  const confirmeEstPlusLong = resultats.confirme.contenu.includes('2-3-4-5-4-3-2min');
+  console.log('Confirmé a une pyramide plus longue (2-3-4-5-4-3-2min) :', confirmeEstPlusLong ? 'OK' : 'ÉCHEC');
 }

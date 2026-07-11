@@ -1066,12 +1066,26 @@ function genererContenuQualite({ distance, phase, semaineDansPhase, indexQualite
       break;
     }
     case 'pyramidale': {
-      // Montée-descente classique en VMA — variété rare (1/12), les séances
-      // de base restent largement majoritaires dans la rotation
-      const paliers = [2, 3, 4, 3, 2];
+      // Structure par niveau (v2.2, 11 juillet 2026, demandé par Laurent) —
+      // vérifié contre la littérature (runbikecalc.com) : une demi-pyramide
+      // (montée seulement, sans redescendre) convient mieux aux débutants,
+      // une pyramide complète (montée-descente) aux niveaux intermédiaire/
+      // confirmé — le niveau confirmé va un cran plus loin (palier
+      // supplémentaire à 5min) qu'une pyramide "standard".
+      const PALIERS_PAR_NIVEAU = {
+        debutant:      [2, 3, 4],           // demi-pyramide, montée seulement
+        intermediaire: [2, 3, 4, 3, 2],      // pyramide complète (valeur historique, inchangée)
+        confirme:      [2, 3, 4, 5, 4, 3, 2],// pyramide complète plus longue
+      };
+      const paliers = PALIERS_PAR_NIVEAU[niveau] || PALIERS_PAR_NIVEAU.intermediaire;
+      // Demi-pyramide = montée strictement croissante jusqu'au bout, jamais
+      // de redescente — plus robuste que déduire ça des valeurs elles-mêmes
+      const estDemiPyramide = paliers.every((p, i) => i === 0 || p > paliers[i-1]);
       const totalMin = paliers.reduce((a, b) => a + b, 0);
       kmCorps = kmDepuisMinutes(totalMin, I); // récup ignorée dans l'estimation km (comme i-30-30/seuil-2min)
-      contenuCorps = `Pyramidale ${paliers.join('-')}min @ ${formatPace(I)} (VMA), récup égale au temps de l'effort`;
+      contenuCorps = estDemiPyramide
+        ? `Pyramidale (montée) ${paliers.join('-')}min @ ${formatPace(I)} (VMA), récup égale au temps de l'effort`
+        : `Pyramidale ${paliers.join('-')}min @ ${formatPace(I)} (VMA), récup égale au temps de l'effort`;
       structureIntervalles = { blocs: paliers.map(p => ({ repetitions: 1, dureeEffortSec: p*60, allure: formatPace(I), dureeRecupSec: p*60 })) };
       break;
     }
