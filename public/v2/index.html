@@ -972,31 +972,16 @@
         <button class="btn-mini" onclick="sauvegarderPlanUI()">Confirmer la sauvegarde</button>
         <div id="sauvegardeMsg" style="margin-top:8px; font-size:13px;"></div>
 
-        <!-- Synchronisation entre appareils via QR code — même principe que
-             le mécanisme déjà existant dans index.html (section
-             "Configurer sur un autre appareil"), plutôt que le système à 2
-             champs (token + code à copier-coller manuellement) tenté en
-             premier lieu le 7 juillet 2026. Laurent l'a trouvé trop
-             compliqué en usage réel (confusion entre les deux champs,
-             mauvaise valeur collée au mauvais endroit) — remplacé par un
-             lien unique encodant les deux informations, à scanner ou
-             ouvrir directement, sans manipulation manuelle. -->
-        <div style="margin-top:18px; padding-top:14px; border-top:1px solid rgba(238,240,234,0.12);">
-          <p class="sub" style="font-size:12px; margin-bottom:8px;">Synchroniser avec un autre appareil</p>
-          <button class="btn-mini" style="width:100%;" onclick="genererQrSyncV2()">📱 Générer le QR code</button>
-          <div id="qrSyncV2Container" style="display:flex; justify-content:center; margin-top:10px;"></div>
-          <!-- Bouton "Copier le lien" rendu STATIQUE (toujours présent dans le
-               HTML, pas créé dynamiquement en JS) — Laurent signale le 11
-               juillet 2026 : le QR code s'affichait bien, mais le bouton
-               "Copier le lien" (auparavant créé par appendChild() juste
-               après) n'apparaissait jamais visuellement sur son smartphone,
-               cause exacte non identifiée (pas d'accès aux outils
-               développeur mobile pour diagnostiquer). Plutôt que de
-               continuer à chercher la vraie cause sans pouvoir observer
-               l'erreur, le bouton est rendu statique pour éliminer
-               complètement ce risque, peu importe la cause réelle. -->
-          <button id="btnCopierLienSyncV2" class="btn-mini" style="width:100%; margin-top:10px; display:none;" onclick="copierLienSyncV2()">🔗 Copier le lien (si tu ne peux pas scanner)</button>
-        </div>
+        <!-- Synchronisation entre appareils retirée du wizard le 11 juillet
+             2026 — Laurent a demandé qu'il n'y ait plus qu'UN SEUL vrai
+             mécanisme de synchronisation, dans l'app principale (index.html,
+             section "Configurer sur un autre appareil"), pas un mécanisme
+             séparé et redondant ici. La confusion entre les deux
+             emplacements (Laurent cherchait le bouton "Copier le lien" dans
+             l'app principale, alors qu'il ne vivait que dans le wizard) a
+             révélé que deux mécanismes distincts pour synchroniser deux
+             Gists différents (v2_gist_id ici, lk_gist_id dans l'app) était
+             une vraie source de confusion, pas juste un défaut d'affichage. -->
       </div>
 
       <!-- Actions avancées : repliées par défaut, moins utilisées au quotidien -->
@@ -1622,75 +1607,24 @@
     }
   }
 
-  // Synchronisation entre appareils via QR code (même principe que le
-  // mécanisme déjà existant dans index.html) — encode token +
-  // gistId dans un lien unique, à scanner ou ouvrir directement. Paramètre
-  // gistV2 (pas gist, déjà utilisé par index.html pour un Gist de
-  // backup général différent, cf. docs/v2-methodologie/convergence-v1-v2.md).
-  let derniereUrlSyncV2 = null; // mémorisée pour le bouton "Copier le lien" statique
-
-  function genererQrSyncV2() {
-    const token = getGithubToken();
-    const gistId = getV2GistId();
-    if (!token || !gistId) {
-      alert("Sauvegarde d'abord un plan sur cet appareil avant de générer le QR code.");
-      return;
-    }
-    const url = window.location.origin + '/v2?token=' + encodeURIComponent(token) + '&gistV2=' + encodeURIComponent(gistId);
-    derniereUrlSyncV2 = url;
-    const qrDiv = document.getElementById('qrSyncV2Container');
-    qrDiv.innerHTML = '';
-    const img = document.createElement('img');
-    img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(url);
-    img.style.borderRadius = '8px';
-    qrDiv.appendChild(img);
-
-    // Bouton pour copier le LIEN texte, pas seulement l'image du QR code —
-    // nécessaire pour synchroniser vers un appareil qui ne peut pas scanner
-    // physiquement l'écran du premier (typiquement mobile -> PC, le PC
-    // n'ayant généralement pas de caméra orientée vers un écran de
-    // téléphone). Cas réel rencontré par Laurent le 7 juillet 2026 : sans
-    // ce bouton, seule l'URL de l'IMAGE du QR code (api.qrserver.com) était
-    // copiable en pratique, pas le lien de destination qu'elle encode.
-    //
-    // Rendu STATIQUE le 11 juillet 2026 (bouton déjà présent dans le HTML,
-    // juste affiché ici) plutôt que créé dynamiquement par appendChild() —
-    // Laurent signale que le bouton créé dynamiquement n'apparaissait
-    // jamais visuellement sur son smartphone, cause exacte non identifiée
-    // faute d'accès aux outils développeur mobile.
-    const btnCopierLien = document.getElementById('btnCopierLienSyncV2');
-    // DIAGNOSTIC TEMPORAIRE (11 juillet 2026) — Laurent signale que le
-    // bouton "Copier le lien" n'apparaît toujours pas malgré deux
-    // corrections précédentes (bouton statique, mise à jour forcée du
-    // service worker). alert() pour voir précisément ce qui se passe sur
-    // son vrai appareil, faute d'accès aux outils développeur mobile — à
-    // retirer une fois la cause trouvée.
-    alert('DIAGNOSTIC — bouton trouvé : ' + (btnCopierLien ? 'OUI' : 'NON') + (btnCopierLien ? ' (display actuel : "' + btnCopierLien.style.display + '")' : ''));
-    if (btnCopierLien) {
-      btnCopierLien.style.display = 'block';
-      btnCopierLien.textContent = '🔗 Copier le lien (si tu ne peux pas scanner)';
-    }
-  }
-
-  function copierLienSyncV2() {
-    if (!derniereUrlSyncV2) return;
-    const btnCopierLien = document.getElementById('btnCopierLienSyncV2');
-    navigator.clipboard?.writeText(derniereUrlSyncV2).then(() => {
-      if (btnCopierLien) btnCopierLien.textContent = '✅ Lien copié — colle-le dans le navigateur de l\'autre appareil';
-    }).catch(() => {
-      prompt('Copie ce lien manuellement :', derniereUrlSyncV2);
-    });
-  }
+  // Synchronisation entre appareils retirée du wizard le 11 juillet 2026 —
+  // Laurent a demandé qu'il n'y ait plus qu'UN SEUL vrai mécanisme, dans
+  // l'app principale (index.html), qui synchronise maintenant TOUT en un
+  // seul lien (token + lk_gist_id + v2_gist_id). Le wizard peut toujours
+  // recevoir token/gistV2 en paramètres d'URL si un lien généré par une
+  // ancienne version circule encore, mais ne génère plus lui-même de QR
+  // code/lien — cf. appliquerSyncDepuisUrl() ci-dessous, conservée pour la
+  // compatibilité de lecture uniquement.
 
   // Récupère token + gistV2 depuis l'URL si présents (lien ouvert depuis un
-  // QR code scanné sur un autre appareil) — même principe que le mécanisme
-  // équivalent dans index.html. Doit attendre que window.Engine soit
-  // chargé (événement engineReady) avant d'appeler setGithubToken/
-  // setV2GistId : ces wrappers font le lookup Engine.xxx au moment de
-  // l'appel, donc une exécution immédiate (avant que le <script
-  // type="module"> précédent n'ait fini de charger) planterait sur
-  // "Cannot read property of undefined" — même risque déjà documenté pour
-  // initialiserApresChargementEngine() un peu plus bas dans ce fichier.
+  // QR code scanné sur un autre appareil, généré par l'app principale
+  // maintenant). Doit attendre que window.Engine soit chargé (événement
+  // engineReady) avant d'appeler setGithubToken/setV2GistId : ces wrappers
+  // font le lookup Engine.xxx au moment de l'appel, donc une exécution
+  // immédiate (avant que le <script type="module"> précédent n'ait fini de
+  // charger) planterait sur "Cannot read property of undefined" — même
+  // risque déjà documenté pour initialiserApresChargementEngine() un peu
+  // plus bas dans ce fichier.
   function appliquerSyncDepuisUrl() {
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('token');

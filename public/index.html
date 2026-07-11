@@ -224,6 +224,10 @@ function clePourPlan(cle) {
 let view = "dashboard";
 let selectedWeek = 1;
 let statuses = load(clePourPlan("lk_statuses"), {});
+// Mémorise le dernier lien de synchro généré, pour le bouton "Copier le
+// lien" (section "Configurer sur un autre appareil", unifié le 11 juillet
+// 2026 pour synchroniser token + lk_gist_id + v2_gist_id en un seul lien).
+let derniereUrlSyncApp = null;
 let hiddenSessions = load(clePourPlan("lk_hidden_sessions"), {}); // {uid: true}
 let swappedSessions = load(clePourPlan("lk_swapped_sessions"), {}); // {uid: swapUid} swap bidirectionnel
 let notesList = load(clePourPlan("lk_notes"), []);
@@ -241,14 +245,18 @@ let githubToken = load("lk_github_token", "");
 let gistId = load("lk_gist_id", "");
 let gistMsg = "";
 
-// Récupérer token + gistId depuis l\'URL si présent
+// Récupérer token + gistId (+ gistV2, unifié le 11 juillet 2026 — Laurent
+// a demandé qu'un seul lien synchronise tout, plutôt que deux mécanismes
+// séparés dans deux fichiers différents) depuis l\'URL si présent
 (function() {
   const params = new URLSearchParams(window.location.search);
   const urlToken = params.get("token");
   const urlGist = params.get("gist");
+  const urlGistV2 = params.get("gistV2");
   if (urlToken) { githubToken = urlToken; save("lk_github_token", githubToken); }
   if (urlGist) { gistId = urlGist; save("lk_gist_id", gistId); }
-  if (urlToken || urlGist) { window.history.replaceState({}, "", window.location.pathname); }
+  if (urlGistV2 && typeof setV2GistId === "function") { setV2GistId(urlGistV2); }
+  if (urlToken || urlGist || urlGistV2) { window.history.replaceState({}, "", window.location.pathname); }
 })();
 let predHistory = load(clePourPlan("lk_pred_history"), []); // [{date, time, confidence}]
 
@@ -4298,23 +4306,52 @@ function renderSettings() {
   });
 
   // ── QR Code pour configurer un autre appareil ─────────────────────────────
+  // Unifié le 11 juillet 2026 (demandé par Laurent : "plus de V2, uniquement
+  // synchro sur l'app") — synchronise maintenant TOUT en un seul lien
+  // (token GitHub + lk_gist_id, le Gist de backup général v1/statuts/
+  // activités + v2_gist_id, le Gist des plans v2), plutôt que deux
+  // mécanismes séparés dans deux fichiers différents (celui-ci ne
+  // synchronisait auparavant que token+lk_gist_id, le wizard avait son
+  // propre mécanisme séparé pour v2_gist_id — source de vraie confusion,
+  // Laurent cherchait le bouton "Copier le lien" du wizard dans cette
+  // section-ci, où il n'avait jamais existé).
   const qrSection = el("div",{style:{marginBottom:"16px"}},
     el("div",{class:"label"},"📱 Configurer sur un autre appareil"),
     card(
-      el("div",{class:"muted",style:{fontSize:"14px",marginBottom:"10px"}},"Scanne ce QR code depuis ton smartphone pour transférer la configuration automatiquement."),
+      el("div",{class:"muted",style:{fontSize:"14px",marginBottom:"10px"}},"Scanne ce QR code depuis ton smartphone (ou ouvre le lien copié) pour transférer toute la configuration automatiquement."),
       el("div",{id:"qr-container",style:{display:"flex",justifyContent:"center",marginBottom:"10px"}}),
       el("button",{style:{width:"100%",background:"#f9731611",border:"1px solid #f9731633",borderRadius:"8px",padding:"8px",color:"#f97316",fontSize:"14px",fontWeight:"700",cursor:"pointer"},
+        feedback:true,
         onClick:()=>{
-          const url = window.location.origin + "/?token=" + encodeURIComponent(githubToken) + "&gist=" + encodeURIComponent(gistId);
+          const v2GistId = getV2GistId ? getV2GistId() : "";
+          const url = window.location.origin + "/?token=" + encodeURIComponent(githubToken) + "&gist=" + encodeURIComponent(gistId) + (v2GistId ? "&gistV2=" + encodeURIComponent(v2GistId) : "");
+          derniereUrlSyncApp = url;
           const qrDiv = document.getElementById("qr-container");
           qrDiv.innerHTML = "";
-          // Utiliser l\'API QR code Google
           const img = document.createElement("img");
           img.src = "https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=" + encodeURIComponent(url);
           img.style.borderRadius = "8px";
           qrDiv.appendChild(img);
+          const btnCopier = document.getElementById("btnCopierLienSyncApp");
+          if (btnCopier) { btnCopier.style.display = "block"; btnCopier.textContent = "🔗 Copier le lien (si tu ne peux pas scanner)"; }
         }
-      },"📱 Générer le QR code")
+      },"📱 Générer le QR code"),
+      // Bouton "Copier le lien" STATIQUE (présent dès le départ dans le
+      // HTML, pas créé dynamiquement) — leçon retenue du même défaut trouvé
+      // côté wizard le 11 juillet 2026 (commit ea28a91) : un bouton créé
+      // par appendChild() n'apparaissait pas de façon fiable sur mobile.
+      el("button",{id:"btnCopierLienSyncApp",style:{width:"100%",marginTop:"8px",background:"none",border:"1px solid #2e3347",borderRadius:"8px",padding:"8px",color:"#94a3b8",fontSize:"14px",fontWeight:"600",cursor:"pointer",display:"none"},
+        feedback:true,
+        onClick:()=>{
+          if (!derniereUrlSyncApp) return;
+          const btnCopier = document.getElementById("btnCopierLienSyncApp");
+          navigator.clipboard?.writeText(derniereUrlSyncApp).then(()=>{
+            if (btnCopier) btnCopier.textContent = "✅ Lien copié — colle-le dans le navigateur de l'autre appareil";
+          }).catch(()=>{
+            prompt("Copie ce lien manuellement :", derniereUrlSyncApp);
+          });
+        }
+      },"🔗 Copier le lien (si tu ne peux pas scanner)")
     )
   );
 
