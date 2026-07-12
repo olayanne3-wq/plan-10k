@@ -835,10 +835,10 @@ function construireSessionTargets() {
   const specSec = parseAllure(allures?.C, 294); // 294 = milieu de 291-298 (arrondi)
 
   return {
-    VMA:   { targetMin:Math.round(vmaSec-8),  targetMax:Math.round(vmaSec+7),  okPace:Math.round(vmaSec+12), warnPace:Math.round(vmaSec+32), repOk:0.80, repWarn:0.60, effort:formatPace(vmaSec-8)+"–"+formatPace(vmaSec+7)+"/km", tolerance:"±10 sec", recup:"≥ 6:00/km" },
-    SPEC:  { targetMin:Math.round(specSec-3), targetMax:Math.round(specSec+4), okPace:Math.round(specSec+4),  warnPace:Math.round(specSec+16), repOk:0.80, repWarn:0.60, effort:formatPace(specSec)+"/km", tolerance:"±7 sec",  recup:"≥ 6:00/km" },
-    SEUIL: { targetMin:Math.round(seuilSec-5),targetMax:Math.round(seuilSec+5),okPace:Math.round(seuilSec+5), warnPace:Math.round(seuilSec+20),repOk:null, repWarn:null,  effort:formatPace(seuilSec)+"/km", tolerance:"±10 sec", recup:"≥ 6:00/km" },
-    TEST:  { targetMin:Math.round(specSec-3), targetMax:Math.round(specSec+4), okPace:Math.round(specSec+4),  warnPace:Math.round(specSec+16), repOk:0.80, repWarn:0.60, effort:formatPace(specSec)+"/km", tolerance:"±7 sec",  recup:"≥ 6:00/km" },
+    VMA:   { targetMin:Math.round(vmaSec-8),  targetMax:Math.round(vmaSec+7),  okPace:Math.round(vmaSec+12), warnPace:Math.round(vmaSec+32), repOk:0.80, repWarn:0.60, effort:formatPace(vmaSec-8)+"–"+formatPace(vmaSec+7), tolerance:"±10 sec", recup:"≥ 6:00/km" },
+    SPEC:  { targetMin:Math.round(specSec-3), targetMax:Math.round(specSec+4), okPace:Math.round(specSec+4),  warnPace:Math.round(specSec+16), repOk:0.80, repWarn:0.60, effort:formatPace(specSec), tolerance:"±7 sec",  recup:"≥ 6:00/km" },
+    SEUIL: { targetMin:Math.round(seuilSec-5),targetMax:Math.round(seuilSec+5),okPace:Math.round(seuilSec+5), warnPace:Math.round(seuilSec+20),repOk:null, repWarn:null,  effort:formatPace(seuilSec), tolerance:"±10 sec", recup:"≥ 6:00/km" },
+    TEST:  { targetMin:Math.round(specSec-3), targetMax:Math.round(specSec+4), okPace:Math.round(specSec+4),  warnPace:Math.round(specSec+16), repOk:0.80, repWarn:0.60, effort:formatPace(specSec), tolerance:"±7 sec",  recup:"≥ 6:00/km" },
   };
 }
 const SESSION_TARGETS = construireSessionTargets();
@@ -2919,7 +2919,7 @@ function renderStats() {
   // "6:20" codée en dur (bug trouvé le 7 juillet 2026, même famille que
   // les autres résidus de cette session). Repli "6:20" si absente
   // (compatibilité avec un plan sans cette donnée).
-  const alluresEF = window.__PLAN_BRUT__?.allures?.E || "6:20";
+  const alluresEF = window.__PLAN_BRUT__?.allures?.E || "6:20/km";
   const chaleurEF = (() => {
     const allureStr = window.__PLAN_BRUT__?.allures?.E; // ex. "6:10/km"
     if (!allureStr) return "6:40"; // repli historique
@@ -3208,7 +3208,7 @@ function renderStats() {
           el("div",{class:"muted",style:{fontSize:"13px"}},r.heat?"Chaud : "+r.heat:SESSION_TARGETS[r.type]?"Tolérance "+SESSION_TARGETS[r.type].tolerance:"—")
         ),
         el("div",{style:{textAlign:"right"}},
-          el("div",{style:{color:r.color,fontSize:"15px",fontWeight:"700"}},r.pace+"/km"),
+          el("div",{style:{color:r.color,fontSize:"15px",fontWeight:"700"}},r.pace),
           el("div",{class:"muted",style:{fontSize:"13px"}},r.fc+" bpm")
         )
       ))
