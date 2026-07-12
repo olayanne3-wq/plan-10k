@@ -506,6 +506,20 @@ function globalPct() {
 }
 function phaseOf(weekNum) { return PHASES.find(p=>p.weeks.includes(weekNum))||{color:"#e2e8f0",label:""}; }
 
+// Identifie si une semaine est une semaine de décharge — champ produit par
+// le moteur v2 (estDechargeSemaine, cf. v2/engine/plan-generator.js) et
+// présent dans le plan brut mais PAS dans PLAN/ALL_SESSIONS (format traduit
+// v1, qui ne connaît que volumeCibleKm/allures/statuts par séance). Repli
+// silencieux à false si absent (plan généré avant l'introduction du champ,
+// ou __PLAN_BRUT__ pas encore chargé) — ne doit jamais faire planter le
+// rendu de l'onglet Semaines.
+function estSemaineDecharge(weekNum) {
+  const semaines = window.__PLAN_BRUT__?.semaines;
+  if (!semaines) return false;
+  const semaine = semaines.find(s => s.semaineNum === weekNum);
+  return !!semaine?.estDechargeSemaine;
+}
+
 // ── Projections Riegel multi-distances ────────────────────────────────────
 function riegelProjections(timeSurDistanceActuelle) {
   // La distance mise en avant (target: true) doit correspondre à la vraie
@@ -2374,14 +2388,17 @@ function renderWeeks() {
   return el("div",{style:{padding:"0 16px 100px"}},
     el("div",{style:{marginTop:"8px",marginBottom:"12px",color:"#e2e8f0",fontSize:"14px"}},"Semaine actuelle : ",el("span",{style:{color:"#f97316",fontWeight:"700"}},"S"+cw)),
     ...PLAN.map(week=>{
-      const pct=weekPct(week), isActive=week.week===cw, color=phaseOf(week.week).color;
+      const pct=weekPct(week), isActive=week.week===cw, color=phaseOf(week.week).color, decharge=estSemaineDecharge(week.week);
       const b=el("button",{style:{width:"100%",background:isActive?"#232738":"#1a1d27",border:`1px solid ${isActive?"#f9731655":"#2e3347"}`,borderLeft:`3px solid ${color}`,borderRadius:"10px",padding:"12px 14px",marginBottom:"8px",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"12px"}},
         el("div",{style:{textAlign:"center",minWidth:"36px"}},
           el("div",{style:{color,fontSize:"18px",fontWeight:"800",lineHeight:"1"}},"S"+week.week),
           isActive?el("div",{style:{color:"#f97316",fontSize:"13px",fontWeight:"700"}},"NOW"):null
         ),
         el("div",{style:{flex:"1"}},
-          el("div",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"600"}},phaseOf(week.week).label),
+          el("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
+            el("div",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"600"}},phaseOf(week.week).label),
+            decharge?el("span",{class:"pill",style:{background:"#f9731622",color:"#f97316"}},"Décharge"):null
+          ),
           el("div",{class:"muted",style:{fontSize:"13px",marginTop:"2px"}},fmtDate(week.sessions[0].date)+" → "+fmtDate(week.sessions[6].date)),
           el("div",{style:{height:"3px",background:"#232738",borderRadius:"2px",marginTop:"6px",marginBottom:"6px"}},
             el("div",{style:{height:"100%",width:pct+"%",background:color,borderRadius:"2px"}})
