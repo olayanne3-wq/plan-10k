@@ -2,7 +2,7 @@
 
 > Vue d'ensemble de référence — à relire en début de session pour retrouver le contexte
 > sans re-parcourir tout le repo. Mis à jour au 13 juillet 2026 (chantier ACWR en cours ;
-> harmonisation visuelle app/wizard).
+> harmonisation visuelle app/wizard ; badge décharge onglet Semaines).
 > Pour l'historique des décisions et le "pourquoi", voir les autres docs de ce dossier
 > (bibliotheque-seances.md, convergence-v1-v2.md, etc.) et les mémoires de session.
 >
@@ -96,7 +96,12 @@ Fonctions de rendu principales (`render*`) :
 
 - `renderSelecteurPlan` — sélection entre plusieurs plans actifs
 - `renderDashboard` — écran d'accueil, résumé de la semaine
-- `renderWeeks` / `renderWeekDetail` — vue calendrier et détail d'une semaine
+- `renderWeeks` / `renderWeekDetail` — vue calendrier et détail d'une semaine.
+  `renderWeeks` (liste repliée par semaine) affiche depuis le 13 juillet 2026 un
+  badge "Décharge" (pill orange, style cohérent avec `.pill` déjà défini en CSS
+  global) à côté du libellé de phase, quand `estSemaineDecharge(weekNum)` est
+  vraie. Le numéro de semaine ("S{n}") de chaque onglet replié était déjà coloré
+  selon la couleur de phase (`phaseOf(week.week).color`) — confirmé, pas modifié.
 - `renderStatusRow`, `showSessionMenu`, `showMoveMenu`, `showRestoreMenu` — gestion
   des séances (statut fait/raté, déplacement, restauration)
 - `renderStats` — statistiques
@@ -195,6 +200,17 @@ zones FC (`computeFcMaxTanaka`, `computeZonesFC`), jalons de transition entre ph
 notes pratiques et repères de ressenti injectés dans les séances, cohérence de la
 semaine test.
 
+**Semaines de décharge** — chaque semaine du plan brut porte un champ booléen
+`estDechargeSemaine` (`window.__PLAN_BRUT__.semaines[i].estDechargeSemaine`,
+indexé par `semaineNum`). Déjà affiché côté wizard (`.decharge-tag`, orange
+`--signal`). Ce champ n'existe PAS dans `PLAN`/`ALL_SESSIONS` (format traduit
+v1 consommé par `index.html` — ne connaît que `volumeCibleKm`/allures/statuts
+par séance) : toute lecture côté app doit repasser par `__PLAN_BRUT__.semaines`,
+même pattern déjà utilisé pour `raceName`/`zoneFC`/etc. (cf. §2, commentaire du
+chargement du plan). Helper ajouté le 13 juillet 2026 : `estSemaineDecharge(weekNum)`
+(juste après `phaseOf`), repli silencieux à `false` si `__PLAN_BRUT__` ou le
+champ est absent (plans générés avant l'introduction du champ).
+
 ## 8. Intégrations externes
 
 **Strava** (Client ID `260339`)
@@ -240,6 +256,7 @@ géré par `v2/engine/gist-sync.js` (`chargerPlans`, `sauvegarderPlan`,
 | Dé-duplication moteur/classic (`type="module"`) | ⏸️ Reporté — trop risqué à chaud |
 | ACWR (Acute:Chronic Workload Ratio) | 🟡 En cours (13 juillet) — moteur + graphique Stats codés, intégration dashboard (analyserAdaptations) reportée |
 | Harmonisation visuelle app/wizard (titre + aide dans le header) | ✅ Clos (13 juillet) |
+| Badge "Décharge" dans l'onglet Semaines (`renderWeeks`) | ✅ Clos (13 juillet) |
 | Rework présentation wizard | 🔜 À revalider avec Laurent |
 | v2.5 commercialisation (Supabase, Stripe, multi-user) | 🔜 Architecture décidée, pas codée |
 
