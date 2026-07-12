@@ -4761,7 +4761,16 @@ async function syncStrava() {
   try {
     syncMsg="Récupération des activités..."; render();
     const intervalDates = [...INTERVAL_SESSION_DATES].join(",");
-    const planStart = PLAN[0].sessions[0].date;
+    // L'ACWR (section Stats, 13 juillet 2026) a besoin d'au moins 28 jours
+    // d'historique, idéalement 8 semaines pour le graphique — on ne peut pas
+    // se limiter à la date de début du plan actuel (un plan qui vient de
+    // démarrer aurait alors trop peu de recul pour calculer une charge
+    // chronique complète). On demande donc le plus ancien entre le début du
+    // plan et 8 semaines en arrière.
+    const huitSemainesAvant = new Date();
+    huitSemainesAvant.setDate(huitSemainesAvant.getDate() - 8 * 7);
+    const huitSemainesStr = huitSemainesAvant.toISOString().slice(0, 10);
+    const planStart = PLAN[0].sessions[0].date < huitSemainesStr ? PLAN[0].sessions[0].date : huitSemainesStr;
     const resp = await fetch(`/api/strava/activities?token=${stravaToken}&interval_dates=${intervalDates}&plan_start=${planStart}`);
     const activities = await resp.json();
     if (Array.isArray(activities)) {
