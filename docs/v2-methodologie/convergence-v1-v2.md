@@ -353,7 +353,7 @@ Repère pour reprendre le travail sans avoir à fouiller l'historique git.
 
 **Copie de travail v1 + preview** :
 - `public/index-v2-preview.html` — copie de `index.html` branchée sur le moteur v2 via `v1-bridge.js`. **`index.html` (l'outil réel de Laurent) n'est pas touché.**
-- `public/v2-preview-scripts/plan-generator.classic.js` et `v1-bridge.classic.js` — copies dérivées des modules ES ci-dessus, `export` retirés, pour un chargement en scripts classiques (cf. section 6, décision technique sur le timing). **Pas une source de vérité : à régénérer depuis les fichiers `engine/` si le moteur évolue**, ex. `sed 's/^export //' public/v2/engine/plan-generator.js > public/v2-preview-scripts/plan-generator.classic.js`
+- `public/engine-classic-scripts/plan-generator.classic.js` et `v1-bridge.classic.js` — copies dérivées des modules ES ci-dessus, `export` retirés, pour un chargement en scripts classiques (cf. section 6, décision technique sur le timing). **Pas une source de vérité : à régénérer depuis les fichiers `engine/` si le moteur évolue**, ex. `sed 's/^export //' public/v2/engine/plan-generator.js > public/engine-classic-scripts/plan-generator.classic.js`
 
 **API météo** :
 - `api/weather.js` — endpoint serverless, proxy vers Open-Meteo (route déclarée dans `vercel.json`, ne pas oublier en cas de nouvel endpoint : cf. bug déjà rencontré sur ce point précis dans la session)
@@ -372,7 +372,7 @@ Repère pour reprendre le travail sans avoir à fouiller l'historique git.
 
 Ces choix ont déjà été débattus et tranchés avec de bonnes raisons — les reprendre à zéro sans ce contexte risquerait de refaire le même chemin :
 
-- **Scripts classiques, pas modules ES, dans `index-v2-preview.html`** : presque tout le script existant lit `PLAN` dès le chargement (pas seulement sur clic), contrairement à v2/index.html. Un chargement en modules ES (asynchrone) aurait un risque de timing bien plus large — potentiellement tout le dashboard cassé, pas juste une fonctionnalité isolée. D'où la duplication assumée en `v2-preview-scripts/`.
+- **Scripts classiques, pas modules ES, dans `index-v2-preview.html`** : presque tout le script existant lit `PLAN` dès le chargement (pas seulement sur clic), contrairement à v2/index.html. Un chargement en modules ES (asynchrone) aurait un risque de timing bien plus large — potentiellement tout le dashboard cassé, pas juste une fonctionnalité isolée. D'où la duplication assumée en `engine-classic-scripts/`.
 - **Fidélité du plan v2 aux "grandes masses", pas jour par jour** : le moteur reste générique, ne doit pas recoder les spécificités du plan personnel de Laurent. Conséquence acceptée : la prédiction de performance ne doit plus dépendre d'une correspondance stricte de date avec le plan (cf. section 6).
 - **Détection du type d'effort par allure réelle, pas par correspondance au plan** : à la fois pour la prédiction (section 6) et implicitement pour tout futur usage similaire — un plan affiché n'est jamais une garantie de ce qui a été réellement couru ce jour-là.
 - **Garde-fou par comparaison à `BASE_TIME`, pas à la médiane des autres sources** : avec seulement 2 sources, la médiane ne peut jamais détecter d'aberration (elle vaut leur moyenne, chaque valeur en est mécaniquement à égale distance).
