@@ -2042,6 +2042,11 @@
     el.classList.add('selected');
     currentDist = el.dataset.dist;
     applyDistanceMeta();
+    // Recalcule le meilleur record selon la nouvelle distance visée (v2.3,
+    // 12 juillet 2026) — ex. si Laurent bascule de 10K vers Semi, le champ
+    // du temps de référence doit refléter le bon record (ou la bonne
+    // estimation Riegel), pas rester sur celui de l'ancienne distance.
+    if (typeof preremplirDepuisProfilCoureur === 'function') preremplirDepuisProfilCoureur();
   }
 
   function applyDistanceMeta(){
@@ -2241,6 +2246,64 @@
   renderStartQuickOptions();
   setDefaultRaceDate();
   updateConstraintSummary();
+
+  // Pré-remplissage depuis le profil coureur global (v2.3, 12 juillet 2026,
+  // partie 2 — la partie 1, côté app principale, a construit le vrai
+  // profilCoureur unifié avec des records par distance) — le wizard n'a
+  // plus besoin de redemander année de naissance/FC max/temps de référence
+  // à chaque nouveau plan, en pré-remplissant depuis ce profil sauvegardé.
+  //
+  // Choix du record le plus pertinent (décision actée le 11 juillet 2026) :
+  // automatique, le plus proche de la distance visée par CE plan — avec
+  // repli sur le record le plus proche disponible + conversion Riegel
+  // (déjà dans le moteur) si aucun record exact n'existe pour cette
+  // distance, en signalant clairement que c'est une estimation.
+  const ORDRE_PROXIMITE_DISTANCE = {
+    '5K': ['5K','10K','Semi','Marathon'],
+    '10K': ['10K','5K','Semi','Marathon'],
+    'Semi': ['Semi','10K','Marathon','5K'],
+    'Marathon': ['Marathon','Semi','10K','5K'],
+  };
+  const KM_PAR_DISTANCE_WIZARD = { '5K':5, '10K':10, 'Semi':21.0975, 'Marathon':42.195 };
+
+  function preremplirDepuisProfilCoureur() {
+    if (!window.Engine) return; // pas encore chargé, l'appel via engineReady réessaiera
+    let profil;
+    try { profil = JSON.parse(localStorage.getItem('lk_profil_coureur')); } catch { profil = null; }
+    if (!profil) return;
+
+    if (profil.anneeNaissance) document.getElementById('birthYear').value = profil.anneeNaissance;
+    if (profil.fcMax) document.getElementById('fcMaxConnue').value = profil.fcMax;
+
+    const distanceViseeActuelle = currentDist === '5' ? '5K' : currentDist === '10' ? '10K' : currentDist === '21.1' ? 'Semi' : 'Marathon';
+    const ordre = ORDRE_PROXIMITE_DISTANCE[distanceViseeActuelle] || ORDRE_PROXIMITE_DISTANCE['10K'];
+    const distanceAvecRecord = ordre.find(d => profil.records?.[d]?.temps);
+    if (!distanceAvecRecord) return; // aucun record connu du tout, laisse les vraies valeurs par défaut du wizard
+
+    const recordSource = profil.records[distanceAvecRecord];
+    let tempsAUtiliserSec = Engine.parseTimeToSeconds(recordSource.temps);
+    if (distanceAvecRecord !== distanceViseeActuelle) {
+      // Pas de record exact pour la distance visée par CE plan : conversion
+      // Riegel depuis le record le plus proche disponible, avec un vrai
+      // message explicite pour que Laurent sache que c'est une estimation,
+      // pas sa vraie performance mesurée sur cette distance précise.
+      tempsAUtiliserSec = Math.round(Engine.riegelPredict(tempsAUtiliserSec, KM_PAR_DISTANCE_WIZARD[distanceAvecRecord], KM_PAR_DISTANCE_WIZARD[distanceViseeActuelle]));
+      const noteEstimation = document.getElementById('refHelpText');
+      if (noteEstimation) noteEstimation.textContent = `Estimé depuis ton record ${distanceAvecRecord} (${recordSource.temps}) — corrige si besoin, c'est une estimation.`;
+    }
+    const h = Math.floor(tempsAUtiliserSec/3600), m = Math.floor((tempsAUtiliserSec%3600)/60), s = tempsAUtiliserSec%60;
+    if (h > 0) { document.getElementById('tHour').value = h; }
+    document.getElementById('tMin').value = m;
+    document.getElementById('tSec').value = s;
+    if (typeof updatePaceHelper === 'function') updatePaceHelper();
+  }
+  preremplirDepuisProfilCoureur();
+  if (!window.Engine) {
+    // window.Engine pas encore chargé à ce point précis (risque de timing
+    // documenté ailleurs dans ce fichier, cf. initialiserApresChargementEngine) —
+    // réessaie une fois l'événement engineReady émis.
+    document.addEventListener('engineReady', preremplirDepuisProfilCoureur, { once: true });
+  }
 
   // Restaure l'étape du wizard si elle a été persistée (ex: juste avant un
   // rechargement forcé par le retour OAuth Strava) — évite de renvoyer
