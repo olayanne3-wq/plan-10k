@@ -1,9 +1,15 @@
 # Inventaire de l'application "Run by Léa"
 
 > Vue d'ensemble de référence — à relire en début de session pour retrouver le contexte
-> sans re-parcourir tout le repo. Mis à jour au 13 juillet 2026 (chantier ACWR en cours).
+> sans re-parcourir tout le repo. Mis à jour au 13 juillet 2026 (chantier ACWR en cours ;
+> harmonisation visuelle app/wizard).
 > Pour l'historique des décisions et le "pourquoi", voir les autres docs de ce dossier
 > (bibliotheque-seances.md, convergence-v1-v2.md, etc.) et les mémoires de session.
+>
+> ⚠️ **Cet inventaire doit être mis à jour à chaque push** — voir §10, principe
+> "Inventaire à jour". Un push qui change la structure, les écrans, les clés de
+> stockage, les intégrations ou l'état des chantiers sans mettre à jour ce fichier
+> est incomplet.
 
 ## 1. Vue d'ensemble
 
@@ -67,6 +73,22 @@ modification du moteur doit être répercutée à la main dans les deux — déj
 d'oublis. Piste propre identifiée (convertir `index.html` en `type="module"`) jugée
 trop risquée pour une intervention à chaud (fichier ~5000 lignes) ; reportée à une
 session dédiée avec tests approfondis.
+
+**Harmonisation visuelle app/wizard** (13 juillet 2026) : les variables CSS du
+wizard (`--ink`, `--ink-soft`, `--paper`, `--line` dans `v2/index.html`)
+correspondaient déjà exactement à la palette codée en dur dans `index.html`
+(`#0f1117`/`#1a1d27`/`#f1f5f9`/`#2e3347`) — aucun changement de couleur nécessaire.
+Le bandeau du wizard (logo + "Run by Léa", ajouté le 8 juillet, commit 83cb4f0)
+a été complété avec :
+- un sous-titre "CONCEPTION DE PLAN" (orange `--signal`, sous le titre principal),
+  pour distinguer clairement le wizard du dashboard ;
+- un bouton aide `?` en haut à droite du bandeau, visuellement identique au
+  `helpBtn` de `index.html` (même style, mêmes dimensions 26px) ;
+- une modale d'aide propre au wizard (pas un lien vers `renderHelp()` de l'app,
+  inaccessible depuis `v2/index.html` — pages séparées, pas de routage entre
+  les deux) : 4 questions ciblées sur le fonctionnement du wizard lui-même
+  (objet de l'assistant, navigation arrière, persistance des réponses en cours
+  de route, où trouver l'aide complète une fois le plan généré).
 
 ## 4. Écrans de l'app principale (`index.html`)
 
@@ -217,11 +239,24 @@ géré par `v2/engine/gist-sync.js` (`chargerPlans`, `sauvegarderPlan`,
 | Connecteur MCP GitHub custom (remplacer PAT) | ❌ Abandonné (12 juillet) — OAuth App trop lourd pour l'usage |
 | Dé-duplication moteur/classic (`type="module"`) | ⏸️ Reporté — trop risqué à chaud |
 | ACWR (Acute:Chronic Workload Ratio) | 🟡 En cours (13 juillet) — moteur + graphique Stats codés, intégration dashboard (analyserAdaptations) reportée |
+| Harmonisation visuelle app/wizard (titre + aide dans le header) | ✅ Clos (13 juillet) |
 | Rework présentation wizard | 🔜 À revalider avec Laurent |
 | v2.5 commercialisation (Supabase, Stripe, multi-user) | 🔜 Architecture décidée, pas codée |
 
 ## 10. Principes transverses à retenir
 
+- **Inventaire à jour à chaque push** — toute modification poussée sur le repo qui
+  change la structure des fichiers, les écrans, les clés de stockage, les
+  intégrations externes, le pipeline du moteur ou l'état d'un chantier doit
+  s'accompagner d'une mise à jour de ce fichier (`inventaire-application.md`)
+  dans le même push. Objectif : ce document reste la référence fiable à relire
+  en début de session, sans dérive par rapport au code réel. Un push qui laisse
+  l'inventaire obsolète est considéré incomplet, au même titre qu'un push qui
+  casserait la syntaxe JS.
+  Mécanique retenue avec Claude (13 juillet 2026) : dès qu'un fichier destiné à
+  être poussé sur GitHub est fourni en sortie de conversation, l'inventaire mis
+  à jour est fourni avec, sans que l'utilisateur ait à le redemander — pas
+  besoin de signaler explicitement qu'un push a eu lieu.
 - **Prefixage des données de plan** obligatoire (`clePourPlan()`) — clé globale non
   préfixée = risque de contamination inter-plans.
 - **Un seul variable modifiée à la fois** pour la progressive overload (raison de la
