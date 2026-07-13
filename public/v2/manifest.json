@@ -1,9 +1,9 @@
 {
-  "name": "Run by Léa (v2)",
-  "short_name": "Run by Léa v2",
+  "name": "Run by Léa",
+  "short_name": "Run by Léa",
   "description": "Ton coach running personnel pour préparer ta course — v2",
   "start_url": "/v2",
-  "scope": "/v2",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0f1117",
   "theme_color": "#f97316",
