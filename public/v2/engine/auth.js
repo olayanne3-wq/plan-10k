@@ -200,10 +200,20 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
     });
 
     // Session déjà active au chargement (retour utilisateur) : on
-    // saute directement l'écran, sans attendre d'action.
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) debloquer(user);
-    });
+    // saute directement l'écran, sans attendre d'action. SAUF si l'URL
+    // contient un token de recovery (#access_token=...&type=recovery) —
+    // dans ce cas, on laisse le listener PASSWORD_RECOVERY ci-dessous
+    // gérer l'affichage du formulaire de nouveau mot de passe, plutôt
+    // que de débloquer directement sur une session déjà active (bug
+    // découvert en PWA installée le 13 juillet 2026 : getUser() se
+    // résolvait plus vite que le SDK ne traite le fragment d'URL,
+    // débloquant sur le dashboard sans jamais montrer le formulaire).
+    const estRetourRecovery = window.location.hash.includes('type=recovery');
+    if (!estRetourRecovery) {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) debloquer(user);
+      });
+    }
 
     // Retour depuis le lien "mot de passe oublié" — Supabase déclenche
     // PASSWORD_RECOVERY plutôt qu'une session normale. Ajouté le 13
