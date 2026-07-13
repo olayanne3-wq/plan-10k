@@ -6,7 +6,8 @@
 > authentification Supabase, migration rétroactive, sync temps réel, wizard protégé,
 > nettoyage Réglages, variables d'env Vercel, file d'attente de sync ; **publication
 > Play Store en cours**, voir §11 ; **chantier Mode Forme (v2.6) démarré** — moteur
-> `plan-forme.js` codé et testé, câblage wizard/index.html restant, voir §12).
+> `plan-forme.js` codé et testé, câblage wizard/index.html restant, voir §12 ;
+> **bug TWA duplication de tâches résolu**, voir §13).
 > Pour l'historique des décisions et le "pourquoi", voir les autres docs de ce dossier
 > (bibliotheque-seances.md, convergence-v1-v2.md, etc.) et les mémoires de session.
 >
@@ -861,3 +862,72 @@ Laurent le 13 juillet 2026). Cadrage discuté et validé avant codage :
 - Volume hebdo actuel et jours disponibles : à réutiliser tels quels depuis
   le wizard existant (Strava déjà générique, cf. arborescence ci-dessus) —
   pas de nouveau composant à créer, juste à câbler sur la branche Forme.
+
+## 13. Bug TWA — duplication de tâches à la navigation vers /v2 (résolu)
+
+**Symptôme** (signalé le 13 juillet 2026, pendant la session mode Forme) :
+sur l'app Android installée (TWA), chaque navigation vers "configuration de
+plan" (`/v2`) ouvrait une **nouvelle tâche** dans le multitâche du
+téléphone (plusieurs cartes "Run by Léa" visuellement identiques
+s'accumulaient), et le système proposait systématiquement "ouvrir avec
+Chrome" au lieu de rester dans l'app.
+
+**Fausses pistes explorées avant la vraie cause** (utiles à documenter pour
+ne pas les re-tester inutilement si un symptôme similaire réapparaît) :
+- **`v2/manifest.json` avait un `scope`/`name` différents de la racine**
+  (`scope: "/v2"` vs `"/"`, `name: "Run by Léa (v2)"` vs `"Run by Léa"`) —
+  corrigé (alignés sur la racine), déployé, mais n'a pas résolu le
+  problème seul. Le correctif reste appliqué et légitime (cohérence
+  générale), juste insuffisant.
+- **WebAPK Chrome fantôme** (`org.chromium.webapk.afd89bd65879efa80_v2`) —
+  un second package Chrome, distinct du TWA, revendiquait aussi
+  `plan-10k-alpha.vercel.app` (signature différente). Désinstallé via
+  `adb uninstall org.chromium.webapk.afd89bd65879efa80_v2` — a nettoyé un
+  vrai conflit potentiel mais n'était pas non plus la cause du symptôme
+  observé (confirmé via `pm get-app-links` et `dumpsys package
+  domain-preferred-apps` après coup : un seul revendicateur restant, bug
+  toujours présent).
+- **`launchHandlerClientMode` vide dans `twa-manifest.json`** — changé en
+  `"navigate-existing"`, rebuild complet (Bubblewrap → échec de signature
+  automatique `BadPaddingException`, contournement habituel par signature
+  manuelle `apksigner.jar`, réinstallation via `adb uninstall`/`adb
+  install`). N'a pas résolu le problème non plus. Le changement reste
+  appliqué (bonne pratique générale pour un TWA), sans effet sur ce bug
+  précis.
+
+**Vraie cause** : dans `public/index.html`, fonction `renderSelecteurPlan()`
+(dashboard), le bouton "🏁 Configurer un plan" était un `<a href="/v2"
+target="_blank">`. `target="_blank"` force Android à traiter la navigation
+comme **externe** au TWA plutôt qu'interne, ce qui déclenche à la fois le
+choix d'application ("ouvrir avec Chrome") et l'ouverture d'une nouvelle
+tâche à chaque clic.
+
+**Origine de cet attribut** : ajouté le 8 juillet 2026 (commit antérieur à
+cette session) pour contourner un bug différent — `window.open()` en JS ne
+fonctionnait pas du tout depuis la PWA installée en mode standalone. Le
+correctif de l'époque (passer par un vrai `<a target="_blank">` plutôt que
+`window.open()`) résolvait ce problème-là, mais introduisait celui-ci sans
+que le lien ait été identifié à l'époque.
+
+**Correctif appliqué** : retrait de `target:"_blank"` sur ce lien (reste un
+`<a href="/v2">` simple). Un `<a>` cliqué directement (pas via
+`window.open()` JS) reste fiable en contexte TWA/PWA standalone — le retrait
+ne devrait donc pas réintroduire l'ancien bug de juillet, mais **à surveiller**
+si un comportement similaire à celui du 8 juillet réapparaît un jour.
+
+**Méthode de diagnostic qui a fini par isoler la cause** : recherche directe
+dans le code de toute occurrence de `/v2` pour vérifier COMMENT la
+navigation était déclenchée (`grep` sur le fichier `index.html` téléchargé
+depuis GitHub), plutôt que de continuer à empiler des hypothèses côté
+configuration Android/manifest. Une fois localisé, la cause était visible
+immédiatement dans le code.
+
+**Commandes ADB utiles pour un diagnostic futur** (conservées pour
+référence) :
+```
+adb shell pm get-app-links <package>
+adb shell dumpsys package domain-preferred-apps | findstr /i "<mot-clé>"
+adb shell pm list packages | findstr /i "<mot-clé>"
+adb uninstall <package>
+adb install <apk>
+```
