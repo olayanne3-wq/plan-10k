@@ -159,9 +159,12 @@
         }
       });
 
-      supabase.auth.getUser().then(function (res) {
-        if (res.data.user) debloquer(res.data.user);
-      });
+      const estRetourRecovery = window.location.hash.indexOf('type=recovery') !== -1;
+      if (!estRetourRecovery) {
+        supabase.auth.getUser().then(function (res) {
+          if (res.data.user) debloquer(res.data.user);
+        });
+      }
 
       supabase.auth.onAuthStateChange(function (event, session) {
         if (event !== 'PASSWORD_RECOVERY') return;
