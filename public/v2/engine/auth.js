@@ -167,8 +167,11 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
       resolve(user);
     }
 
+    let modeRecovery = false; // devient true une fois le formulaire remplacé pour le reset
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (modeRecovery) return; // le formulaire a été remplacé, ce listener est obsolète
       submitBtn.disabled = true;
       messageEl.textContent = '';
       const email = emailInput.value.trim();
@@ -224,6 +227,7 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
     // changement, puis on débloque normalement.
     supabase.auth.onAuthStateChange((event, session) => {
       if (event !== 'PASSWORD_RECOVERY') return;
+      modeRecovery = true; // désactive le vieux listener de connexion, cf. plus haut
       form.innerHTML = `
         <label for="auth-nouveau-mdp">Choisis un nouveau mot de passe</label>
         <input type="password" id="auth-nouveau-mdp" autocomplete="new-password" required minlength="6">
