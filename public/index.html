@@ -1300,103 +1300,16 @@ function predict10KAtDate(dateStr) {
   return Math.round(BASE_TIME * lavWeight + weighted * (1 - lavWeight));
 }
 
-// Nettoyage des notes météo dupliquées (bug corrigé le 7 juillet 2026,
-// commit 1776ac7 — enrichirSeanceAvecMeteo() n'était pas idempotente,
-// verifierMeteoSeanceDemain() appelée à chaque régénération/rechargement du
-// plan dans le wizard pouvait empiler la même note plusieurs fois). Action
-// ponctuelle de rattrapage pour les plans déjà affectés, pas un mécanisme
-// permanent — le vrai correctif vit dans weather.js, ceci ne fait que
-// nettoyer ce qui est déjà écrit dans un plan existant.
-//
-// NOTE_CHALEUR recopiée en dur ici plutôt qu'importée de weather.js (non
-// chargé côté preview) — action de rattrapage ponctuelle, pas une
-// dépendance à maintenir en synchronisation permanente avec le module.
-const NOTE_CHALEUR_A_NETTOYER = "Chaleur annoncée pour demain — ralentis l'allure si besoin, l'important est de finir la séance, pas de tenir un chrono.";
+// nettoyerNotesMeteoDupliquees() retirée le 13 juillet 2026 — bouton UI
+// correspondant retiré de Réglages, plus aucun appelant. Le vrai correctif
+// (enrichirSeanceAvecMeteo idempotente) vit toujours dans weather.js.
 
-async function nettoyerNotesMeteoDupliquees() {
-  const msgEl = document.getElementById('syncMsg');
-  if (!window.__PLAN_BRUT__?.semaines) return;
+// regenererStructuresIntervallesUI() retirée le 13 juillet 2026 — bouton
+// UI retiré de Réglages, outil de rattrapage ponctuel pour plans créés
+// avant le 8 juillet 2026 (structureIntervalles), plus nécessaire.
+// regenererStructuresIntervalles() reste disponible dans le moteur si
+// besoin de la rappeler manuellement plus tard.
 
-  let nbCorrigees = 0;
-  window.__PLAN_BRUT__.semaines.forEach(semaine => {
-    Object.values(semaine.assignment).forEach(seance => {
-      if (!seance.contenu || !seance.contenu.includes(NOTE_CHALEUR_A_NETTOYER)) return;
-      // Compte les occurrences avant nettoyage
-      const occurrences = seance.contenu.split(NOTE_CHALEUR_A_NETTOYER).length - 1;
-      if (occurrences <= 1) return; // rien à nettoyer, une seule occurrence est normale
-      // Retire toutes les occurrences puis en réinjecte une seule, à la fin
-      const contenuSansNote = seance.contenu.split(NOTE_CHALEUR_A_NETTOYER).join('').trim();
-      seance.contenu = `${contenuSansNote} ${NOTE_CHALEUR_A_NETTOYER}`;
-      nbCorrigees++;
-    });
-  });
-
-  if (nbCorrigees === 0) {
-    if (msgEl) { msgEl.textContent = 'Aucune note dupliquée trouvée.'; msgEl.style.color = 'rgba(238,240,234,0.5)'; }
-    return;
-  }
-
-  // Re-traduit le plan brut corrigé vers le format v1 affiché, et sauvegarde
-  window.__PLAN_GENERE__ = traduirePlanVersFormatV1(window.__PLAN_BRUT__);
-  PLAN = window.__PLAN_GENERE__;
-  ALL_SESSIONS = recalculerAllSessions();
-
-  try {
-    if (getGithubToken && getGithubToken() && sauvegarderPlan) {
-      await sauvegarderPlan(window.__PLAN_BRUT__);
-    }
-  } catch (e) {
-    console.warn('Nettoyage effectué localement, sauvegarde échouée :', e.message);
-  }
-
-  if (msgEl) { msgEl.textContent = '✅ ' + nbCorrigees + ' séance(s) nettoyée(s).'; msgEl.style.color = '#22c55e'; }
-  render();
-}
-
-// Ajout rétroactif de structureIntervalles sur un plan déjà existant
-// (section 2.8 du doc de convergence, demandé par Laurent le 8 juillet
-// 2026) — les plans générés avant l'introduction de structureIntervalles
-// n'ont pas cette donnée, donc pas de bouton "à programmer" affiché. Plutôt
-// que de recréer le plan depuis zéro (perte des statuts déjà validés),
-// régénère uniquement structureIntervalles pour chaque séance qualité
-// existante, sans toucher au contenu textuel déjà affiché ni au reste du
-// plan. Réutilise regenererStructuresIntervalles() du moteur (garde-fou
-// intégré : ne touche que les séances sans structureIntervalles déjà
-// présente, et vérifie que le sous-type recalculé correspond bien à
-// l'original avant d'appliquer).
-async function regenererStructuresIntervallesUI() {
-  const msgEl = document.getElementById('syncMsg');
-  if (!window.__PLAN_BRUT__) return;
-
-  let nbMisesAJour;
-  try {
-    nbMisesAJour = regenererStructuresIntervalles(window.__PLAN_BRUT__);
-  } catch (e) {
-    if (msgEl) { msgEl.textContent = '❌ ' + e.message; msgEl.style.color = 'var(--signal)'; }
-    return;
-  }
-
-  if (nbMisesAJour === 0) {
-    if (msgEl) { msgEl.textContent = 'Toutes les séances ont déjà leur structure à programmer.'; msgEl.style.color = 'rgba(238,240,234,0.5)'; }
-    return;
-  }
-
-  // Re-traduit le plan brut corrigé vers le format v1 affiché, et sauvegarde
-  window.__PLAN_GENERE__ = traduirePlanVersFormatV1(window.__PLAN_BRUT__);
-  PLAN = window.__PLAN_GENERE__;
-  ALL_SESSIONS = recalculerAllSessions();
-
-  try {
-    if (getGithubToken && getGithubToken() && sauvegarderPlan) {
-      await sauvegarderPlan(window.__PLAN_BRUT__);
-    }
-  } catch (e) {
-    console.warn('Régénération effectuée localement, sauvegarde échouée :', e.message);
-  }
-
-  if (msgEl) { msgEl.textContent = '✅ ' + nbMisesAJour + ' séance(s) mise(s) à jour.'; msgEl.style.color = '#22c55e'; }
-  render();
-}
 
 function rebuildPredHistory() {
   if (!stravaActivities.length || isRebuilding) return;
