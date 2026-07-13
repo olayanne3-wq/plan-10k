@@ -5,7 +5,8 @@
 > harmonisation visuelle app/wizard ; badge décharge onglet Semaines ; **v2.5 publiée** —
 > authentification Supabase, migration rétroactive, sync temps réel, wizard protégé,
 > nettoyage Réglages, variables d'env Vercel, file d'attente de sync ; **publication
-> Play Store en cours**, voir §11).
+> Play Store en cours**, voir §11 ; **chantier Mode Forme (v2.6) démarré** — moteur
+> `plan-forme.js` codé et testé, câblage wizard/index.html restant, voir §12).
 > Pour l'historique des décisions et le "pourquoi", voir les autres docs de ce dossier
 > (bibliotheque-seances.md, convergence-v1-v2.md, etc.) et les mémoires de session.
 >
@@ -68,19 +69,36 @@ plan-10k/
 │   │                               # v2/engine/sync-storage.js, 13 juillet 2026), attachés à
 │   │                               # window.LkAuth et window.LkSync respectivement, plutôt
 │   │                               # qu'aux globals habituels PLAN/ALL_SESSIONS.
+│   │                               # plan-forme.classic.js (13 juillet 2026) dépend des
+│   │                               # globales de plan-generator.classic.js (formatPace,
+│   │                               # paceFromTime, riegelPredict, PACE_RATIOS, placerSemaine,
+│   │                               # genererContenuEF/Longue, repartirVolumeSemaine,
+│   │                               # computeFcMaxTanaka, computeZonesFC) — DOIT être chargé
+│   │                               # après lui dans index.html, pas encore fait (§12).
 │   └── v2/
 │       ├── index.html             # Wizard de création de plan (~120K)
 │       ├── manifest.json, sw.js   # PWA v2
 │       └── engine/                # Moteur v2 (modules ES, source de vérité)
 │           ├── plan-generator.js  # Cœur : génération de plan, séances, adaptations (~100K)
+│           ├── plan-forme.js      # Mode Forme (v2.6, 13 juillet 2026) : cycle glissant sans
+│           │                       # date de course, réutilise les briques génériques de
+│           │                       # plan-generator.js (placerSemaine, genererContenuEF/Longue,
+│           │                       # repartirVolumeSemaine, computeFcMaxTanaka, computeZonesFC)
+│           │                       # — n'importe jamais computePhases/ROTATION_SOUS_TYPE/
+│           │                       # placerSeanceTest/placerSeanceCourse. Codé et testé
+│           │                       # (14 tests), câblage wizard/index.html pas encore fait —
+│           │                       # voir §12.
 │           ├── gist-sync.js       # Sync multi-device via GitHub Gist
 │           ├── pdf-export.js      # Export PDF du plan (jsPDF)
-│           ├── strava.js          # Intégration Strava côté client (tokens, volume)
+│           ├── strava.js          # Intégration Strava côté client (tokens, volume) — réutilisé
+│           │                       # tel quel par le mode Forme (déjà générique, aucune
+│           │                       # dépendance à distance/objectif de course)
 │           ├── weather.js         # Intégration météo côté client
 │           ├── auth.js            # Auth Supabase (écran connexion/inscription, session) — v2.5, 13 juillet 2026
 │           ├── sync-storage.js    # Synchronisation localStorage ↔ Supabase, incl. migration rétroactive one-shot — v2.5, 13 juillet 2026
 │           ├── v1-bridge.js       # Traduction plan v2 → format v1 (pour affichage classic)
-│           └── test-*.mjs         # Suite de tests (13 fichiers, un par module/fonctionnalité)
+│           └── test-*.mjs         # Suite de tests (14 fichiers, un par module/fonctionnalité,
+│                                    # incl. test-plan-forme.mjs depuis le 13 juillet 2026)
 ├── vercel.json                    # Routage : /api/*, /v2, fallback statique
 └── package.json                   # { "type": "module" }
 ```
@@ -752,3 +770,94 @@ faire dans Play Console, jamais automatique.
   dans `assetlinks.json` par celui de Play App Signing (Release > Setup >
   App Integrity dans Play Console) — différent du fingerprint local actuel,
   Google re-signe l'app avec sa propre clé de gestion
+
+## 12. Mode Forme (v2.6) — chantier en cours
+
+**Objectif** : un mode d'entraînement alternatif au plan course, pour le
+maintien en forme hors préparation d'une échéance précise (demandé par
+Laurent le 13 juillet 2026). Cadrage discuté et validé avant codage :
+
+- **Mode alternatif, sans date de fin** — remplace le plan course plutôt que
+  de s'y ajouter en complément ; pas de switch libre entre les deux au sein
+  d'un même plan.
+- **Plan structuré** (pas un simple journal de suivi), mais orienté
+  développement général plutôt que préparation compétitive.
+- **Paramètres d'entrée** : niveau + volume hebdo + « accent » au choix
+  (VMA / Endurance / Polyvalent), pas de distance/date de course/objectif
+  chrono.
+- **Renouvellement dans le temps** : plan « glissant », qui s'ajuste par
+  blocs de semaines plutôt qu'une structure cyclique fixe ou un plan à durée
+  déterminée.
+- **Affichage** : même dashboard que le mode course (`index.html`), pas de
+  vue séparée — `plan.mode` sert de discriminant, les blocs spécifiques à la
+  course (compte à rebours, phases, jour J) se masquent en mode Forme.
+  Décision motivée par la réutilisation directe de l'ACWR, des Stats, de la
+  séance du jour, de la sync Strava et du suivi de statuts, tous déjà
+  indépendants de la notion de date de course.
+- **Contenu des séances qualité** : registre volontairement différent du
+  moteur course — dans l'esprit « jeu avec l'allure » (fartlek à fourchette
+  d'allure T-I sans découpage en blocs fixes, pyramidale sur allure seuil
+  plutôt que VMA) plutôt que le protocole chronométré strict des séances
+  course. Décision explicite pour que le mode Forme ne soit pas juste
+  « un plan course sans date ».
+
+**Réalisé (13 juillet 2026)** :
+- `public/v2/engine/plan-forme.js` — module ES codé et testé. Réutilise
+  directement `placerSemaine`, `genererContenuEF`, `genererContenuLongue`,
+  `repartirVolumeSemaine`, `computeFcMaxTanaka`, `computeZonesFC` de
+  `plan-generator.js` ; n'importe jamais `computePhases`,
+  `ROTATION_SOUS_TYPE`, `placerSeanceTest`, `placerSeanceCourse` ni
+  `injecterApprocheCourse`. Fonctions principales :
+  - `generatePlanForme(profil, params)` — génère un bloc glissant de N
+    semaines (4 par défaut, `nbSemainesBloc` réglable). Retourne un plan
+    avec `mode: 'forme'`, `accent`, pas de `phases`/`dateCourse`.
+  - `genererBlocSuivant(planPrecedent, profilOrigine, paramsOrigine)` —
+    enchaîne le bloc suivant en repartant du plateau de volume atteint (pas
+    de la dernière semaine si celle-ci est une décharge), pour une
+    progression continue sans redémarrer de zéro ni reculer à chaque
+    enchaînement.
+  - `computeAlluresForme` — variante de `computeAllures` sans zone C
+    (allure course), les autres zones (recup/E/T/I/V) réutilisent
+    `PACE_RATIOS` tel quel.
+  - `computeVolumeFormeSemaine` — plateau glissant (volume départ + 15% max,
+    `MARGE_PROGRESSION_PLATEAU`), montée douce sur 3 semaines puis
+    stabilisation, décharge -25% tous les 4 semaines (même règle que le
+    moteur course).
+  - `genererContenuQualiteForme` + `ROTATION_SOUS_TYPE_FORME` — rotation par
+    accent (`vma`/`endurance`/`polyvalent`), sous-types propres au mode
+    Forme (`fartlek`, `pyramidale-forme`, `i-30-30-forme`, `cotes-forme`,
+    `seuil-forme`), jamais ceux du moteur course.
+- `public/engine-classic-scripts/plan-forme.classic.js` — copie non-module
+  correspondante (génération manuelle par retrait des `export`, même
+  principe que les autres `.classic.js`). Dépend des globales déjà définies
+  par `plan-generator.classic.js` — **doit être chargé après lui** dans
+  `index.html` (pas encore fait, cf. chantiers ouverts ci-dessous).
+- `public/v2/engine/test-plan-forme.mjs` — 14 tests (mode/accent corrects,
+  absence de zone C, absence de séance course/test, rotation par accent,
+  décharge tous les 4 semaines, plateau jamais dépassé, enchaînement de
+  blocs qui repart bien du plateau, garde-fous hérités de `placerSemaine`,
+  zone FC Tanaka/mesurée). Tous passent.
+- Bug trouvé et corrigé en testant manuellement avant de figer le module :
+  le texte fartlek affichait un double `/km` (`4:59/km et 4:18/km/km`) —
+  `formatPace()` inclut déjà l'unité, il ne fallait pas la rajouter dans le
+  gabarit du texte.
+
+**Chantiers ouverts (prochaine session)** :
+- **Câblage wizard** : l'étape de choix de mode (mockée le 13 juillet 2026,
+  écran « Objectif course » vs « Mode forme ») n'est pas codée dans
+  `v2/index.html`. La branche Forme doit sauter directement à
+  niveau/volume/jours/accent, sans distance/objectif/date de course.
+- **Câblage `index.html`** : affichage à adapter pour `plan.mode === 'forme'`
+  (masquer compte à rebours/phases/jour J), et gestion de l'enchaînement de
+  blocs via `genererBlocSuivant` quand le bloc courant est terminé (pas
+  encore décidé : déclenchement automatique en arrière-plan, ou action
+  explicite de l'utilisateur ?).
+- **Ordre de chargement** : ajouter `<script src="/engine-classic-scripts/
+  plan-forme.classic.js">` dans `index.html`, après le script tag de
+  `plan-generator.classic.js`.
+- **Import wizard** : ajouter `plan-forme.js` aux imports du
+  `<script type="module">` de `v2/index.html` (même pattern que
+  `PlanGenerator`/`Strava`/`GistSync` déjà fusionnés dans `window.Engine`).
+- Volume hebdo actuel et jours disponibles : à réutiliser tels quels depuis
+  le wizard existant (Strava déjà générique, cf. arborescence ci-dessus) —
+  pas de nouveau composant à créer, juste à câbler sur la branche Forme.
