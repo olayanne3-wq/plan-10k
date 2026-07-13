@@ -4313,6 +4313,28 @@ function renderHelp() {
 }
 
 function renderSettings() {
+  // Section compte utilisateur (Supabase) — ajoutée le 13 juillet 2026,
+  // chantier v2.5 auth (inventaire §8bis). Oubliée lors de l'intégration
+  // initiale de l'écran de connexion : LkAuth.deconnecter() existait déjà
+  // mais aucun bouton n'y donnait accès dans l'interface.
+  const accountSection = el("div", {style:{marginBottom:"24px"}},
+    el("div",{class:"label"},"👤 Compte"),
+    card(
+      el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
+        el("div",{style:{color:"#f1f5f9",fontSize:"15px"}},
+          window.__UTILISATEUR__?.email || "Connecté"
+        ),
+        el("button",{style:{background:"#f8717122",border:"1px solid #f8717155",borderRadius:"8px",padding:"8px 14px",color:"#f87171",fontWeight:"700",fontSize:"14px",cursor:"pointer"},
+          onClick: async ()=>{
+            if (!confirm("Se déconnecter de Run by Léa ?")) return;
+            await LkAuth.deconnecter();
+            window.location.reload();
+          }
+        },"Se déconnecter")
+      )
+    )
+  );
+
   const cloudSection=el("div",{style:{marginBottom:"24px"}},
     el("div",{class:"label"},"☁️ Sauvegarde cloud"),
     !githubToken
@@ -4788,6 +4810,7 @@ function renderSettings() {
   return el("div",{style:{padding:"0 16px 100px"}},
     el("div",{style:{marginTop:"8px"}}),
     appHeaderEl,
+    accountSection,
     profileSection, recordsSection, saveBtn, pdfSection, stravaSection,
     el("div",{style:{marginBottom:"24px"}}, advancedToggle, advancedContent),
     githubToken ? qrSection : null,
