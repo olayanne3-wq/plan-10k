@@ -63,6 +63,12 @@ input[type=text], input[type=number], input[type=password] {
   // Chantier v2.5 migration, 13 juillet 2026 — voir inventaire §8bis.
   window.__AUTH_PRET__ = LkAuth.monterEcranAuth('ecran-auth-hote').then(async function (user) {
     window.__UTILISATEUR__ = user;
+    // Migration rétroactive (one-shot par appareil) AVANT le préchargement :
+    // pousse vers Supabase les données déjà présentes en localStorage
+    // depuis avant la mise en place de cette synchronisation, pour ne
+    // pas les perdre silencieusement au premier login. Cf. bug de
+    // production du 13 juillet 2026, inventaire §8bis.
+    await LkSync.migrerDonneesExistantes(user.id, null);
     await LkSync.precharger(user.id, null);
     return user;
   });
@@ -161,7 +167,12 @@ await window.__AUTH_PRET__; // attend la session ET le premier préchargement (s
 // données préfixées par plan (lk_statuses_xxx, lk_notes_xxx, etc.) AVANT
 // que les lignes `let x = load(clePourPlan("lk_..."), défaut)` plus bas
 // dans ce même script ne s'exécutent. Chantier v2.5, 13 juillet 2026.
+// migrerDonneesExistantes() est idempotente (marqueur localStorage) —
+// l'appeler ici aussi permet de rattraper les données préfixées par
+// plan qui n'avaient pas encore de planId connu lors du premier appel
+// (juste après connexion, avant que le plan soit chargé).
 if (window.__UTILISATEUR__ && window.__PLAN_BRUT__?.id) {
+  await LkSync.migrerDonneesExistantes(window.__UTILISATEUR__.id, window.__PLAN_BRUT__.id);
   await LkSync.precharger(window.__UTILISATEUR__.id, window.__PLAN_BRUT__.id);
 }
 
