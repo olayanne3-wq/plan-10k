@@ -290,6 +290,28 @@ bloqué, ou en spam. Point de vigilance si l'app s'ouvre un jour à
 des utilisateurs externes non familiers : reconsidérer l'activation
 de la confirmation email à ce moment-là.
 
+**Bug de production découvert et corrigé** (13 juillet 2026, après premier
+déploiement sur `main`) — un compte ayant déjà une synchronisation Gist
+active (`lk_github_token` configuré avant la migration) se retrouvait
+après connexion sur le **plan de repli par défaut**, avec le sélecteur
+de plan disparu et l'historique incorrect. Cause : `window.__PLAN_PRET__`
+(qui appelle `chargerPlans()`, dépendante de `lk_github_token` en
+`localStorage`) démarrait en parallèle de `window.__AUTH_PRET__` (qui
+restaure ce même token depuis Supabase via `LkSync.precharger`), sans
+dépendance entre les deux — une course que `chargerPlans()` pouvait
+gagner, trouvant `localStorage` encore vide et échouant silencieusement
+sur le repli. Corrigé en ajoutant `await window.__AUTH_PRET__;` en tout
+début de la définition de `window.__PLAN_PRET__`, garantissant que le
+token est restauré avant toute tentative de chargement Gist. Coût
+accepté : le premier rendu attend désormais la résolution de l'auth
+Supabase avant de tenter le Gist (légèrement plus lent qu'avant, mais
+correct plutôt que rapide-et-faux). Pousser une correction en production
+sans repasser par une branche de test était un raccourci pris sciemment
+ce jour-là (auth.js/auth.classic.js avaient déjà atterri sur `main` par
+inadvertance plus tôt dans la session) — à éviter en temps normal, y
+revenir en pratique standard dès que ce chantier n'est plus en phase
+de découverte active.
+
 **Ce qui est fait** :
 - Schéma SQL exécuté avec succès sur le projet Supabase
 - Authentification par email + mot de passe (pas de magic link,
