@@ -4689,55 +4689,10 @@ function renderSettings() {
     advancedToggle.textContent=advancedOpen?"⚙️ Masquer les options avancées":"⚙️ Options avancées";
   });
 
-  // ── QR Code pour configurer un autre appareil ─────────────────────────────
-  // Unifié le 11 juillet 2026 (demandé par Laurent : "plus de V2, uniquement
-  // synchro sur l'app") — synchronise le token GitHub + v2_gist_id (le Gist
-  // des plans v2, seule vraie source de vérité désormais) en un seul lien.
-  // gist= (lk_gist_id) reste transmis pour compatibilité avec d'anciens
-  // liens qui circuleraient encore, mais le vieux système de backup v1
-  // associé (plan10k_backup.json) a été retiré complètement le même jour —
-  // toutes les vraies données qu'il gérait ont déjà leur foyer légitime
-  // dans le système préfixé par plan (clePourPlan()) ou des clés globales
-  // simples pour les caractéristiques personnelles de Laurent.
-  const qrSection = el("div",{style:{marginBottom:"16px"}},
-    el("div",{class:"label"},"📱 Configurer sur un autre appareil"),
-    card(
-      el("div",{class:"muted",style:{fontSize:"14px",marginBottom:"10px"}},"Scanne ce QR code depuis ton smartphone (ou ouvre le lien copié) pour transférer toute la configuration automatiquement."),
-      el("div",{id:"qr-container",style:{display:"flex",justifyContent:"center",marginBottom:"10px"}}),
-      el("button",{style:{width:"100%",background:"#f9731611",border:"1px solid #f9731633",borderRadius:"8px",padding:"8px",color:"#f97316",fontSize:"14px",fontWeight:"700",cursor:"pointer"},
-        feedback:true,
-        onClick:()=>{
-          const v2GistId = getV2GistId ? getV2GistId() : "";
-          const url = window.location.origin + "/?token=" + encodeURIComponent(githubToken) + "&gist=" + encodeURIComponent(gistId) + (v2GistId ? "&gistV2=" + encodeURIComponent(v2GistId) : "");
-          derniereUrlSyncApp = url;
-          const qrDiv = document.getElementById("qr-container");
-          qrDiv.innerHTML = "";
-          const img = document.createElement("img");
-          img.src = "https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=" + encodeURIComponent(url);
-          img.style.borderRadius = "8px";
-          qrDiv.appendChild(img);
-          const btnCopier = document.getElementById("btnCopierLienSyncApp");
-          if (btnCopier) { btnCopier.style.display = "block"; btnCopier.textContent = "🔗 Copier le lien (si tu ne peux pas scanner)"; }
-        }
-      },"📱 Générer le QR code"),
-      // Bouton "Copier le lien" STATIQUE (présent dès le départ dans le
-      // HTML, pas créé dynamiquement) — leçon retenue du même défaut trouvé
-      // côté wizard le 11 juillet 2026 (commit ea28a91) : un bouton créé
-      // par appendChild() n'apparaissait pas de façon fiable sur mobile.
-      el("button",{id:"btnCopierLienSyncApp",style:{width:"100%",marginTop:"8px",background:"none",border:"1px solid #2e3347",borderRadius:"8px",padding:"8px",color:"#94a3b8",fontSize:"14px",fontWeight:"600",cursor:"pointer",display:"none"},
-        feedback:true,
-        onClick:()=>{
-          if (!derniereUrlSyncApp) return;
-          const btnCopier = document.getElementById("btnCopierLienSyncApp");
-          navigator.clipboard?.writeText(derniereUrlSyncApp).then(()=>{
-            if (btnCopier) btnCopier.textContent = "✅ Lien copié — colle-le dans le navigateur de l'autre appareil";
-          }).catch(()=>{
-            prompt("Copie ce lien manuellement :", derniereUrlSyncApp);
-          });
-        }
-      },"🔗 Copier le lien (si tu ne peux pas scanner)")
-    )
-  );
+  // Section QR code retirée le 13 juillet 2026 — redondante avec Supabase :
+  // un nouvel appareil récupère token/gist automatiquement à la connexion
+  // (precharger()), plus besoin de transfert manuel par QR/lien.
+  const qrSection = null;
 
   const appHeaderEl = el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",display:"flex",alignItems:"center",gap:"12px",marginBottom:"20px"}},
     runByLeaIcon(40, 10),
