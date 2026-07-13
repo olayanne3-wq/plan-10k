@@ -181,6 +181,23 @@ if (window.__UTILISATEUR__ && window.__PLAN_BRUT__?.id) {
   await LkSync.assurerPlanExiste(window.__UTILISATEUR__.id, window.__PLAN_BRUT__.id, window.__PLAN_BRUT__);
   await LkSync.migrerDonneesExistantes(window.__UTILISATEUR__.id, window.__PLAN_BRUT__.id);
   await LkSync.precharger(window.__UTILISATEUR__.id, window.__PLAN_BRUT__.id);
+
+  // Realtime — ajouté le 13 juillet 2026. Un changement fait sur un autre
+  // appareil (même compte) déclenche ce callback : on relit les données
+  // fraîches depuis Supabase (precharger, qui écrase localStorage), puis
+  // on ré-exécute les mêmes lectures que celles faites au chargement
+  // (statuses, notes, etc.) avant de redemander un rendu. Pas de retry
+  // ni de gestion d'erreur poussée ici — un échec silencieux n'est pas
+  // grave, le prochain rechargement de page rattrapera de toute façon.
+  await LkSync.activerRealtime(window.__PLAN_BRUT__.id, async () => {
+    await LkSync.precharger(window.__UTILISATEUR__.id, window.__PLAN_BRUT__.id);
+    statuses = load(clePourPlan("lk_statuses"), {});
+    hiddenSessions = load(clePourPlan("lk_hidden_sessions"), {});
+    swappedSessions = load(clePourPlan("lk_swapped_sessions"), {});
+    notesList = load(clePourPlan("lk_notes"), []);
+    sessionNotes = load(clePourPlan("lk_session_notes"), {});
+    render();
+  });
 }
 
 const STRAVA_CLIENT_ID = "260339";
