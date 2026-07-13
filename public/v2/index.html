@@ -626,6 +626,26 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
+
+<!-- ============================================================
+     Écran d'authentification Supabase — ajouté le 13 juillet 2026.
+     Même module que public/index.html (LkAuth, auth.classic.js) —
+     source de vérité : public/v2/engine/auth.js. Bloque l'accès au
+     wizard tant qu'aucune session n'est active, pour qu'un plan créé
+     ici soit toujours rattaché à un vrai user_id.
+============================================================ -->
+<div id="ecran-auth-hote"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/engine-classic-scripts/auth.classic.js"></script>
+<script>
+  window.__AUTH_PRET__ = LkAuth.monterEcranAuth('ecran-auth-hote').then(function (user) {
+    window.__UTILISATEUR__ = user;
+    document.getElementById('wizard-contenu').style.display = 'block';
+    return user;
+  });
+</script>
+
+<div id="wizard-contenu" style="display:none;">
 <div class="phone">
 
   <!-- Bandeau avec logo, cohérent avec le header du dashboard de l'app
@@ -2501,5 +2521,6 @@
     });
   }
 </script>
+</div>
 </body>
 </html>
