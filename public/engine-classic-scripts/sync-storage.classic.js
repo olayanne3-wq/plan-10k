@@ -281,6 +281,7 @@
       return;
     }
     const cleBase = planId ? cle.replace('_' + planId, '') : cle;
+    marquerEchoLocal(planId);
 
     supabase.from('plan_donnees')
       .select('data')
@@ -338,11 +339,54 @@
     }
   }
 
+  const ECHOS_RECENTS = {};
+
+  function marquerEchoLocal(planId) {
+    ECHOS_RECENTS[planId] = Date.now();
+  }
+
+  function estEchoRecent(planId) {
+    const t = ECHOS_RECENTS[planId];
+    return t && (Date.now() - t) < 3000;
+  }
+
+  let canalRealtimeActuel = null;
+
+  async function activerRealtime(planId, onChangement) {
+    await window.LkAuth.supabaseReady;
+    const supabase = window.LkAuth.supabase;
+    if (!estUuidValide(planId)) return function () {};
+
+    if (canalRealtimeActuel) {
+      supabase.removeChannel(canalRealtimeActuel);
+      canalRealtimeActuel = null;
+    }
+
+    const canal = supabase
+      .channel('plan_donnees_' + planId)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'plan_donnees', filter: 'plan_id=eq.' + planId },
+        function (payload) {
+          if (estEchoRecent(planId)) return;
+          onChangement(payload);
+        }
+      )
+      .subscribe();
+
+    canalRealtimeActuel = canal;
+    return function () {
+      supabase.removeChannel(canal);
+      if (canalRealtimeActuel === canal) canalRealtimeActuel = null;
+    };
+  }
+
   window.LkSync = {
     precharger: precharger,
     synchroniserVersSupabase: synchroniserVersSupabase,
     migrerDonneesExistantes: migrerDonneesExistantes,
     assurerPlanExiste: assurerPlanExiste,
-    rejouerFileSync: rejouerFileSync
+    rejouerFileSync: rejouerFileSync,
+    activerRealtime: activerRealtime
   };
 })();
