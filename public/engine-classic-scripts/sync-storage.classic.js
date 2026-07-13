@@ -12,14 +12,20 @@
 
   const CLES_LOCALES_UNIQUEMENT = ['lk_weather_cache'];
 
+  const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function estUuidValide(valeur) {
+    return typeof valeur === 'string' && RE_UUID.test(valeur);
+  }
+
   async function precharger(userId, planId) {
+    const planIdValide = estUuidValide(planId) ? planId : null;
     const supabase = window.LkAuth.supabase;
     try {
       const results = await Promise.all([
         supabase.from('profils_coureur').select('data').eq('user_id', userId).maybeSingle(),
         supabase.from('integrations').select('*').eq('user_id', userId).maybeSingle(),
-        planId
-          ? supabase.from('plan_donnees').select('data').eq('plan_id', planId).maybeSingle()
+        planIdValide
+          ? supabase.from('plan_donnees').select('data').eq('plan_id', planIdValide).maybeSingle()
           : Promise.resolve({ data: null, error: null }),
       ]);
       const profilRes = results[0];
@@ -93,6 +99,11 @@
     }
 
     if (!planId) return;
+    if (!estUuidValide(planId)) {
+      // Plan de repli par défaut ou tout autre id non-UUID : pas de table
+      // pour ce cas, on reste volontairement en localStorage uniquement.
+      return;
+    }
     const cleBase = planId ? cle.replace('_' + planId, '') : cle;
 
     supabase.from('plan_donnees')
