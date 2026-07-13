@@ -171,8 +171,13 @@
         lk_gist_id: 'gist_id',
       };
       const colonne = colonnes[cle];
+      let valeurFinale = valeur;
+      if ((colonne === 'strava_expires' || colonne === 'last_sync') && typeof valeur === 'number') {
+        const enMillisecondes = valeur < 1e12 ? valeur * 1000 : valeur;
+        valeurFinale = new Date(enMillisecondes).toISOString();
+      }
       const payload = { user_id: userId };
-      payload[colonne] = valeur;
+      payload[colonne] = valeurFinale;
       supabase.from('integrations')
         .upsert(payload)
         .then(function (res) { if (res.error) console.warn('Sync intégration échouée :', res.error.message); });
@@ -209,9 +214,39 @@
       .catch(function (err) { console.warn('Sync plan_donnees échouée :', err.message); });
   }
 
+  async function assurerPlanExiste(userId, planId, planBrut) {
+    if (!estUuidValide(planId)) return;
+    const supabase = window.LkAuth.supabase;
+
+    try {
+      const lecture = await supabase.from('plans').select('id').eq('id', planId).maybeSingle();
+      if (lecture.error) {
+        console.warn('Vérification existence du plan échouée :', lecture.error.message);
+        return;
+      }
+      if (lecture.data) return;
+
+      const nom = (planBrut && planBrut.nom) ||
+        (((planBrut && planBrut.distance) || '') + ' — ' + ((planBrut && planBrut.objectif) || '')).trim() ||
+        'Plan';
+      const insertion = await supabase.from('plans').insert({
+        id: planId,
+        user_id: userId,
+        nom: nom,
+        plan_brut: planBrut || {},
+      });
+      if (insertion.error) {
+        console.warn('Création de la ligne plans échouée :', insertion.error.message);
+      }
+    } catch (err) {
+      console.warn('assurerPlanExiste a échoué :', err.message);
+    }
+  }
+
   window.LkSync = {
     precharger: precharger,
     synchroniserVersSupabase: synchroniserVersSupabase,
-    migrerDonneesExistantes: migrerDonneesExistantes
+    migrerDonneesExistantes: migrerDonneesExistantes,
+    assurerPlanExiste: assurerPlanExiste
   };
 })();
