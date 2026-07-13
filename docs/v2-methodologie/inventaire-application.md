@@ -4,7 +4,8 @@
 > sans re-parcourir tout le repo. Mis à jour au 13 juillet 2026 (chantier ACWR en cours ;
 > harmonisation visuelle app/wizard ; badge décharge onglet Semaines ; **v2.5 publiée** —
 > authentification Supabase, migration rétroactive, sync temps réel, wizard protégé,
-> nettoyage Réglages, variables d'env Vercel, file d'attente de sync).
+> nettoyage Réglages, variables d'env Vercel, file d'attente de sync ; **publication
+> Play Store en cours**, voir §11).
 > Pour l'historique des décisions et le "pourquoi", voir les autres docs de ce dossier
 > (bibliotheque-seances.md, convergence-v1-v2.md, etc.) et les mémoires de session.
 >
@@ -27,7 +28,12 @@ plan-10k/
 ├── api/                          # Endpoints serverless (Vercel/Node)
 │   ├── coach.js                  # Proxy vers Claude Haiku (messages coach courts)
 │   ├── strava.js                 # OAuth Strava (auth, callback, refresh, activities)
-│   └── weather.js                # Proxy Open-Meteo (prévision + alerte chaleur >28°C)
+│   ├── weather.js                # Proxy Open-Meteo (prévision + alerte chaleur >28°C)
+│   └── config.js                  # Expose SUPABASE_URL/SUPABASE_ANON_KEY (variables
+│                                    # d'environnement Vercel) au client — ajouté le
+│                                    # 13 juillet 2026. Route déclarée explicitement dans
+│                                    # vercel.json (routing en liste blanche, absence
+│                                    # initiale de cette route causait un 404).
 ├── docs/v2-methodologie/         # Documentation méthodologique et architecture
 │   ├── inventaire-application.md # CE FICHIER
 │   ├── bibliotheque-seances.md   # Méthodologie détaillée des types de séances qualité
@@ -38,16 +44,22 @@ plan-10k/
 │   ├── notes-meteo.md
 │   └── notes-pratiques.md
 │   └── reperes-qualitatifs.md
-├── api/
-│   ├── strava.js, coach.js, weather.js  # Routes serverless existantes
-│   └── config.js                  # Expose SUPABASE_URL/SUPABASE_ANON_KEY (variables
-│                                    # d'environnement Vercel) au client — ajouté le
-│                                    # 13 juillet 2026. Route déclarée explicitement dans
-│                                    # vercel.json (routing en liste blanche, absence
-│                                    # initiale de cette route causait un 404).
 ├── public/
 │   ├── index.html                 # App principale (dashboard) — sert le plan v2, ~300K
 │   ├── manifest.json, sw.js, icônes  # PWA v1 (racine)
+│   ├── icon.svg                   # Source vectorielle de l'icône (silhouette coureur
+│   │                               # orange sur fond arrondi) — utilisée aussi pour
+│   │                               # générer les visuels Play Store
+│   ├── privacy.html               # Politique de confidentialité — ajoutée le
+│   │                               # 13 juillet 2026 pour la publication Play Store.
+│   │                               # Accessible à /privacy.html
+│   ├── .well-known/
+│   │   └── assetlinks.json        # Digital Asset Links — lie le domaine à l'app
+│   │                               # Android TWA (Trusted Web Activity). Contient le
+│   │                               # SHA256 du certificat de signature. À mettre à jour
+│   │                               # à chaque changement de keystore, et une dernière
+│   │                               # fois avec le fingerprint Play App Signing après
+│   │                               # publication (cf. §11)
 │   ├── engine-classic-scripts/    # Copies non-module (.classic.js) du moteur v2,
 │   │                               # utilisées par index.html (script classique).
 │   │                               # À régénérer manuellement à chaque modif du moteur.
@@ -72,6 +84,12 @@ plan-10k/
 ├── vercel.json                    # Routage : /api/*, /v2, fallback statique
 └── package.json                   # { "type": "module" }
 ```
+
+**Projet Android local (hors repo)** — `C:\Users\olaya\runbylea-android-v3\` sur la
+machine de Laurent. Généré via Bubblewrap (TWA), contient `android.keystore` (clé de
+signature, **jamais dans le repo**, à sauvegarder séparément), `app-release-signed.apk`,
+et le projet Gradle complet. Voir §11 pour le détail du setup et des mots de passe à
+conserver précieusement en dehors de ce document.
 
 ## 3. Les deux interfaces
 
@@ -485,11 +503,6 @@ en conditions réelles**, pas seulement en théorie ou en test isolé.
     deux correctifs, en attente de re-confirmation sur ce même compte
     avant de considérer la migration validée de bout en bout
 
-**Pas encore fait** (suite du chantier) :
-- Tester la migration en conditions réelles : créer/modifier des
-  données (statuts de séance, notes, profil coureur) et confirmer
-  qu'elles apparaissent bien dans les tables Supabase, PUIS qu'elles
-  se rechargent correctement sur un autre appareil/navigateur
 **Suite de la session — tout ce qui a été fait après les 5 bugs
 ci-dessus** (13 juillet 2026, jusqu'à publication de la v2.5) :
 
@@ -554,8 +567,6 @@ ci-dessus** (13 juillet 2026, jusqu'à publication de la v2.5) :
 - `localStorage` reste un doublon volontaire de Supabase (pas
   supprimé, cf. décision Realtime ci-dessus) — cache local + source de
   vérité distante, pas une vraie source unique
-- Publication effective sur le Play Store (TWA/Bubblewrap, compte
-  développeur, fiche store) — chantier distinct, pas commencé
 
 ## 9. État des chantiers (au 13/07/2026)
 
@@ -573,8 +584,9 @@ ci-dessus** (13 juillet 2026, jusqu'à publication de la v2.5) :
 | Harmonisation visuelle app/wizard (titre + aide dans le header) | ✅ Clos (13 juillet) |
 | Badge "Décharge" dans l'onglet Semaines (`renderWeeks`) | ✅ Clos (13 juillet) |
 | Rework présentation wizard | 🔜 À revalider avec Laurent |
-| v2.5 authentification Supabase | 🟢 **Publiée** (13 juillet) — auth, migration rétroactive, wizard protégé, sync temps réel (Realtime), file d'attente, variables d'env Vercel, Réglages nettoyés. Reste : Play Store (TWA/Bubblewrap), confirmation email à reconsidérer si ouverture publique (détail §8bis) |
+| v2.5 authentification Supabase | ✅ **Publiée** (13 juillet) — auth, migration rétroactive, wizard protégé, sync temps réel (Realtime), file d'attente, variables d'env Vercel, Réglages nettoyés |
 | v2.5 commercialisation (Stripe) | 🔜 Non commencé |
+| **Publication Play Store (TWA)** | 🟡 **En cours** (13 juillet) — voir §11 pour le détail complet |
 
 ## 10. Principes transverses à retenir
 
@@ -604,3 +616,139 @@ ci-dessus** (13 juillet 2026, jusqu'à publication de la v2.5) :
   parseur) ; vérification syntaxique systématique après modification.
 - **404 sur une route API** → vérifier `vercel.json` en premier (pas un fichier
   manquant).
+- **Écriture GitHub via connecteur MCP indisponible** — le connecteur GitHub
+  connecté (`Push Github ...`) peut lire le repo (`get_file_contents`,
+  `search_code` une fois indexé) mais **échoue systématiquement en écriture**
+  (`create_or_update_file`, 403 "Resource not accessible by integration"),
+  malgré les permissions Contents Read+Write du token PAT. Pattern établi :
+  Claude prépare le contenu final exact et le fournit à copier-coller, Laurent
+  le colle et commit manuellement sur GitHub.com. Rediscuter si le connecteur
+  évolue.
+
+## 11. Publication Play Store (TWA / Bubblewrap) — chantier ouvert le 13/07/2026
+
+**Choix d'architecture** : TWA (Trusted Web Activity) via Bubblewrap plutôt que
+Capacitor — l'app étant déjà une PWA conforme (manifest, service worker, HTTPS),
+le TWA est un wrapper quasi sans code natif. Mises à jour de contenu (99% des cas)
+ne nécessitent aucune re-publication : le TWA charge directement le site en
+production, donc un `git push` + déploiement Vercel suffit. Seuls les changements
+touchant l'app native elle-même (icône, nom, permissions, thème) nécessitent de
+regénérer et re-soumettre un `.aab`.
+
+**Setup local (machine de Laurent, Windows/CMD)** — mis en place le 13 juillet,
+douloureux mais one-shot, ne sera pas à refaire :
+- JDK 17 (Eclipse Temurin) installé manuellement en `C:\Java\jdk-17.0.19+10`
+  (zip, pas de `.msi` disponible) + variables système `JAVA_HOME` et ajout au `Path`
+- Android SDK existant en `C:\Users\olaya\AppData\Local\Android\Sdk`, complété
+  manuellement avec `cmdline-tools/latest` (téléchargé séparément, structure
+  stricte requise) et le paquet legacy `tools` (requis spécifiquement par
+  Bubblewrap 1.24.1, qui cherche `tools/bin/sdkmanager.bat` et non
+  `cmdline-tools/latest/bin/sdkmanager.bat`) + variables système `ANDROID_HOME`
+  et `ANDROID_SDK_ROOT`
+- **Bug JAXB/Java 17** : le vieux `sdkmanager` embarqué dans `tools/` plante
+  avec `NoClassDefFoundError: javax/xml/bind/...` (module retiré depuis Java 11).
+  Corrigé en copiant manuellement 7 jars JAXB (`jaxb-api-2.3.1`,
+  `jaxb-runtime-2.3.2`, `jakarta.xml.bind-api-2.3.2`,
+  `jakarta.activation-api-1.2.1`, `txw2-2.3.2`, `istack-commons-runtime-3.0.8`,
+  `stax-ex-1.8.1`, `FastInfoset-1.2.16` — récupérés depuis
+  `cmdline-tools/latest/lib/external/...`, déjà présents localement) dans
+  `Sdk/tools/lib/`, puis en éditant `tools/bin/sdkmanager.bat` pour les
+  préfixer manuellement à la variable `CLASSPATH`.
+- **Bug de signature Bubblewrap** : `bubblewrap build` échoue systématiquement
+  à la dernière étape (signature de l'APK/AAB) avec `BadPaddingException` /
+  "Wrong password?", en réutilisant en cache un ancien couple de mots de passe
+  au lieu de ceux fraîchement saisis — reproductible sur plusieurs projets
+  générés à zéro. Contournement systématique : signer manuellement avec
+  `apksigner.jar` en ligne de commande une fois le build (non signé) généré :
+  ```
+  java -jar <SDK>/build-tools/34.0.0/lib/apksigner.jar sign --ks android.keystore
+    --ks-key-alias android --out app-release-signed.apk app-release-unsigned-aligned.apk
+  ```
+  À refaire à l'identique pour le futur `.aab` de publication si le même bug
+  se reproduit.
+- Projet Android final : `C:\Users\olaya\runbylea-android-v3\` (v1 et v2
+  abandonnés en cours de route à cause de la casquette de bugs ci-dessus,
+  jamais nettoyés — sans conséquence, hors repo Git). Contient
+  `android.keystore` (jamais committé, mots de passe connus de Laurent
+  uniquement, **critique de ne jamais le perdre** : irremplaçable pour toute
+  future mise à jour Play Store une fois publié) et `app-release-signed.apk`.
+
+**Digital Asset Links (`assetlinks.json`)** — nécessaire pour que l'app
+s'ouvre en plein écran (TWA) plutôt qu'en Chrome Custom Tab (barre d'adresse
+visible). Déployé à `public/.well-known/assetlinks.json`, contient le SHA256
+du certificat de signature (`keytool -list -v -keystore android.keystore
+-alias android`, chercher la ligne SHA256). **Bug de diagnostic notable** :
+l'outil web Google "Statement List Generator" a affiché une erreur "No app
+deep linking permission found" alors que le fichier était en réalité
+parfaitement valide (confirmé par l'API réelle
+`digitalassetlinks.googleapis.com/v1/statements:list` en GET direct
+navigateur, qui a répondu correctement) — ne pas se fier à cet outil web en
+cas de doute, préférer l'appel API direct.
+
+**Vraie cause de la barre d'adresse persistante** (résolue) : ce n'était ni
+`assetlinks.json` ni un problème de cache MIUI — c'était simplement une
+**ancienne version de l'app** (signée avec un ancien keystore/fingerprint,
+projet v1 ou v2) qui restait installée sur le téléphone malgré plusieurs
+tentatives de désinstallation/réinstallation manuelle depuis l'interface
+MIUI. Diagnostiqué via ADB (`adb shell pm get-app-links <package>`, qui
+affiche le fingerprint réellement enregistré par le système) puis résolu en
+désinstallant/réinstallant **via ADB** (`adb uninstall` / `adb install`)
+plutôt que depuis l'interface téléphone — nécessite d'activer "Installer via
+USB" dans les Options développeur MIUI (désactivé par défaut, bloque
+silencieusement `adb install` avec `INSTALL_FAILED_USER_RESTRICTED` sinon).
+Après cette install propre, `pm get-app-links` a confirmé `verified` et
+l'app s'est ouverte correctement en plein écran avec la bonne icône.
+**Leçon retenue** : en cas de comportement incohérent sur MIUI après
+plusieurs réinstallations manuelles, vérifier via ADB quelle version/
+fingerprint est réellement installée avant de chercher ailleurs.
+
+**Package Android** : `app.vercel.plan_10k_alpha.twa`
+**Domaine associé** : `plan-10k-alpha.vercel.app`
+
+**Assets store préparés** :
+- Icône source : `public/icon.svg` (silhouette coureur orange, déjà en prod)
+- Feature graphic (1024×500) : composé en SVG, version horizontale validée
+  (icône à gauche, texte à droite, fond sombre avec courbes de route) —
+  à exporter en PNG et uploader
+- Textes de fiche store (titre, description courte/longue, catégorie,
+  mots-clés) rédigés, ton "produit public" (vouvoiement implicite, sans
+  "ton/ta") — fournis à Laurent, pas encore commités nulle part (pas
+  pertinent pour le repo, vivent dans Play Console directement)
+- `public/privacy.html` rédigée et fournie à déployer (couvre : email,
+  profil coureur, localisation, données Strava ; stockage Supabase avec RLS ;
+  partage limité à Strava/Open-Meteo/Anthropic à des fins strictement
+  fonctionnelles, jamais publicitaire ; droit à la suppression)
+- Guide de remplissage Data Safety Play Console fourni (catégories à cocher :
+  informations personnelles, localisation approximative, santé et fitness ;
+  aucun partage tiers à visée publicitaire ; chiffrement en transit ;
+  suppression possible sur demande)
+
+**Décision de diffusion** (13 juillet 2026) : l'app restera en **piste de test
+interne** sur Play Console, pas en production. Visible uniquement par les emails
+ajoutés explicitement comme testeurs (Laurent, et famille/proches si besoin) —
+non trouvable par recherche publique, non installable par des inconnus. Cohérent
+avec l'état actuel de l'app (mono-utilisateur, Supabase encore jeune). Le passage
+en production reste possible à tout moment plus tard, c'est un choix explicite à
+faire dans Play Console, jamais automatique.
+
+**État au 13/07/2026 fin de session** :
+- ✅ TWA généré, buildé, signé manuellement, **testé en conditions réelles**
+  sur le Xiaomi 11 de Laurent : plein écran confirmé (`pm get-app-links` →
+  `verified`), icône correcte, auth Supabase fonctionnelle, géolocalisation
+  fonctionnelle
+- ✅ Compte développeur Google Play créé, 25$ payés, **vérification
+  d'identité en cours** (délai variable, quelques heures à quelques jours)
+- ✅ Politique de confidentialité rédigée (à déployer sur `public/privacy.html`)
+- ✅ Textes de fiche store rédigés
+- ✅ Feature graphic composé et validé (version horizontale)
+- 🔜 Captures d'écran (à prendre directement sur le téléphone, pas encore fait)
+- 🔜 Classification du contenu (questionnaire Play Console, pas encore rempli)
+- 🔜 Data Safety form (guide fourni, pas encore rempli dans Play Console)
+- 🔜 Création de l'app dans Play Console + upload du `.aab` (bloqué en
+  attente de la validation du compte développeur)
+- 🔜 Test en piste interne — **c'est la piste retenue, pas de passage en
+  production prévu pour l'instant** (cf. décision de diffusion ci-dessus)
+- 🔜 **Après première publication uniquement** : remplacer le fingerprint
+  dans `assetlinks.json` par celui de Play App Signing (Release > Setup >
+  App Integrity dans Play Console) — différent du fingerprint local actuel,
+  Google re-signe l'app avec sa propre clé de gestion
