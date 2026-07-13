@@ -38,6 +38,90 @@ const CLES_INTEGRATIONS = [
 // de perte en cas de changement d'appareil).
 const CLES_LOCALES_UNIQUEMENT = ['lk_weather_cache'];
 
+// ------------------------------------------------------------
+// File d'attente de synchronisation — ajoutée le 13 juillet 2026.
+// Si une écriture Supabase échoue (réseau coupé, timeout, etc.), on la
+// met en file plutôt que de l'abandonner silencieusement. La file est
+// rejouée automatiquement au retour du réseau (événement 'online') et
+// périodiquement (au cas où 'online' ne se déclenche pas de façon fiable
+// sur tous les navigateurs/PWA). localStorage reste toujours correct
+// entre-temps — cette file ne fait que rattraper Supabase.
+// ------------------------------------------------------------
+const CLE_FILE_SYNC = 'lk_file_attente_sync';
+
+function litFileSync() {
+  try { return JSON.parse(localStorage.getItem(CLE_FILE_SYNC)) || []; }
+  catch (e) { return []; }
+}
+
+function ecritFileSync(file) {
+  try { localStorage.setItem(CLE_FILE_SYNC, JSON.stringify(file)); }
+  catch (e) { /* quota localStorage dépassé, tant pis pour cette entrée */ }
+}
+
+// Ajoute une tentative échouée à la file. `type` identifie l'action à
+// rejouer (une des clés gérées par rejouerEntreeFile ci-dessous).
+function ajouterALaFile(type, payload) {
+  const file = litFileSync();
+  file.push({ type, payload, essais: 0, ajoute: Date.now() });
+  ecritFileSync(file);
+}
+
+// Rejoue une entrée de la file selon son type. Retourne true si réussie.
+async function rejouerEntreeFile(entree) {
+  await supabaseReady;
+  try {
+    if (entree.type === 'profil') {
+      const { error } = await supabase.from('profils_coureur').upsert(entree.payload);
+      return !error;
+    }
+    if (entree.type === 'integration') {
+      const { error } = await supabase.from('integrations').upsert(entree.payload);
+      return !error;
+    }
+    if (entree.type === 'plan_donnees') {
+      const { error: erreurLecture, data: existant } = await supabase
+        .from('plan_donnees').select('data').eq('plan_id', entree.payload.plan_id).maybeSingle();
+      if (erreurLecture) return false;
+      const donnees = { ...(existant?.data || {}), [entree.payload.cleBase]: entree.payload.valeur };
+      const { error } = await supabase.from('plan_donnees').upsert({
+        plan_id: entree.payload.plan_id, user_id: entree.payload.user_id, data: donnees,
+      });
+      return !error;
+    }
+    return true; // type inconnu : on l'abandonne plutôt que de la rejouer indéfiniment
+  } catch (e) {
+    return false;
+  }
+}
+
+// Rejoue toute la file, retire les entrées réussies, garde les autres
+// (avec compteur d'essais incrémenté). Abandonne une entrée après 10
+// essais infructueux, pour éviter une file qui grossit indéfiniment
+// avec une entrée systématiquement en échec (ex: donnée corrompue).
+export async function rejouerFileSync() {
+  const file = litFileSync();
+  if (file.length === 0) return;
+
+  const fileRestante = [];
+  for (const entree of file) {
+    const reussi = await rejouerEntreeFile(entree);
+    if (!reussi) {
+      entree.essais++;
+      if (entree.essais < 10) fileRestante.push(entree);
+      // sinon : abandonnée silencieusement après 10 essais
+    }
+  }
+  ecritFileSync(fileRestante);
+}
+
+// Déclenche un rejeu au retour du réseau, et toutes les 5 minutes en
+// secours (PWA en arrière-plan, événement 'online' pas toujours fiable).
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => { rejouerFileSync(); });
+  setInterval(() => { rejouerFileSync(); }, 5 * 60 * 1000);
+}
+
 // Vérifie qu'une chaîne a la forme d'un UUID v4-like (celle générée par
 // crypto.randomUUID() côté wizard). Le plan de repli par défaut, généré
 // quand aucun plan n'existe encore (index.html, id fixe 'plan-repli-defaut',
@@ -214,9 +298,15 @@ export function synchroniserVersSupabase(userId, planId, cle, valeur) {
   }
 
   if (cle === 'lk_profil_coureur') {
+    const payload = { user_id: userId, data: valeur };
     supabase.from('profils_coureur')
-      .upsert({ user_id: userId, data: valeur })
-      .then(({ error }) => { if (error) console.warn('Sync profil échouée :', error.message); });
+      .upsert(payload)
+      .then(({ error }) => {
+        if (error) {
+          console.warn('Sync profil échouée, mise en file :', error.message);
+          ajouterALaFile('profil', payload);
+        }
+      });
     return;
   }
 
@@ -247,7 +337,12 @@ export function synchroniserVersSupabase(userId, planId, cle, valeur) {
     const payload = { user_id: userId, [colonne]: valeurFinale };
     supabase.from('integrations')
       .upsert(payload)
-      .then(({ error }) => { if (error) console.warn('Sync intégration échouée :', error.message); });
+      .then(({ error }) => {
+        if (error) {
+          console.warn('Sync intégration échouée, mise en file :', error.message);
+          ajouterALaFile('integration', payload);
+        }
+      });
     return;
   }
 
@@ -278,8 +373,16 @@ export function synchroniserVersSupabase(userId, planId, cle, valeur) {
         data: donnees,
       });
     })
-    .then((res) => { if (res?.error) console.warn('Sync plan_donnees échouée :', res.error.message); })
-    .catch((err) => console.warn('Sync plan_donnees échouée :', err.message));
+    .then((res) => {
+      if (res?.error) {
+        console.warn('Sync plan_donnees échouée, mise en file :', res.error.message);
+        ajouterALaFile('plan_donnees', { plan_id: planId, user_id: userId, cleBase, valeur });
+      }
+    })
+    .catch((err) => {
+      console.warn('Sync plan_donnees échouée, mise en file :', err.message);
+      ajouterALaFile('plan_donnees', { plan_id: planId, user_id: userId, cleBase, valeur });
+    });
 }
 
 // ------------------------------------------------------------
