@@ -4392,9 +4392,20 @@ function renderSettings() {
       :el("a",{href:"/api/strava/auth",style:{display:"block",background:"#fc4c0222",border:"1px solid #fc4c0255",borderRadius:"10px",padding:"12px 16px",color:"#fc4c02",fontWeight:"700",fontSize:"15px",textAlign:"center",textDecoration:"none"}},"🔗 Connecter Strava")
   );
 
-  const versionSection = (function buildVersionSection() {
-    const VERSIONS = [
-      { ver:"v2.3", title:"Profil coureur global & personnalisation par niveau", current:true, notes:[
+  // VERSIONS déclarée en dehors de buildVersionSection (au lieu d'être
+  // piégée dedans) depuis le 13 juillet 2026, pour que le bandeau header
+  // (dashHeaderEl plus bas) puisse afficher VERSIONS[0].ver dynamiquement
+  // plutôt qu'un numéro de version en dur, oublié pendant plusieurs
+  // versions (retrouvé figé sur v1.8.15 alors que l'app était en v2.3).
+  const VERSIONS = [
+      { ver:"v2.5", title:"Authentification Supabase, multi-appareils & synchro temps réel", current:true, notes:[
+        "🔐 Connexion par compte (email + mot de passe), préparation Play Store",
+        "☁️ Données synchronisées sur Supabase en plus du Gist (statuts, notes, profil, plans)",
+        "⚡ Synchronisation temps réel entre appareils sur les séances/notes",
+        "🧹 Retirée : sauvegarde cloud manuelle et QR code (remplacées par la synchro auto au login)",
+        "🐛 Corrections de fiabilité (chargement du plan, dates d'intégration Strava)",
+      ]},
+      { ver:"v2.3", title:"Profil coureur global & personnalisation par niveau", current:false, notes:[
         "👤 Profil coureur mémorisé une fois pour toutes (records par distance, plus besoin de les ressaisir)",
         "🎯 Progression des séances qualité adaptée à ton niveau (débutant/intermédiaire/confirmé)",
         "🔒 Modification d'objectif préserve désormais les séances déjà réalisées",
@@ -4552,6 +4563,8 @@ function renderSettings() {
       { ver:"v1.0", title:"Lancement", current:false, notes:["Plan 11 semaines, suivi des séances"]},
     ];
 
+  const versionSection = (function buildVersionSection() {
+
     function buildBloc(v, isLast) {
       return el("div",{style:{padding:"10px",background:v.current?"#f9731622":"transparent",border:v.current?"1px solid #f9731633":"none",borderRadius:"8px",marginBottom:isLast?"0":"8px"}},
         el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}},
@@ -4601,7 +4614,7 @@ function renderSettings() {
     runByLeaIcon(40, 10),
     el("div",{},
       el("div",{style:{color:"#f1f5f9",fontSize:"16px",fontWeight:"800"}},"Run by Léa"),
-      el("div",{class:"muted",style:{fontSize:"14px"}},"v1.8.15 · plan-10k-alpha.vercel.app")
+      el("div",{class:"muted",style:{fontSize:"14px"}},VERSIONS[0].ver+" · plan-10k-alpha.vercel.app")
     )
   );
 
