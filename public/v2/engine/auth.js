@@ -80,6 +80,8 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
     #ecran-auth .message { margin-top: 14px; font-size: 0.82rem; text-align: center; min-height: 1.2em; }
     #ecran-auth .message.erreur { color: #f87171; }
     #ecran-auth .message.succes { color: #22c55e; }
+    #ecran-auth .lien-secondaire { margin-top: 12px; font-size: 0.82rem; text-align: center; color: #9ca3af; }
+    #ecran-auth .lien-secondaire:hover { color: #f97316; }
     </style>
     <div id="ecran-auth">
       <div class="carte">
@@ -99,6 +101,7 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
           <button type="submit" class="btn-principal" id="auth-submit">Se connecter</button>
           <div class="message" id="auth-message"></div>
         </form>
+        <div class="lien-secondaire" id="lien-mdp-oublie" style="cursor:pointer; text-decoration:underline;">Mot de passe oublié ?</div>
       </div>
     </div>
   `;
@@ -111,6 +114,7 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
     const submitBtn = hote.querySelector('#auth-submit');
     const messageEl = hote.querySelector('#auth-message');
     const onglets = hote.querySelectorAll('#ecran-auth .onglet');
+    const lienMdpOublie = hote.querySelector('#lien-mdp-oublie');
 
     let mode = 'connexion';
     let dejaResolu = false;
@@ -121,6 +125,7 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
         onglets.forEach(b => b.classList.toggle('actif', b === btn));
         submitBtn.textContent = mode === 'connexion' ? 'Se connecter' : 'Créer mon compte';
         passwordInput.autocomplete = mode === 'connexion' ? 'current-password' : 'new-password';
+        lienMdpOublie.style.display = mode === 'connexion' ? 'block' : 'none';
         messageEl.textContent = '';
       });
     });
@@ -129,6 +134,31 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
       messageEl.textContent = texte;
       messageEl.className = `message ${type}`;
     }
+
+    // "Mot de passe oublié ?" — envoie un email Supabase avec un lien de
+    // réinitialisation. Ajouté le 13 juillet 2026 (jusque-là, seule
+    // option : réinitialisation manuelle via SQL Editor, peu pratique
+    // pour un usage courant).
+    lienMdpOublie.addEventListener('click', async () => {
+      const email = emailInput.value.trim();
+      if (!email) {
+        afficherMessage('Entre ton email ci-dessus, puis clique à nouveau sur ce lien.', 'erreur');
+        return;
+      }
+      lienMdpOublie.style.pointerEvents = 'none';
+      afficherMessage('Envoi en cours…', 'succes');
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin,
+        });
+        if (error) throw error;
+        afficherMessage('Email envoyé — vérifie ta boîte mail (et les spams) pour le lien de réinitialisation.', 'succes');
+      } catch (err) {
+        afficherMessage('Erreur : ' + err.message, 'erreur');
+      } finally {
+        lienMdpOublie.style.pointerEvents = 'auto';
+      }
+    });
 
     function debloquer(user) {
       if (dejaResolu) return; // évite une double résolution (ex: getUser() + submit concurrents)
@@ -173,6 +203,37 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
     // saute directement l'écran, sans attendre d'action.
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) debloquer(user);
+    });
+
+    // Retour depuis le lien "mot de passe oublié" — Supabase déclenche
+    // PASSWORD_RECOVERY plutôt qu'une session normale. Ajouté le 13
+    // juillet 2026 : sans ce cas, resetPasswordForEmail() connectait bien
+    // l'utilisateur au clic sur le lien email, mais ne proposait jamais
+    // de saisir le nouveau mot de passe — impasse. On remplace le
+    // formulaire de connexion par un formulaire dédié le temps de ce
+    // changement, puis on débloque normalement.
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== 'PASSWORD_RECOVERY') return;
+      form.innerHTML = `
+        <label for="auth-nouveau-mdp">Choisis un nouveau mot de passe</label>
+        <input type="password" id="auth-nouveau-mdp" autocomplete="new-password" required minlength="6">
+        <button type="submit" class="btn-principal">Valider</button>
+      `;
+      hote.querySelector('#ecran-auth .onglets').style.display = 'none';
+      lienMdpOublie.style.display = 'none';
+      hote.querySelector('.sous-titre').textContent = 'Nouveau mot de passe';
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const nouveauMdp = hote.querySelector('#auth-nouveau-mdp').value;
+        try {
+          const { error } = await supabase.auth.updateUser({ password: nouveauMdp });
+          if (error) throw error;
+          debloquer(session.user);
+        } catch (err) {
+          afficherMessage('Erreur : ' + err.message, 'erreur');
+        }
+      }, { once: true });
     });
   });
 }
