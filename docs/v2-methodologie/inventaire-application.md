@@ -385,6 +385,38 @@ réel. **Reste à vérifier** : l'écriture réelle vers `plan_donnees`
 avec un vrai plan actif (UUID, pas le plan de repli) — non testée
 explicitement cette session, cf. plus bas.
 
+**Deux derniers bugs découverts et corrigés lors du test final de
+synchronisation `plan_donnees`** (13 juillet 2026, sur un vrai plan
+existant, id `250aae43-...`) :
+
+4. **Contrainte de clé étrangère violée (`plan_donnees_plan_id_fkey`)**
+   — `plan_donnees.plan_id` référence `plans.id`, mais aucun code
+   n'insérait jamais de ligne dans la table `plans` elle-même. Toute
+   tentative d'écriture vers `plan_donnees` échouait donc en 409, quel
+   que soit le plan. Corrigé : nouvelle fonction
+   `assurerPlanExiste(userId, planId, planBrut)` dans
+   `sync-storage.js`/`sync-storage.classic.js`, qui vérifie l'existence
+   de la ligne et l'insère si besoin (id, user_id, nom déduit du
+   plan_brut, plan_brut complet). Appelée dans `index.html`
+   **avant** `migrerDonneesExistantes`/`precharger` avec `planId`, dès
+   que `window.__PLAN_BRUT__.id` est connu.
+
+5. **Erreur de conversion de date** (`date/time field value out of
+   range`) sur `strava_expires`/`last_sync` — `synchroniserVersSupabase`
+   envoyait le timestamp Unix brut (parfois en secondes, parfois en
+   millisecondes selon l'origine dans `index.html`) directement vers
+   une colonne `timestamptz`, sans conversion. Corrigé : détection du
+   format (secondes si `< 1e12`) et conversion en ISO avant l'envoi.
+
+**Confirmation finale de bout en bout** (13 juillet 2026, après ces 5
+corrections cumulées) : une séance cochée sur un vrai plan
+(`250aae43-2f9b-4f1c-a031-bb57a1b6ae90`) a été vérifiée présente dans
+`plan_donnees.data.lk_statuses` sur Supabase, avec les bonnes valeurs
+(`"1-1": "✅"`, etc.). **La chaîne complète — auth, migration
+rétroactive, création automatique de la ligne `plans`, et
+synchronisation des statuts de séances — est confirmée fonctionnelle
+en conditions réelles**, pas seulement en théorie ou en test isolé.
+
 **Ce qui est fait** :
 - Schéma SQL exécuté avec succès sur le projet Supabase
 - Authentification par email + mot de passe (pas de magic link,
@@ -484,7 +516,7 @@ explicitement cette session, cf. plus bas.
 | Harmonisation visuelle app/wizard (titre + aide dans le header) | ✅ Clos (13 juillet) |
 | Badge "Décharge" dans l'onglet Semaines (`renderWeeks`) | ✅ Clos (13 juillet) |
 | Rework présentation wizard | 🔜 À revalider avec Laurent |
-| v2.5 authentification Supabase | 🟡 En cours (13 juillet) — auth/déconnexion/sélecteur de plan/wizard fonctionnels en production après plusieurs incidents corrigés (course, migration manquante, wizard écrasé) ; profil coureur d'un compte de test perdu et ressaisi manuellement ; écriture réelle plan_donnees pas encore testée ; wizard pas protégé par auth (détail §8bis) |
+| v2.5 authentification Supabase | 🟢 Confirmé fonctionnel de bout en bout (13 juillet) — auth, migration rétroactive, wizard, et synchronisation réelle des séances vers Supabase tous validés en production après 5 bugs corrigés. Restant : wizard pas protégé par auth ; bascule complète des lectures vers Supabase (localStorage reste la source vive) ; variables d'env Vercel (détail §8bis) |
 | v2.5 commercialisation (Stripe) | 🔜 Non commencé |
 
 ## 10. Principes transverses à retenir
