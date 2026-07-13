@@ -17,6 +17,91 @@
     return typeof valeur === 'string' && RE_UUID.test(valeur);
   }
 
+  const CLE_MARQUEUR_MIGRATION_GLOBALE = 'lk_migration_supabase_globale_faite';
+  const CLE_MARQUEUR_MIGRATION_PLAN_PREFIX = 'lk_migration_supabase_plan_faite_';
+
+  async function migrerDonneesExistantes(userId, planId) {
+    const supabase = window.LkAuth.supabase;
+    const planIdValide = estUuidValide(planId) ? planId : null;
+    const dejaGlobale = !!localStorage.getItem(CLE_MARQUEUR_MIGRATION_GLOBALE);
+    const cleMarqueurPlan = planIdValide ? (CLE_MARQUEUR_MIGRATION_PLAN_PREFIX + planIdValide) : null;
+    const dejaPlan = cleMarqueurPlan ? !!localStorage.getItem(cleMarqueurPlan) : true;
+
+    if (dejaGlobale && dejaPlan) return;
+
+    try {
+      if (!dejaGlobale) {
+        const profilBrut = localStorage.getItem('lk_profil_coureur');
+        if (profilBrut) {
+          try {
+            const profil = JSON.parse(profilBrut);
+            await supabase.from('profils_coureur').upsert({ user_id: userId, data: profil });
+          } catch (e) { /* ignore */ }
+        }
+
+        const colonnes = {
+          lk_strava_token: 'strava_token',
+          lk_strava_refresh: 'strava_refresh',
+          lk_github_token: 'github_token',
+          lk_gist_id: 'gist_id',
+        };
+        const payloadIntegrations = { user_id: userId };
+        let auMoinsUneIntegration = false;
+        const entriesColonnes = Object.entries(colonnes);
+        for (let i = 0; i < entriesColonnes.length; i++) {
+          const cleLocale = entriesColonnes[i][0];
+          const colonne = entriesColonnes[i][1];
+          const brut = localStorage.getItem(cleLocale);
+          if (brut) {
+            try {
+              payloadIntegrations[colonne] = JSON.parse(brut);
+              auMoinsUneIntegration = true;
+            } catch (e) { /* ignore */ }
+          }
+        }
+        const stravaExpiresBrut = localStorage.getItem('lk_strava_expires');
+        if (stravaExpiresBrut) {
+          try {
+            const ts = JSON.parse(stravaExpiresBrut);
+            if (ts) { payloadIntegrations.strava_expires = new Date(ts).toISOString(); auMoinsUneIntegration = true; }
+          } catch (e) { /* ignore */ }
+        }
+        const lastSyncBrut = localStorage.getItem('lk_last_sync');
+        if (lastSyncBrut) {
+          try {
+            const ts = JSON.parse(lastSyncBrut);
+            if (ts) { payloadIntegrations.last_sync = new Date(ts).toISOString(); auMoinsUneIntegration = true; }
+          } catch (e) { /* ignore */ }
+        }
+        if (auMoinsUneIntegration) {
+          await supabase.from('integrations').upsert(payloadIntegrations);
+        }
+
+        localStorage.setItem(CLE_MARQUEUR_MIGRATION_GLOBALE, 'true');
+      }
+
+      if (!dejaPlan && planIdValide) {
+        const cleSuffixe = '_' + planIdValide;
+        const donnees = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const cle = localStorage.key(i);
+          if (cle && cle.indexOf('lk_') === 0 && cle.endsWith(cleSuffixe)) {
+            const cleBase = cle.slice(0, -cleSuffixe.length);
+            try {
+              donnees[cleBase] = JSON.parse(localStorage.getItem(cle));
+            } catch (e) { /* ignore */ }
+          }
+        }
+        if (Object.keys(donnees).length > 0) {
+          await supabase.from('plan_donnees').upsert({ plan_id: planIdValide, user_id: userId, data: donnees });
+        }
+        localStorage.setItem(cleMarqueurPlan, 'true');
+      }
+    } catch (err) {
+      console.warn('Migration rétroactive localStorage → Supabase échouée, nouvelle tentative au prochain appel :', err.message);
+    }
+  }
+
   async function precharger(userId, planId) {
     const planIdValide = estUuidValide(planId) ? planId : null;
     const supabase = window.LkAuth.supabase;
@@ -126,6 +211,7 @@
 
   window.LkSync = {
     precharger: precharger,
-    synchroniserVersSupabase: synchroniserVersSupabase
+    synchroniserVersSupabase: synchroniserVersSupabase,
+    migrerDonneesExistantes: migrerDonneesExistantes
   };
 })();
