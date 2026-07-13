@@ -38,18 +38,31 @@ const CLES_INTEGRATIONS = [
 // de perte en cas de changement d'appareil).
 const CLES_LOCALES_UNIQUEMENT = ['lk_weather_cache'];
 
+// Vérifie qu'une chaîne a la forme d'un UUID v4-like (celle générée par
+// crypto.randomUUID() côté wizard). Le plan de repli par défaut, généré
+// quand aucun plan n'existe encore (index.html, id fixe 'plan-repli-defaut',
+// cf. inventaire §2 commentaire du chargement du plan), n'en est pas un —
+// la colonne plan_id de plans/plan_donnees est typée uuid côté Postgres,
+// toute tentative d'écriture avec un id non-UUID échoue en 400. On l'ignore
+// proprement plutôt que de laisser l'erreur réseau se répéter à chaque save().
+const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function estUuidValide(valeur) {
+  return typeof valeur === 'string' && RE_UUID.test(valeur);
+}
+
 // ------------------------------------------------------------
 // Précharge toutes les données Supabase de l'utilisateur dans
 // localStorage. À appeler une fois, juste après confirmation de la
 // session (avant que index.html ne lise ses variables `let x = load(...)`).
 // ------------------------------------------------------------
 export async function precharger(userId, planId) {
+  const planIdValide = estUuidValide(planId) ? planId : null;
   try {
     const [profilRes, integrationsRes, planDonneesRes] = await Promise.all([
       supabase.from('profils_coureur').select('data').eq('user_id', userId).maybeSingle(),
       supabase.from('integrations').select('*').eq('user_id', userId).maybeSingle(),
-      planId
-        ? supabase.from('plan_donnees').select('data').eq('plan_id', planId).maybeSingle()
+      planIdValide
+        ? supabase.from('plan_donnees').select('data').eq('plan_id', planIdValide).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
     ]);
 
@@ -128,6 +141,12 @@ export function synchroniserVersSupabase(userId, planId, cle, valeur) {
   // Toute autre clé préfixée par plan (lk_statuses_xxx, lk_notes_xxx, etc.)
   // va dans plan_donnees.data, sous sa clé SANS le suffixe d'id.
   if (!planId) return; // pas de plan actif, rien à synchroniser
+  if (!estUuidValide(planId)) {
+    // Plan de repli par défaut ou tout autre id non-UUID : pas de table
+    // pour ce cas, on reste volontairement en localStorage uniquement.
+    // Redevient synchronisable dès qu'un vrai plan (UUID du wizard) est actif.
+    return;
+  }
   const cleBase = planId ? cle.replace(`_${planId}`, '') : cle;
 
   supabase.from('plan_donnees')
