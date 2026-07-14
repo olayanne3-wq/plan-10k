@@ -2,16 +2,18 @@
 
 > Vue d'ensemble de référence — à relire en début de session pour retrouver le contexte
 > sans re-parcourir tout le repo. Mis à jour au 14 juillet 2026 (chantier **marche-course
-> / niveau grand-débutant en cours** — moteur fait et poussé, duplication classic +
-> wizard + app pas commencés, voir §15 ; bug v2_gist_id résolu, voir §14 ; chantier ACWR
-> toujours en cours ; harmonisation visuelle app/wizard ; badge décharge onglet Semaines ;
-> **v2.5 publiée** — authentification Supabase, migration rétroactive, sync temps réel,
-> wizard protégé, nettoyage Réglages, variables d'env Vercel, file d'attente de sync ;
-> **publication Play Store en cours**, voir §11 ; **Mode Forme (v2.6) câblé de bout en
-> bout** — wizard, dashboard, coach adapté, clôture permanente avec garde-fou
-> anti-chevauchement, fiabilité du coach (prénom, moments de journée, météo dynamique),
-> voir §12 ; **bug TWA duplication de tâches résolu**, voir §13 ; **rebranding Yoria**
-> — nouveau nom, repo renommé plan-10k → yoria).
+> / niveau grand-débutant CLOS** — moteur, pont v1, wizard et dashboard faits et poussés,
+> reste des tests réels sur l'app déployée à faire, voir §15 ; **bug POIDS_STATUT corrigé
+> au passage** (l'adaptation dynamique était silencieusement cassée depuis un moment),
+> voir §15.5 ; bug v2_gist_id résolu, voir §14 ; chantier ACWR toujours en cours ;
+> harmonisation visuelle app/wizard ; badge décharge onglet Semaines ; **v2.5 publiée** —
+> authentification Supabase, migration rétroactive, sync temps réel, wizard protégé,
+> nettoyage Réglages, variables d'env Vercel, file d'attente de sync ; **publication
+> Play Store en cours**, voir §11 ; **Mode Forme (v2.6) câblé de bout en bout** — wizard,
+> dashboard, coach adapté, clôture permanente avec garde-fou anti-chevauchement, fiabilité
+> du coach (prénom, moments de journée, météo dynamique), voir §12 ; **bug TWA duplication
+> de tâches résolu**, voir §13 ; **rebranding Yoria** — nouveau nom, repo renommé
+> plan-10k → yoria).
 > Pour l'historique des décisions et le "pourquoi", voir les autres docs de ce dossier
 > (bibliotheque-seances.md, convergence-v1-v2.md, etc.) et les mémoires de session.
 >
@@ -1619,7 +1621,7 @@ relisant le code — la faute de frappe %22 dans l'URL a été le vrai
 indice, pas visible en lisant sync-storage.js isolément sans comparer à
 la façon dont gist-sync.js lit cette même clé.
 
-## 15. Niveau "grand débutant" et séances marche-course (chantier ouvert, démarré le 14/07/2026)
+## 15. Niveau "grand débutant" et séances marche-course (chantier clos le 14/07/2026)
 
 Contexte — les 3 niveaux existants (debutant/intermediaire/confirme,
 cf. §2.2 méthodologie) supposent tous une capacité à courir en continu.
@@ -1632,99 +1634,139 @@ méthode Galloway) :
 
 - Nouveau niveau **`grand-debutant`**, distinct de `debutant` — évite de
   complexifier les 12 sous-types de séance qualité existants avec une
-  logique marche-course (un grand débutant n'a de toute façon pas sa
-  place sur ces séances-là).
+  logique marche-course.
 - Le marche-course est une **phase initiale transitoire**, pas un
   remplacement permanent de l'EF — une fois la course continue acquise,
-  transition vers le niveau `debutant` classique (structure
-  longue/EF/qualité).
+  transition vers un vrai plan `debutant` (structure longue/EF/qualité),
+  via une bannière dédiée plutôt qu'une conversion automatique en place
+  (jugée risquée, cf. §15.4).
 - **Pas de sortie longue distincte** pendant cette phase : toutes les
   séances de la semaine sont identiques (même palier marche-course),
-  conforme à tous les programmes de référence consultés — la notion de
-  "longue" n'apparaît qu'une fois la course continue tenue.
-- **Progression conditionnelle, pas de durée fixe** — chaque palier a un
-  seuil minimal de séances validées avant de proposer le palier suivant,
-  mais pas de saut automatique à date fixe (cohérent avec le principe
-  "pas de saut brutal" déjà appliqué en v2.2, et avec ce que font tous
-  les programmes de référence : 8 à 12+ semaines selon la personne, sans
-  pénalité à répéter une semaine).
-- **Garde-fou de durée** : si le coureur reste bloqué au même palier plus
-  de 12 semaines, un avertissement informatif (pas bloquant) est généré
-  plutôt que de laisser le plan traîner silencieusement sans que
-  personne ne s'en aperçoive.
-- Une seule variable bouge à la fois : la durée totale de séance reste
-  stable (~25min) pendant que le ratio course/marche évolue — jamais les
-  deux en même temps (principe retrouvé dans toutes les sources sur le
-  run/walk method).
+  conforme à tous les programmes de référence consultés.
+- **Progression conditionnelle, pas de durée fixe** — seuil minimal de
+  séances validées avant de proposer le palier suivant, jamais de saut
+  automatique à date fixe.
+- **Garde-fou de durée** : au-delà de 12 semaines bloqué au même palier,
+  avertissement informatif (pas bloquant).
+- Une seule variable bouge à la fois : durée totale de séance stable
+  (~25min), seul le ratio course/marche évolue.
 
-### 15.1 Moteur (FAIT et poussé le 14/07/2026, commit 7b4295b)
+### 15.1 Moteur — FAIT (commits 7b4295b, a22c6e1)
 
-Dans `public/v2/engine/plan-generator.js` :
+Dans `public/v2/engine/plan-generator.js` (dupliqué en classic) :
 
-- `nbQualiteFor(nbSeances, niveau)` : `grand-debutant` → toujours 0.
-- `placerSemaine(...)` : pour `grand-debutant`, court-circuite la
-  logique longue/qualité/EF — toutes les séances de la semaine reçoivent
-  `{ type: 'marche-course' }`. Garde-fou 48h entre séances dures
-  toujours appliqué.
-- `PALIERS_MARCHE_COURSE` : table de 7 paliers, du ratio 1min course /
-  1min30 marche jusqu'à 30min de course continue (méthode Galloway),
-  chacun avec un label et des durées course/marche en secondes.
-- `genererContenuMarcheCourse({ palierId })` : génère le texte de séance
-  (échauffement marche + N cycles course/marche + retour au calme), en
-  ajustant le nombre de cycles pour tenir dans la durée cible fixe
-  (~25min) — pas de kmEstime fiable à ce stade (pas d'allure établie).
-- `palierMarcheCourseFor(seancesValideesPalierCourant, palierActuelId)` :
-  détermine si le coureur est prêt pour le palier suivant (seuil : 2
-  séances validées "reussie" au palier courant).
-- `generatePlanMarcheCourse(profil, params)` : chemin de génération
-  dédié, appelé depuis `generatePlan()` dès que `profil.niveau ===
-  'grand-debutant'` — pas de phases Construction/Spécifique/Affûtage
-  (qui supposent une allure course/Riegel dont ce public n'a pas encore
-  besoin), pas d'estimation d'allure. Le plan est une répétition du
-  palier courant (`profil.palierMarcheCourse`) sur toutes les semaines ;
-  changer de palier nécessite de régénérer le plan avec la nouvelle
-  valeur (pas de recalcul automatique en cours de plan à ce stade).
-- `analyserProgressionMarcheCourse(plan)` : lit les statuts des séances
-  marche-course déjà vécues (`statuses`), compte les séances "reussie"
-  depuis le début du palier courant, retourne si prêt pour le palier
-  suivant + déclenche le warning `MARCHE_COURSE_PROGRESSION_LENTE` au-delà
-  de `GARDE_FOU_SEMAINES_MARCHE_COURSE` (12) semaines sans progression.
-  Distincte du mécanisme d'adaptation classique (`analyserAdaptations`,
-  §33) car ici il s'agit de faire avancer un palier, pas d'ajuster un
-  volume — `calculerScoreSemaine` ignore de toute façon les séances
-  `marche-course` (ne compte que qualité/longue), donc les deux
-  mécanismes ne se marchent pas dessus.
+- `nbQualiteFor` / `placerSemaine` : `grand-debutant` → 0 qualité, pas de
+  longue, uniquement séances `{ type: 'marche-course' }`. Garde-fou 48h
+  entre séances toujours appliqué.
+- `PALIERS_MARCHE_COURSE` : 7 paliers, de 1min course/1min30 marche à
+  30min de course continue (méthode Galloway).
+- `genererContenuMarcheCourse({ palierId })` : texte de séance généré
+  (échauffement + N cycles + retour au calme), durée totale stable.
+- `palierMarcheCourseFor` : seuil de 2 séances "✅" validées avant de
+  proposer le palier suivant.
+- `generatePlanMarcheCourse` : chemin de génération dédié (appelé
+  automatiquement par `generatePlan()` si `profil.niveau ===
+  'grand-debutant'`), sans phases Construction/Spécifique/Affûtage.
+  Expose `mode: 'marche-course'`, `palierMarcheCourse`, `dateDebut` à la
+  racine du plan (même contrat que le plan classique et que
+  `plan-forme.js`, nécessaire pour `renderResults`/`v1-bridge.js`).
+- `analyserProgressionMarcheCourse(plan)` : détecte si prêt pour le
+  palier suivant (lit les statuts `"✅"` réels, pas des mots), déclenche
+  `MARCHE_COURSE_PROGRESSION_LENTE` au-delà de 12 semaines de stagnation.
+  Distincte d'`analyserAdaptations` (§33) : ici on fait avancer un
+  palier, pas un ajustement de volume.
 
-Testé (fichiers de test manuels, non committés — à formaliser en vrai
-fichier `test-marche-course.mjs` lors d'une prochaine session) : cas
-niveau/nbQualite, placement de semaine, contenu par palier, progression
-conditionnelle, garde-fou déclenché au bon seuil, génération de plan
-complet. Aucune régression sur `test-plan-generator.mjs` existant
-(exit 0, tous les cas debutant/intermediaire/confirme toujours OK).
+Testé : `test-plan-generator.mjs` (exit 0, aucune régression sur les 3
+niveaux existants) + tests manuels ciblés (non committés — à formaliser
+en `test-marche-course.mjs` dans une session dédiée) sur placement de
+semaine, contenu par palier, progression conditionnelle, garde-fou,
+génération de plan complet, intégration avec le pont v1.
 
-### 15.2 Reste à faire (pas commencé)
+### 15.2 Pont v1-bridge — FAIT (commits 473859f, 0a2f00e)
 
-- **Duplication classic** : régénérer
-  `public/engine-classic-scripts/plan-generator.classic.js` avec les
-  mêmes ajouts (export retirés via `sed`, cf. §12) — sans ça, `index.html`
-  ne voit aucun de ces changements malgré le push du moteur ES.
-- **Wizard** (`public/v2/index.html`) : ajouter le choix `grand-debutant`
-  dans la sélection de niveau, idéalement avec une question de type
-  "je n'ai jamais couru / je marche mais ne cours pas encore" plutôt que
-  d'exposer directement le mot "grand débutant".
-- **App/dashboard** (`public/index.html`) : afficher le contenu
-  marche-course (actuellement juste un texte généré, pas de rendu
-  spécifique), capter le statut de chaque séance (reussie/ratee/adaptee),
-  déclencher le changement de palier (mettre à jour
-  `profil.palierMarcheCourse` puis régénérer le plan — pas de mécanisme
-  de régénération partielle pour l'instant) une fois
-  `analyserProgressionMarcheCourse` confirme `pretPourSuivant`.
-- **Transition vers `debutant`** : au dernier palier (course continue
-  30min), pas encore de mécanique définie pour basculer proprement vers
-  un vrai plan `debutant` avec structure longue/EF/qualité — à
-  concevoir lors d'une prochaine session (probablement : proposer la
-  création d'un nouveau plan `debutant` une fois le dernier palier
-  validé, plutôt qu'une transformation automatique en place).
-- Le warning `MARCHE_COURSE_PROGRESSION_LENTE` n'est affiché nulle part
-  dans l'UI pour l'instant (le mécanisme existe côté moteur, pas encore
-  câblé à un composant d'affichage).
+`public/v2/engine/v1-bridge.js` (dupliqué en classic) : nouveau type
+`MARCHE_COURSE` dans `typeV1DepuisSeanceV2` et `traduirePlanVersFormatV1`
+— contenu affiché tel quel (pas de découpage warmup/session/cooldown
+comme pour les séances qualité, le format généré est déjà une phrase
+lisible), `palierLabel` propagé pour un affichage futur plus riche côté
+carte de séance si besoin.
+
+### 15.3 Wizard — FAIT (commit b1d9fa7)
+
+`public/v2/index.html` :
+
+- Nouveau choix niveau "Je n'ai jamais couru" (Step 2), mappé sur
+  `grand-debutant` — libellé volontairement accessible plutôt que
+  d'exposer le terme technique "grand débutant".
+- Steps 3 (volume actuel), 4 (chrono de référence), 5 (objectif chrono)
+  **sautés automatiquement** dans les deux sens de navigation
+  (`estGrandDebutant()` + saut conditionnel dans `nextStep`/`prevStep`)
+  — décision explicite avec Laurent : plus honnête que des valeurs par
+  défaut invisibles, ces notions n'existent pas pour ce profil.
+- Step 6 (échéance) adapté : libellés changés ("Jusqu'à quand ?" /
+  "Fin du bloc" au lieu de "Jour de la course"), bloc "Infos de la
+  course" (nom/lieu/lien) masqué.
+- `collectParamsFromWizard` : `palierMarcheCourse: 0` à la création,
+  constantes neutres (`'5K'`, `'30:00'`) pour `distance`/`tempsReference`
+  /`objectif` — jamais affichées, seulement pour satisfaire la signature
+  de `generatePlanMarcheCourse` qui ne les utilise pas.
+- `renderResults` : court-circuit dédié pour `plan.mode ===
+  'marche-course'` (pas d'allures/zoneFC à afficher, palier de départ
+  affiché à la place).
+
+### 15.4 Dashboard — FAIT (commit b52b1ca)
+
+`public/index.html` :
+
+- `STYPES.MARCHE_COURSE` ajouté (même famille visuelle que EF — effort
+  d'endurance douce, pas une séance d'intensité). Couvre automatiquement
+  la plupart des affichages via les nombreux replis
+  `STYPES[type]||STYPES.REPOS` déjà présents dans le code.
+- **Bannière de progression de palier** (pattern calqué sur la bannière
+  d'adaptation existante, §33) : "🎉 Prêt·e pour la suite ?" avec deux
+  boutons — "Palier suivant" (régénère le plan avec
+  `palierMarcheCourse + 1`, sauvegarde si connecté) et "Continuer ce
+  palier" (mémorise le refus pour CE palier précis, pas définitif —
+  disparaît si on retombe dans la même situation à un palier différent).
+- **Bannière de transition vers `debutant`** au dernier palier (course
+  continue 30min) validé : "🏆 Tu cours en continu !" avec un lien vers
+  `/v2` (même pattern que "🏁 Configurer un plan" déjà existant) pour
+  créer un vrai plan `debutant`, plutôt qu'une conversion automatique en
+  place — et un bouton "Pas encore" pour repousser sans y être forcé.
+- Warning de stagnation (`MARCHE_COURSE_PROGRESSION_LENTE`) affiché en
+  bannière discrète (💛) dès qu'il se déclenche, indépendamment du reste.
+
+### 15.5 Bug corrigé au passage : `POIDS_STATUT` neutralisait
+### `analyserAdaptations()` depuis un moment (commits a22c6e1, 7f823ad)
+
+Repéré en corrigeant le même type d'erreur sur
+`analyserProgressionMarcheCourse` : `POIDS_STATUT` utilisait des clés
+textuelles (`ratee`/`adaptee`/`reussie`) qui ne correspondaient à AUCUN
+statut réel jamais stocké par l'app — les vrais statuts sont des emojis
+(`"✅"`/`"❌"`/`"⚠️"`/`"😴"`, cf. `SOPTS` dans `index.html`).
+`POIDS_STATUT[statut]` retournait donc toujours `undefined`, neutralisé
+silencieusement par le repli `?? 0` — chaque séance ratée comptait pour
+0 au lieu de 1 dans `calculerScoreSemaine`. Conséquence concrète : la
+bannière "🔄 Adaptation suggérée" ne s'affichait JAMAIS, quel que soit le
+nombre de séances ratées, depuis l'introduction de ce mécanisme.
+
+Corrigé : `POIDS_STATUT = { '❌': 1, '⚠️': 0.5, '✅': 0 }`. Validé par un
+test ciblé (2 séances dures marquées "❌" sur une semaine → score 2 →
+semaine suivante correctement proposée à l'adaptation, alors qu'avant
+le correctif rien ne se déclenchait jamais).
+
+### 15.6 Reste à faire
+
+- **Tests réels sur l'app déployée** — pas encore fait à la clôture de
+  cette session, à vérifier dès que Vercel a redéployé : parcours wizard
+  complet en "Je n'ai jamais couru", validation de séances, apparition
+  de la bannière de progression, passage de palier, bannière de
+  transition au dernier palier.
+- Fichier de test formel `test-marche-course.mjs` à créer (les tests
+  actuels sont des scripts manuels non committés).
+- Le calcul de km prévisionnel affiché sur la carte "Aujourd'hui"
+  (`index.html`, repli `pace=6` par défaut pour tout type non EF/LONGUE/
+  VMA/SPEC/SEUIL) donnera une estimation approximative pour
+  `MARCHE_COURSE` — pas cassé, juste imprécis (le vrai `kmEstime` du
+  moteur est `null` pour ce type, faute d'allure établie). Pas
+  prioritaire, mais à garder en tête si Laurent le remarque.
