@@ -855,6 +855,27 @@ async function fetchCoachMsg() {
   const tomorrowKeySess = ALL_SESSIONS.find(s=>s.date===tomorrowKeyStr&&["VMA","SPEC","SEUIL","TEST"].includes(s.type));
   const isEveOfKeySession = !!tomorrowKeySess;
 
+  // Données Strava de la séance du jour si terminée
+  const todayStravaRun = sessionDone ? stravaActivities.find(r=>r.start_date_local?.slice(0,10)===t) : null;
+  const todayEffortLaps = todayStravaRun ? getLapsAffichage(todayStravaRun, todaySessObj?.structureIntervalles) : [];
+  const todayAvgPace = todayEffortLaps.length > 0
+    ? fmtPace(todayEffortLaps.reduce((s,l)=>s+l.average_speed,0)/todayEffortLaps.length)+"/km"
+    : todayStravaRun ? fmtPace(todayStravaRun.average_speed)+"/km" : null;
+  const todayInTarget = todayEffortLaps.length > 0 && SESSION_TARGETS[sessType]
+    ? todayEffortLaps.filter(l=>(1000/l.average_speed)<=SESSION_TARGETS[sessType].okPace).length+"/"+todayEffortLaps.length+" reps dans la cible"
+    : null;
+  // IE moyen et cadence moyenne de la séance terminée (si assez de données — min 3 séances du même type)
+  const todayNSameType = stravaActivities.filter(a=>{
+    const d = a.start_date_local?.slice(0,10);
+    return ALL_SESSIONS.find(ss=>ss.date===d&&ss.type===sessType);
+  }).length;
+  const todayIEVals = todayEffortLaps.length > 0 ? todayEffortLaps.map(l=>economyScore(l,sessType)).filter(v=>v!==null) : [];
+  const todayAvgIE = (todayIEVals.length > 0 && todayNSameType >= 3)
+    ? Math.round(todayIEVals.reduce((a,b)=>a+b,0)/todayIEVals.length)
+    : null;
+  const todayCadVals = todayEffortLaps.length > 0 ? todayEffortLaps.map(l=>l.average_cadence?Math.round(l.average_cadence*2):null).filter(v=>v!==null) : [];
+  const todayAvgCad = todayCadVals.length > 0 ? Math.round(todayCadVals.reduce((a,b)=>a+b,0)/todayCadVals.length) : null;
+
   // Charge d'entraînement (ACWR) — utilisée pour NUANCER le ton du coach
   // (prudence si charge élevée, encouragement si charge basse/stable),
   // jamais mentionnée explicitement (terme trop technique pour un message
