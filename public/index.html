@@ -913,7 +913,7 @@ async function fetchCoachMsg() {
   const prompt = `Tu es Léa, coach running.${prenomCoureur ? ` Le coureur à qui tu t'adresses s'appelle ${prenomCoureur} — utilise son prénom pour t'adresser à lui, jamais "Léa" (qui est TON propre prénom, pas le sien).` : ' Ne t\'adresse jamais au coureur par "Léa" — c\'est ton propre prénom, pas le sien ; utilise "tu" sans prénom si tu ne connais pas le sien.'}${ESTMODEFORME ? ' Ton coureur suit un plan de maintien en forme (pas de course visée actuellement).' : ` Tu prépares le ${RACE_NAME} le ${new Date(DATE_COURSE_REFERENCE+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})} à ${RACE_LOCATION} (objectif ${fmtTime(raceGoalTime)}).`}
 ${ESTMODEFORME ? '' : `Estimation actuelle : ${predNow.timeStr} (${gapStr}).`}
 ${isMonday && prevWeekReport ? `Semaine ${prevWeekNum} terminée : ${prevWeekReport.done}/${prevWeekReport.total} séances validées, ${prevWeekKm} km courus.` : ''}
-${sessionDone ? `Séance ${sessType} terminée ce soir — statut ${todaySessionStatus}.${todayAvgPace ? ' Allure intervalles : '+todayAvgPace+'.' : ''}${todayInTarget ? ' '+todayInTarget+'.' : ''}${todayAvgIE ? ' Indice d\'économie (IE) : '+todayAvgIE+' (100=normal, >100=meilleur qu\'attendu).' : ''}${todayAvgCad ? ' Cadence moy. : '+todayAvgCad+' spm.' : ''}` : `Aujourd'hui (PAS ENCORE FAIT) : ${sessType} — ${sessDesc}.`}
+${sessionDone ? `Séance ${sessType} déjà terminée aujourd'hui — statut ${todaySessionStatus}.${todayAvgPace ? ' Allure intervalles : '+todayAvgPace+'.' : ''}${todayInTarget ? ' '+todayInTarget+'.' : ''}${todayAvgIE ? ' Indice d\'économie (IE) : '+todayAvgIE+' (100=normal, >100=meilleur qu\'attendu).' : ''}${todayAvgCad ? ' Cadence moy. : '+todayAvgCad+' spm.' : ''}` : `Aujourd'hui (PAS ENCORE FAIT) : ${sessType} — ${sessDesc}.`}
 ${isEveOfKeySession ? `Demain séance clé : ${tomorrowKeySess.type} — ${tomorrowKeySess.session}.` : ''}
 ${weatherTemp ? 'Température : '+weatherTemp+'°C.' : ''}
 ${!ESTMODEFORME && isLastTwoWeeks ? `J–${cd} avant la course.` : ""}
@@ -932,6 +932,7 @@ ${isMonday
         : 'La séance du jour N\'A PAS ENCORE EU LIEU — ne la commente jamais au passé ni comme si elle était déjà faite. Génère UN message de coaching court et motivant, tourné vers l\'AVANT, sur la séance à venir. 2-3 phrases max.'}
 ${!ESTMODEFORME && isLastTwoWeeks ? "Mentionne le compte à rebours." : "Ne mentionne pas le nombre de jours restants."}
 Ne mentionne jamais le terme "ACWR" ou "charge aiguë/chronique" — reste dans un langage naturel de coach, pas technique.
+Tu ne connais jamais l'heure ni le moment de la journée (matin, midi, soir) où une séance a eu lieu ou aura lieu — ne l'invente jamais ("ce soir", "demain matin", "avant de dormir"...) et ne donne aucun conseil qui suppose un horaire précis (petit-déjeuner avant la séance, hydratation la veille au soir...). Reste sur des repères de jour uniquement (aujourd'hui, demain).
 Réponds uniquement avec le message, sans guillemets.`;
 
   try {
@@ -984,7 +985,7 @@ async function fetchCoachRaceMsg(notesSegments) {
 Objectif : ${fmtTime(raceGoalTime)}. Estimation actuelle : ${predNow.timeStr} (${gapStr}).
 J-${cd} avant la course.
 Stratégie de course déjà affichée à l'utilisateur (ne la répète pas, ne redonne pas les allures/km déjà visibles) : ${notesSegments.join(' puis ')}.
-Donne un vrai conseil complémentaire, PAS une reformulation de la stratégie ci-dessus — plutôt un conseil mental (gestion du stress, focus), logistique (sommeil, alimentation les jours précédents) ou sur l'écart actuel avec l'objectif (rassurant si en avance, réaliste si en retard). 2-3 phrases max. Réponds uniquement avec le message, sans guillemets.`;
+Donne un vrai conseil complémentaire, PAS une reformulation de la stratégie ci-dessus — plutôt un conseil mental (gestion du stress, focus), logistique (sommeil, alimentation les jours précédents) ou sur l'écart actuel avec l'objectif (rassurant si en avance, réaliste si en retard). Tu ne connais jamais l'heure de départ de la course ni le moment de la journée d'aucune séance — reste sur des repères de jour uniquement, jamais d'horaire précis inventé. 2-3 phrases max. Réponds uniquement avec le message, sans guillemets.`;
 
   try {
     const resp = await fetch("/api/coach", {
