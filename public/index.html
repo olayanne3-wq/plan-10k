@@ -5,25 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#07162F">
+<meta name="theme-color" content="#F8FAFC">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <title>Yoria</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-body { background: #07162F; color: #f1f5f9; font-family: 'Inter',-apple-system,'Helvetica Neue',Arial,sans-serif; font-variant-numeric: tabular-nums; max-width: 430px; margin: 0 auto; }
+body { background: #F8FAFC; color: #1F2937; font-family: 'Inter',-apple-system,'Helvetica Neue',Arial,sans-serif; font-variant-numeric: tabular-nums; max-width: 430px; margin: 0 auto; }
 button, input { font-family: inherit; }
 .pill { border-radius: 4px; padding: 2px 7px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; flex-shrink: 0; }
-.card { background: #1a1d27; border: 1px solid #2e3347; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+.card { background: #FFFFFF; border: 1px solid #D6DCE5; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
 .muted { color: #b0bec5; }
-.text2 { color: #e2e8f0; }
+.text2 { color: #374151; }
 .orange { color: #1E4ED8; }
 .green { color: #22c55e; }
 .label { font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #64748b; margin-bottom: 8px; }
 input[type=text], input[type=number], input[type=password] {
-  background: #1a1d27; border: 1px solid #2e3347; border-radius: 10px;
-  padding: 10px 14px; color: #f1f5f9; font-size: 14px; outline: none; width: 100%;
+  background: #FFFFFF; border: 1px solid #D6DCE5; border-radius: 10px;
+  padding: 10px 14px; color: #1F2937; font-size: 14px; outline: none; width: 100%;
 }
 #app > div { animation: fadeIn 0.2s ease; }
 @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
@@ -261,7 +261,7 @@ const STYPES = {
   SPEC:  { label:"Allure spécifique 10K",  color:"#a855f7",  short:"SPEC"  },
   LONGUE:{ label:"Sortie longue",          color:"#06b6d4",  short:"LONG"  },
   TEST:  { label:"Séance test",            color:"#1E4ED8",  short:"TEST"  },
-  REPOS: { label:"Repos",                  color:"#e2e8f0",  short:"REPOS" },
+  REPOS: { label:"Repos",                  color:"#374151",  short:"REPOS" },
   RACE:  { label:"Course",                 color:"#1E4ED8",  short:"RACE"  },
 };
 
@@ -278,7 +278,7 @@ const STYPES = {
 // avant que SOPTS n'existe encore (temporal dead zone d'une const, à la
 // différence d'une déclaration de fonction qui est hoisted).
 const SOPTS=["—","✅","❌","⚠️","😴"];
-const SCOLORS={"—":"#475569","✅":"#22c55e","❌":"#ef4444","⚠️":"#eab308","😴":"#60a5fa"};
+const SCOLORS={"—":"#6B7280","✅":"#22c55e","❌":"#ef4444","⚠️":"#eab308","😴":"#60a5fa"};
 
 // ── Allures de référence (sec/km) ──
 // EF : 6:20/km = 380 s/km
@@ -674,7 +674,7 @@ function globalPct() {
   const done = ALL_SESSIONS.filter(s=>statuses[s.uid]==="✅").length;
   return Math.round(done/total*100);
 }
-function phaseOf(weekNum) { return PHASES.find(p=>p.weeks.includes(weekNum))||{color:"#e2e8f0",label:""}; }
+function phaseOf(weekNum) { return PHASES.find(p=>p.weeks.includes(weekNum))||{color:"#374151",label:""}; }
 
 // Identifie si une semaine est une semaine de décharge — champ produit par
 // le moteur v2 (estDechargeSemaine, cf. v2/engine/plan-generator.js) et
@@ -1108,7 +1108,7 @@ function economyScore(lap, sessionType) {
   return Math.round(iecTheo / iecReal * 100);
 }
 function economyColor(score, n) {
-  if (!score || n < 3) return "#e2e8f0";
+  if (!score || n < 3) return "#374151";
   if (score > 110) return "#22c55e";
   if (score >= 90) return "#eab308";
   return "#ef4444";
@@ -1303,7 +1303,7 @@ function computeFcDrift(laps) {
   });
   const driftColor = drift <= 5 ? "#22c55e" : drift <= 12 ? "#eab308" : "#ef4444";
   const driftIcon = drift <= 5 ? "✅" : drift <= 12 ? "⚠️" : "🔴";
-  const driftEl = el("div",{style:{background:"#232738",borderRadius:"8px",padding:"8px 12px",marginTop:"6px",display:"flex",justifyContent:"space-between",alignItems:"center"}},
+  const driftEl = el("div",{style:{background:"#E5E9F0",borderRadius:"8px",padding:"8px 12px",marginTop:"6px",display:"flex",justifyContent:"space-between",alignItems:"center"}},
     el("span",{class:"muted",style:{fontSize:"13px"}},"Dérive FC"),
     el("span",{style:{color:driftColor,fontSize:"14px",fontWeight:"700"}},(drift>0?"+":"")+drift+" bpm "+driftIcon)
   );
@@ -1314,7 +1314,7 @@ function computeFcDrift(laps) {
 function renderLapRow(lap, i, sessionType) {
   const tgt = SESSION_TARGETS[sessionType];
   const pace = 1000/lap.average_speed;
-  let bc = "#e2e8f0", em = "";
+  let bc = "#374151", em = "";
   if (tgt) {
     if (pace <= tgt.okPace) { bc="#22c55e"; em="🟢"; }
     else if (pace <= tgt.warnPace) { bc="#eab308"; em="🟡"; }
@@ -1349,10 +1349,10 @@ function renderLapRow(lap, i, sessionType) {
   const reasonColor = bc === "#22c55e" ? "#22c55e" : bc === "#eab308" ? "#eab308" : "#ef4444";
   return el("div",{style:{marginBottom:"6px"}},
     el("div",{style:{display:"grid",gridTemplateColumns:"28px 1fr 64px 56px 20px",gap:"4px",alignItems:"center",marginBottom:"2px"}},
-      el("span",{style:{color:"#e2e8f0",fontSize:"13px"}},"R"+(i+1)),
-      el("div",{style:{height:"4px",background:"#232738",borderRadius:"2px"}},el("div",{style:{width:bw+"%",height:"100%",background:bc,borderRadius:"2px"}})),
-      el("span",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"500",textAlign:"right"}},fmtPace(lap.average_speed)+"/km"),
-      lap.average_heartrate?el("span",{style:{fontSize:"13px",textAlign:"right",color:lap._fcAlert?"#ef4444":"#94a3b8",fontWeight:lap._fcAlert?"700":"400"}},Math.round(lap.average_heartrate)+" bpm"+(lap._fcAlert?" ↑":"")):el("span",{},""),
+      el("span",{style:{color:"#374151",fontSize:"13px"}},"R"+(i+1)),
+      el("div",{style:{height:"4px",background:"#E5E9F0",borderRadius:"2px"}},el("div",{style:{width:bw+"%",height:"100%",background:bc,borderRadius:"2px"}})),
+      el("span",{style:{color:"#1F2937",fontSize:"14px",fontWeight:"500",textAlign:"right"}},fmtPace(lap.average_speed)+"/km"),
+      lap.average_heartrate?el("span",{style:{fontSize:"13px",textAlign:"right",color:lap._fcAlert?"#ef4444":"#64748B",fontWeight:lap._fcAlert?"700":"400"}},Math.round(lap.average_heartrate)+" bpm"+(lap._fcAlert?" ↑":"")):el("span",{},""),
       el("span",{style:{fontSize:"14px",textAlign:"center"}},em)
     ),
     reasonText?el("div",{style:{paddingLeft:"32px",marginBottom:"2px"}},
@@ -1746,7 +1746,7 @@ function renderSelecteurPlan() {
 
   const idActuel = window.__PLAN_BRUT__?.id;
   const select = el("select",{style:{
-    background:"#232738",color:"#f1f5f9",border:"1px solid #2e3347",
+    background:"#E5E9F0",color:"#1F2937",border:"1px solid #D6DCE5",
     borderRadius:"8px",padding:"6px 10px",fontSize:"14px",fontWeight:"600",
     width:"100%",cursor:"pointer"
   }, onChange: (e) => {
@@ -1833,7 +1833,7 @@ function renderDashboard() {
             render();
           }
         },"Appliquer"),
-        el("button",{style:{flex:"1",background:"none",border:"1px solid #2e3347",borderRadius:"8px",padding:"9px",color:"#94a3b8",fontSize:"14px",fontWeight:"600",cursor:"pointer"},
+        el("button",{style:{flex:"1",background:"none",border:"1px solid #D6DCE5",borderRadius:"8px",padding:"9px",color:"#64748B",fontSize:"14px",fontWeight:"600",cursor:"pointer"},
           feedback:true,
           onClick:()=>{
             const ignorees = load(clePourPlan("lk_adaptations_ignorees"), []);
@@ -1866,12 +1866,12 @@ function renderDashboard() {
 
     const inp = document.createElement("input");
     inp.type="time"; inp.step="1";
-    inp.style.cssText="flex:1;background:#232738;border:1px solid #2e3347;border-radius:8px;padding:8px 12px;color:#f1f5f9;font-size:16px;";
+    inp.style.cssText="flex:1;background:#E5E9F0;border:1px solid #D6DCE5;border-radius:8px;padding:8px 12px;color:#1F2937;font-size:16px;";
     const hh=Math.floor(raceResult/3600), mm=Math.floor((raceResult%3600)/60), ss2=raceResult%60;
     inp.value=hh.toString().padStart(2,"0")+":"+mm.toString().padStart(2,"0")+":"+ss2.toString().padStart(2,"0");
     const saveBtn2=document.createElement("button");
     saveBtn2.textContent="OK";
-    saveBtn2.style.cssText="background:"+color+";border:none;border-radius:8px;padding:8px 16px;color:"+(close?"#1a1d27":"#fff")+";font-size:14px;font-weight:700;cursor:pointer;";
+    saveBtn2.style.cssText="background:"+color+";border:none;border-radius:8px;padding:8px 16px;color:"+(close?"#FFFFFF":"#fff")+";font-size:14px;font-weight:700;cursor:pointer;";
     saveBtn2.addEventListener("click",()=>{
       const parts=inp.value.split(":");
       if(parts.length>=2){const secs=parseInt(parts[0])*3600+parseInt(parts[1])*60+(parseInt(parts[2])||0);if(!isNaN(secs)&&secs>0){save(clePourPlan("lk_race_result"),secs);render();}}
@@ -1879,28 +1879,28 @@ function renderDashboard() {
     const inputRow=document.createElement("div");
     inputRow.style.cssText="display:flex;gap:8px;";
     inputRow.appendChild(inp); inputRow.appendChild(saveBtn2);
-    const inputCard=el("div",{style:{background:"#1a1d27",borderRadius:"10px",padding:"12px",marginTop:"8px"}},
-      el("div",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"700",marginBottom:"8px"}},"Corriger mon resultat")
+    const inputCard=el("div",{style:{background:"#FFFFFF",borderRadius:"10px",padding:"12px",marginTop:"8px"}},
+      el("div",{style:{color:"#1F2937",fontSize:"14px",fontWeight:"700",marginBottom:"8px"}},"Corriger mon resultat")
     );
     inputCard.appendChild(inputRow);
-    const banner=el("div",{style:{background:"#1a1d27",border:"1px solid "+color+"44",borderRadius:"16px",padding:"20px",marginBottom:"12px",marginTop:"8px",textAlign:"center"}},
+    const banner=el("div",{style:{background:"#FFFFFF",border:"1px solid "+color+"44",borderRadius:"16px",padding:"20px",marginBottom:"12px",marginTop:"8px",textAlign:"center"}},
       el("div",{style:{fontSize:"48px",marginBottom:"8px"}},emoji),
       el("div",{style:{color:color,fontSize:"22px",fontWeight:"900",marginBottom:"4px"}},title),
-      el("div",{style:{color:"#f1f5f9",fontSize:"15px",marginBottom:"16px"}},RACE_NAME+" - "+new Date(DATE_COURSE_REFERENCE+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})),
+      el("div",{style:{color:"#1F2937",fontSize:"15px",marginBottom:"16px"}},RACE_NAME+" - "+new Date(DATE_COURSE_REFERENCE+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})),
       el("div",{style:{display:"grid",gridTemplateColumns:"1fr 1px 1fr",gap:"12px",marginBottom:"12px"}},
-        el("div",{style:{textAlign:"center"}},el("div",{style:{color:"#94a3b8",fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"4px"}},"Objectif"),el("div",{style:{color:"#1E4ED8",fontSize:"24px",fontWeight:"900"}},fmtTime(raceGoalTime))),
-        el("div",{style:{background:"#2e3347"}}),
-        el("div",{style:{textAlign:"center"}},el("div",{style:{color:"#94a3b8",fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"4px"}},"Resultat"),el("div",{style:{color:color,fontSize:"24px",fontWeight:"900"}},fmtTime(raceResult)))
+        el("div",{style:{textAlign:"center"}},el("div",{style:{color:"#64748B",fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"4px"}},"Objectif"),el("div",{style:{color:"#1E4ED8",fontSize:"24px",fontWeight:"900"}},fmtTime(raceGoalTime))),
+        el("div",{style:{background:"#D6DCE5"}}),
+        el("div",{style:{textAlign:"center"}},el("div",{style:{color:"#64748B",fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"4px"}},"Resultat"),el("div",{style:{color:color,fontSize:"24px",fontWeight:"900"}},fmtTime(raceResult)))
       ),
       el("div",{style:{background:color+"22",border:"1px solid "+color+"44",borderRadius:"10px",padding:"12px",marginBottom:"12px"}},el("div",{style:{color:color,fontSize:"14px",fontWeight:"700"}},subtitle)),
-      el("div",{style:{background:"#232738",borderRadius:"8px",padding:"10px 12px",display:"flex",gap:"8px",textAlign:"left",marginBottom:"8px"}},el("span",{style:{fontSize:"18px",flexShrink:"0"}},"🤖"),el("div",{style:{color:"#e2e8f0",fontSize:"13px",lineHeight:"1.5"}},coachMsg2))
+      el("div",{style:{background:"#E5E9F0",borderRadius:"8px",padding:"10px 12px",display:"flex",gap:"8px",textAlign:"left",marginBottom:"8px"}},el("span",{style:{fontSize:"18px",flexShrink:"0"}},"🤖"),el("div",{style:{color:"#374151",fontSize:"13px",lineHeight:"1.5"}},coachMsg2))
     );
     banner.appendChild(inputCard);
-    const hdr=el("div",{style:{display:"flex",alignItems:"center",gap:"8px",padding:"12px 0 10px",marginBottom:"12px",borderBottom:"1px solid #2e3347"}},
+    const hdr=el("div",{style:{display:"flex",alignItems:"center",gap:"8px",padding:"12px 0 10px",marginBottom:"12px",borderBottom:"1px solid #D6DCE5"}},
       runByLeaIcon(24,6),
-      el("div",{style:{color:"#f1f5f9",fontSize:"16px",fontWeight:"800"}},"Yoria"),
+      el("div",{style:{color:"#1F2937",fontSize:"16px",fontWeight:"800"}},"Yoria"),
       el("div",{style:{flex:"1"}}),
-      el("div",{style:{background:"#232738",borderRadius:"8px",padding:"4px 10px",color:"#1E4ED8",fontSize:"14px",fontWeight:"700"}},"J-"+cd)
+      el("div",{style:{background:"#E5E9F0",borderRadius:"8px",padding:"4px 10px",color:"#1E4ED8",fontSize:"14px",fontWeight:"700"}},"J-"+cd)
     );
     const wrapper=document.createElement("div");
     wrapper.style.cssText="padding:0 16px 100px;";
@@ -1911,7 +1911,7 @@ function renderDashboard() {
   const todaySessions=ALL_SESSIONS.filter(s=>s.date===today());
   const pred=currentPred||predict10K();
 
-  const heroPred = el("div",{style:{background:"linear-gradient(135deg,#1a1d27 0%,#1e1030 100%)",borderRadius:"16px",padding:"16px",marginBottom:"12px",border:"1px solid #1E4ED833",marginTop:"8px"}},
+  const heroPred = el("div",{style:{background:"linear-gradient(135deg,#FFFFFF 0%,#EEF1F8 100%)",borderRadius:"16px",padding:"16px",marginBottom:"12px",border:"1px solid #1E4ED833",marginTop:"8px"}},
     // ── Header : course ──────────────────────────────────────────────────────
     el("div",{style:{marginBottom:"14px"}},
       el("a",{href:RACE_URL,target:"_blank",style:{color:"#1E4ED8",fontSize:"15px",fontWeight:"700",textDecoration:"none",display:"block",marginBottom:"2px"}},"🏁 "+RACE_NAME+" ↗"),
@@ -1924,18 +1924,18 @@ function renderDashboard() {
         el("div",{style:{color:"#1E4ED8",fontSize:"32px",fontWeight:"900",letterSpacing:"-1px",lineHeight:"1"}},fmtTime(raceGoalTime)),
         el("div",{class:"muted",style:{fontSize:"13px",marginTop:"2px"}},fmtPace(DISTANCE_M_REFERENCE/raceGoalTime)+"/km")
       ),
-      el("div",{style:{background:"#2e3347"}}),
+      el("div",{style:{background:"#D6DCE5"}}),
       (()=>{
         const estimEl = el("div",{style:{textAlign:"center",cursor:"pointer"}},
           el("div",{class:"label",style:{marginBottom:"4px"}},"Estimation"),
-          el("div",{style:{color:"#f1f5f9",fontSize:"32px",fontWeight:"900",letterSpacing:"-1px",lineHeight:"1"}},pred.time ? fmtTime(pred.time) : "—"),
+          el("div",{style:{color:"#1F2937",fontSize:"32px",fontWeight:"900",letterSpacing:"-1px",lineHeight:"1"}},pred.time ? fmtTime(pred.time) : "—"),
           el("div",{style:{color:pred.gap<=0?"#22c55e":pred.gap<=30?"#eab308":"#ef4444",fontSize:"13px",marginTop:"2px",fontWeight:"700"}},
             pred.gap<=0 ? "−"+fmtTime(Math.abs(pred.gap))+" ✅" : "+"+fmtTime(pred.gap)+" ⚠️"
           )
         );
         // Panneau détail sources (caché par défaut)
         let detailOpen = false;
-        const detailEl = el("div",{style:{display:"none",background:"#232738",borderRadius:"8px",padding:"10px 12px",marginTop:"8px"}},
+        const detailEl = el("div",{style:{display:"none",background:"#E5E9F0",borderRadius:"8px",padding:"10px 12px",marginTop:"8px"}},
           el("div",{class:"muted",style:{fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"8px"}},"Sources"),
           ...pred.details.map(d => {
             const parts = d.label.split(" · dernier ");
@@ -1946,12 +1946,12 @@ function renderDashboard() {
                 el("div",{class:"muted",style:{fontSize:"13px"}},mainLabel),
                 dateLabel ? el("div",{class:"muted",style:{fontSize:"12px",opacity:"0.7"}},dateLabel) : null
               ),
-              el("span",{style:{color:"#f1f5f9",fontSize:"13px",fontWeight:"600",whiteSpace:"nowrap",marginLeft:"8px"}},d.value)
+              el("span",{style:{color:"#1F2937",fontSize:"13px",fontWeight:"600",whiteSpace:"nowrap",marginLeft:"8px"}},d.value)
             );
           }),
-          el("div",{style:{borderTop:"1px solid #2e3347",marginTop:"6px",paddingTop:"6px",display:"flex",justifyContent:"space-between"}},
+          el("div",{style:{borderTop:"1px solid #D6DCE5",marginTop:"6px",paddingTop:"6px",display:"flex",justifyContent:"space-between"}},
             el("span",{class:"muted",style:{fontSize:"13px"}},"Méthode"),
-            el("span",{style:{color:"#f1f5f9",fontSize:"13px"}},pred.method)
+            el("span",{style:{color:"#1F2937",fontSize:"13px"}},pred.method)
           )
         );
         estimEl.addEventListener("click", () => {
@@ -1979,7 +1979,7 @@ function renderDashboard() {
             left:Math.min(Math.max((BASE_TIME_REFERENCE-pred.time)/(BASE_TIME_REFERENCE-OBJECTIF_REFERENCE)*100,2),98)+"%",
             width:"11px",height:"11px",borderRadius:"50%",
             background:pred.time<=OBJECTIF_REFERENCE?"#639922":pred.time<=OBJECTIF_REFERENCE+30?"#BA7517":pred.time<=OBJECTIF_REFERENCE+60?"#EF9F27":"#E24B4A",
-            border:"2px solid #1a1d27",
+            border:"2px solid #FFFFFF",
             boxShadow:"0 0 0 2px "+(pred.time<=OBJECTIF_REFERENCE?"#639922":pred.time<=OBJECTIF_REFERENCE+30?"#BA7517":pred.time<=OBJECTIF_REFERENCE+60?"#EF9F27":"#E24B4A")+"44"
           }})
     ),
@@ -1991,7 +1991,7 @@ function renderDashboard() {
     // ── Stats séances ─────────────────────────────────────────────────────
     (()=>{
       const totalKmRun = Math.round(activitesDuPlan().reduce((s,a)=>s+a.distance,0)/100)/10;
-      return el("div",{style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"13px",paddingTop:"10px",borderTop:"1px solid #2e334733",marginTop:"10px"}},
+      return el("div",{style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"13px",paddingTop:"10px",borderTop:"1px solid #D6DCE533",marginTop:"10px"}},
         el("span",{style:{color:"#22c55e",fontWeight:"700"}},"✅ "+done),
         el("span",{class:"muted"},"·"),
         el("span",{style:{color:"#eab308",fontWeight:"700"}},"⚠️ "+adapted),
@@ -2021,7 +2021,7 @@ function renderDashboard() {
     syncAgo < 1 ? " · synchro à l\'instant" :
     syncAgo < 60 ? " · synchro il y a "+syncAgo+" min" :
     " · synchro il y a "+(Math.round(syncAgo/60))+"h";
-  const stravaColor = !stravaToken ? "#475569" : syncing ? "#eab308" : syncMsg.startsWith("❌") ? "#ef4444" : "#22c55e";
+  const stravaColor = !stravaToken ? "#6B7280" : syncing ? "#eab308" : syncMsg.startsWith("❌") ? "#ef4444" : "#22c55e";
   const stravaText = !stravaToken ? "Strava non connecté" :
     syncing ? "Strava · synchronisation..." :
     syncMsg.startsWith("❌") ? "Strava · "+syncMsg :
@@ -2035,22 +2035,22 @@ function renderDashboard() {
   const isHot = weatherTemp !== null && weatherTemp > 28;
   // Badge météo discret pour intégration dans la carte séance
   const weatherBadge = weatherTemp !== null
-    ? el("span",{style:{color:isHot?"#1E4ED8":"#94a3b8",fontSize:"13px",fontWeight:isHot?"700":"400"}},
+    ? el("span",{style:{color:isHot?"#1E4ED8":"#64748B",fontSize:"13px",fontWeight:isHot?"700":"400"}},
         (weatherDesc||"🌡️")+" "+weatherTemp+"°C"+(isHot?" 🔥":""))
     : null;
   const weatherEl = null; // Supprimé — météo intégrée dans la carte séance
 
   const todayStatus4Coach = statuses[ALL_SESSIONS.find(s=>s.date===today()&&s.type!=="REPOS")?.uid];
-  const coachBorderColor = todayStatus4Coach==="✅"?"#22c55e33":todayStatus4Coach==="⚠️"?"#eab30833":todayStatus4Coach==="❌"?"#ef444433":"#2e3347";
+  const coachBorderColor = todayStatus4Coach==="✅"?"#22c55e33":todayStatus4Coach==="⚠️"?"#eab30833":todayStatus4Coach==="❌"?"#ef444433":"#D6DCE5";
   const coachLabel = todayStatus4Coach&&["✅","⚠️","❌"].includes(todayStatus4Coach) ? "🤖 Coach · Analyse" : "🤖 Coach";
-  const refreshCoachBtn = el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"15px",cursor:"pointer",padding:"0",lineHeight:"1"},
+  const refreshCoachBtn = el("button",{style:{background:"none",border:"none",color:"#6B7280",fontSize:"15px",cursor:"pointer",padding:"0",lineHeight:"1"},
     onClick:()=>{ coachMsg=null; coachDate=""; save(clePourPlan("lk_coach_msg"),null); save(clePourPlan("lk_coach_date"),""); fetchCoachMsg(); }
   },"🔄");
   // Coach intégré dans la carte séance — bloc discret
-  const coachEl = el("div",{style:{background:"#232738",borderRadius:"8px",padding:"10px 12px",display:"flex",gap:"8px",alignItems:"flex-start"}},
+  const coachEl = el("div",{style:{background:"#E5E9F0",borderRadius:"8px",padding:"10px 12px",display:"flex",gap:"8px",alignItems:"flex-start"}},
     el("span",{style:{fontSize:"16px",flexShrink:"0"}},"🤖"),
     el("div",{style:{flex:"1"}},
-      el("div",{style:{color:"#e2e8f0",fontSize:"14px",fontStyle:"italic",lineHeight:"1.5"}},coachMsg||el("span",{class:"muted",style:{fontSize:"13px"}},"Chargement..."))
+      el("div",{style:{color:"#374151",fontSize:"14px",fontStyle:"italic",lineHeight:"1.5"}},coachMsg||el("span",{class:"muted",style:{fontSize:"13px"}},"Chargement..."))
     ),
     refreshCoachBtn
   );
@@ -2095,10 +2095,10 @@ function renderDashboard() {
 
       todayEl = el("div",{style:{marginBottom:"12px"}},
         el("div",{class:"label"},"Aujourd\'hui"),
-        el("div",{style:{background:"#1a1d27",border:"1px solid #60a5fa33",borderLeft:"3px solid #60a5fa",borderRadius:"10px",padding:"14px"}},
+        el("div",{style:{background:"#FFFFFF",border:"1px solid #60a5fa33",borderLeft:"3px solid #60a5fa",borderRadius:"10px",padding:"14px"}},
           el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"6px"}},
             el("span",{style:{background:"#60a5fa22",color:"#60a5fa",border:"1px solid #60a5fa44",borderRadius:"4px",padding:"2px 7px",fontSize:"13px",fontWeight:"700"}},"REPOS"),
-            el("span",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"600"}},todaySessions[0].session),
+            el("span",{style:{color:"#1F2937",fontSize:"15px",fontWeight:"600"}},todaySessions[0].session),
             el("div",{style:{flex:"1"}}),
             weatherBadge
           ),
@@ -2106,29 +2106,29 @@ function renderDashboard() {
           bilanReport?el("div",{style:{marginBottom:"10px"}},
             el("div",{class:"muted",style:{fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"6px"}},bilanLabel),
             el("div",{style:{display:"flex",gap:"8px"}},
-              el("div",{style:{flex:"1",background:"#232738",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
+              el("div",{style:{flex:"1",background:"#E5E9F0",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
                 el("div",{style:{color:"#22c55e",fontSize:"15px",fontWeight:"700"}},(bilanReport.done+bilanReport.adapted)+"/"+bilanReport.total),
                 el("div",{class:"muted",style:{fontSize:"12px"}},"séances ✅")
               ),
-              el("div",{style:{flex:"1",background:"#232738",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
+              el("div",{style:{flex:"1",background:"#E5E9F0",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
                 el("div",{style:{color:"#1E4ED8",fontSize:"15px",fontWeight:"700"}},bilanKm+" km"),
                 el("div",{class:"muted",style:{fontSize:"12px"}},"courus")
               ),
-              bilanReport.avgEfPace?el("div",{style:{flex:"1",background:"#232738",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
+              bilanReport.avgEfPace?el("div",{style:{flex:"1",background:"#E5E9F0",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
                 el("div",{style:{color:"#60a5fa",fontSize:"15px",fontWeight:"700"}},fmtPace(1000/bilanReport.avgEfPace)+"/km"),
                 el("div",{class:"muted",style:{fontSize:"12px"}},"allure EF")
               ):null
             )
           ):null,
           coachEl,
-          tomorrowKey?el("div",{style:{borderTop:"1px solid #2e3347",paddingTop:"10px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"},
+          tomorrowKey?el("div",{style:{borderTop:"1px solid #D6DCE5",paddingTop:"10px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"},
             onClick:()=>{ selectedWeek=tomorrowKey.week; setView("weekDetail"); }
           },
             el("div",{},
               el("div",{class:"muted",style:{fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"3px"}},"⚡ Demain"),
               el("div",{style:{color:STYPES[tomorrowKey.type]?.color||"#1E4ED8",fontSize:"14px",fontWeight:"700"}},(STYPES[tomorrowKey.type]?.short||tomorrowKey.type)+" · "+tomorrowKey.session)
             ),
-            el("span",{style:{color:"#e2e8f0",fontSize:"18px"}},"›")
+            el("span",{style:{color:"#374151",fontSize:"18px"}},"›")
           ):null
         )
       );
@@ -2150,7 +2150,7 @@ function renderDashboard() {
         const statusColor = status2==="✅"?"#22c55e":status2==="⚠️"?"#eab308":status2==="❌"?"#ef4444":st.color;
 
         const card=el("div",{style:{
-          background:"#1a1d27",
+          background:"#FFFFFF",
           border:`1px solid ${isDone?statusColor+"33":st.color+"33"}`,
           borderTop:`3px solid ${isDone?statusColor:st.color}`,
           borderRadius:"12px",padding:"14px",marginBottom:"8px",
@@ -2159,13 +2159,13 @@ function renderDashboard() {
           el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"8px"}},
             el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
               badge(s.type),
-              el("div",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"700"}},s.session)
+              el("div",{style:{color:"#1F2937",fontSize:"15px",fontWeight:"700"}},s.session)
             ),
             (()=>{
               const histTemp = historicalWeatherCache[s.date];
               if (isDone && histTemp != null) {
                 const hot = histTemp > 28;
-                return el("span",{style:{color:hot?"#1E4ED8":"#94a3b8",fontSize:"13px",fontWeight:hot?"700":"400"}},
+                return el("span",{style:{color:hot?"#1E4ED8":"#64748B",fontSize:"13px",fontWeight:hot?"700":"400"}},
                   (hot?"🔥":"🌡️")+" "+histTemp+"°C");
               }
               return weatherBadge;
@@ -2176,14 +2176,14 @@ function renderDashboard() {
               borderRadius:"6px",padding:"3px 8px",fontSize:"14px",fontWeight:"700"
             }},status2==="✅"?"✅ Validée":status2==="⚠️"?"⚠️ Adaptée":"❌ Ratée"):null
           ),
-          !isRest && (s.warmup||s.cooldown) ? el("div",{style:{background:"#232738",borderRadius:"8px",padding:"8px 10px",marginBottom:"8px"}},
+          !isRest && (s.warmup||s.cooldown) ? el("div",{style:{background:"#E5E9F0",borderRadius:"8px",padding:"8px 10px",marginBottom:"8px"}},
             s.warmup ? el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:s.cooldown?"6px":"0"}},
-              el("span",{style:{color:"#e2e8f0",fontSize:"13px",minWidth:"24px"}},"▶"),
-              el("span",{style:{color:"#e2e8f0",fontSize:"14px"}},s.warmup)
+              el("span",{style:{color:"#374151",fontSize:"13px",minWidth:"24px"}},"▶"),
+              el("span",{style:{color:"#374151",fontSize:"14px"}},s.warmup)
             ) : null,
             s.cooldown ? el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
-              el("span",{style:{color:"#e2e8f0",fontSize:"13px",minWidth:"24px"}},"◀"),
-              el("span",{style:{color:"#e2e8f0",fontSize:"14px"}},s.cooldown)
+              el("span",{style:{color:"#374151",fontSize:"13px",minWidth:"24px"}},"◀"),
+              el("span",{style:{color:"#374151",fontSize:"14px"}},s.cooldown)
             ) : null
           ) : null,
           s.notes ? el("div",{style:{color:"#60a5facc",fontSize:"14px",fontStyle:"italic",marginBottom:"8px"}},"💡 "+s.notes) : null,
@@ -2200,14 +2200,14 @@ function renderDashboard() {
           // Bloc détail repliable après le coach
           (()=>{
             const detailBlock = el("div",{style:{display:"none"}},
-              el("div",{style:{height:"1px",background:"#2e334722",margin:"8px 0"}}),
+              el("div",{style:{height:"1px",background:"#D6DCE522",margin:"8px 0"}}),
               isHot && (s.type==="EF"||s.type==="LONGUE") ? el("div",{style:{color:"#1E4ED8",fontSize:"14px",fontWeight:"600"}},"🔥 Chaleur → allure 6:40/km") : null,
           PACE_REFS[s.type] ? el("div",{style:{background:"#1E4ED811",border:"1px solid #1E4ED833",borderRadius:"8px",padding:"10px 12px",marginBottom:"8px"}},
             el("div",{style:{color:"#1E4ED8",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"8px",fontWeight:"700"}},"⚡ Allures cibles"),
             el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}},
               el("span",{class:"muted",style:{fontSize:"14px"}},"Effort"),
               el("div",{style:{textAlign:"right"}},
-                el("span",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"700"}},PACE_REFS[s.type].effort),
+                el("span",{style:{color:"#1F2937",fontSize:"15px",fontWeight:"700"}},PACE_REFS[s.type].effort),
                 el("span",{class:"muted",style:{fontSize:"13px",marginLeft:"6px"}},PACE_REFS[s.type].tolerance)
               )
             ),
@@ -2266,19 +2266,19 @@ function renderDashboard() {
             ):null
           ):null,
           // Prochaine séance
-          nextSess?el("div",{style:{borderTop:"1px solid #2e3347",paddingTop:"10px",marginTop:"8px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"},
+          nextSess?el("div",{style:{borderTop:"1px solid #D6DCE5",paddingTop:"10px",marginTop:"8px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"},
             onClick:()=>{ selectedWeek=nextSess.week; setView("weekDetail"); }
           },
             el("div",{},
               el("div",{class:"muted",style:{fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"3px"}},"Prochaine séance · "+new Date(nextSess.date+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})),
-              el("div",{style:{color:"#e2e8f0",fontSize:"14px"}},(STYPES[nextSess.type]?.short||nextSess.type)+" · "+nextSess.session)
+              el("div",{style:{color:"#374151",fontSize:"14px"}},(STYPES[nextSess.type]?.short||nextSess.type)+" · "+nextSess.session)
             ),
-            el("span",{style:{color:"#e2e8f0",fontSize:"18px"}},"›")
+            el("span",{style:{color:"#374151",fontSize:"18px"}},"›")
           ):null,
             );
             // Bouton toggle "voir détails"
             const toggleBtn = el("button",{style:{
-              width:"100%",marginTop:"6px",background:"none",border:"1px solid #2e3347",
+              width:"100%",marginTop:"6px",background:"none",border:"1px solid #D6DCE5",
               borderRadius:"8px",padding:"6px",color:"#64748b",fontSize:"12px",cursor:"pointer"
             }},"▼ Voir les détails");
             let detailOpen2 = false;
@@ -2311,7 +2311,7 @@ function renderDashboard() {
     const pctColor = pct>=80?"#22c55e":pct>=50?"#eab308":"#ef4444";
     bilanEl = el("div",{style:{marginBottom:"16px"}},
       el("div",{class:"label"},"Bilan semaine "+cw2),
-      el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"14px"}},
+      el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"12px",padding:"14px"}},
         el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}},
           el("div",{style:{display:"flex",gap:"16px"}},
             el("div",{},el("div",{style:{color:"#22c55e",fontSize:"20px",fontWeight:"800"}},report.done+""),el("div",{class:"muted",style:{fontSize:"13px"}},"✅ faites")),
@@ -2323,9 +2323,9 @@ function renderDashboard() {
             el("div",{class:"muted",style:{fontSize:"13px"}},"complétées")
           )
         ),
-        el("div",{style:{display:"flex",gap:"16px",flexWrap:"wrap",paddingTop:"10px",borderTop:"1px solid #2e3347"}},
+        el("div",{style:{display:"flex",gap:"16px",flexWrap:"wrap",paddingTop:"10px",borderTop:"1px solid #D6DCE5"}},
           report.plannedMin>0?el("div",{},
-            el("div",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"700"}},
+            el("div",{style:{color:"#1F2937",fontSize:"15px",fontWeight:"700"}},
               (report.realMin>0?report.realMin+"'":"-")+" / "+report.plannedMin+"'"
             ),
             el("div",{class:"muted",style:{fontSize:"13px"}},"min réelles / prévues")
@@ -2343,7 +2343,7 @@ function renderDashboard() {
               el("div",{style:{color:"#60a5fa",fontSize:"15px",fontWeight:"700"}},fmtPace(1000/report.avgEfPace)+"/km"),
               report.prevEfPace ? el("span",{style:{
                 fontSize:"13px",
-                color: report.avgEfPace < report.prevEfPace ? "#22c55e" : report.avgEfPace > report.prevEfPace+10 ? "#ef4444" : "#e2e8f0"
+                color: report.avgEfPace < report.prevEfPace ? "#22c55e" : report.avgEfPace > report.prevEfPace+10 ? "#ef4444" : "#374151"
               }}, report.avgEfPace < report.prevEfPace ? "📈" : report.avgEfPace > report.prevEfPace+10 ? "📉" : "➡️") : null
             ),
             el("div",{class:"muted",style:{fontSize:"13px"}},"allure moy. EF"+(report.prevEfPace?(" · "+(report.avgEfPace<report.prevEfPace?"-":"+")+(Math.abs(Math.round(report.avgEfPace-report.prevEfPace)))+"\" vs S"+(cw2-1)):""))
@@ -2353,7 +2353,7 @@ function renderDashboard() {
               el("div",{style:{color:"#1E4ED8",fontSize:"15px",fontWeight:"700"}},report.avgEfHr+" bpm"),
               report.prevEfHr ? el("span",{style:{
                 fontSize:"13px",
-                color: report.avgEfHr < report.prevEfHr ? "#22c55e" : report.avgEfHr > report.prevEfHr+3 ? "#ef4444" : "#e2e8f0"
+                color: report.avgEfHr < report.prevEfHr ? "#22c55e" : report.avgEfHr > report.prevEfHr+3 ? "#ef4444" : "#374151"
               }}, report.avgEfHr < report.prevEfHr ? "📈" : report.avgEfHr > report.prevEfHr+3 ? "📉" : "➡️") : null
             ),
             el("div",{class:"muted",style:{fontSize:"13px"}},"FC moy. EF"+(report.prevEfHr?(" · "+(report.avgEfHr<report.prevEfHr?"-":"+")+(Math.abs(report.avgEfHr-report.prevEfHr))+" bpm vs S"+(cw2-1)):""))
@@ -2363,7 +2363,7 @@ function renderDashboard() {
             if (!efSessions.length) return null;
             const avgTemp = Math.round(efSessions.reduce((s,e)=>s+historicalWeatherCache[e.date],0)/efSessions.length);
             return el("div",{},
-              el("div",{style:{color:avgTemp>28?"#1E4ED8":"#e2e8f0",fontSize:"15px",fontWeight:"700"}},avgTemp+"°C"),
+              el("div",{style:{color:avgTemp>28?"#1E4ED8":"#374151",fontSize:"15px",fontWeight:"700"}},avgTemp+"°C"),
               el("div",{class:"muted",style:{fontSize:"13px"}},"temp. moy. séances")
             );
           })()
@@ -2391,7 +2391,7 @@ function renderDashboard() {
   const pctKm = Math.min(100,Math.round(totalKm/plannedKmTotal*100));
   const pctMin = Math.min(100,Math.round(totalMin/plannedMinTotal*100));
 
-  const progressEl = stravaActivities.length>0 ? el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"10px 14px",marginBottom:"12px"}},
+  const progressEl = stravaActivities.length>0 ? el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"10px",padding:"10px 14px",marginBottom:"12px"}},
     el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}},
       el("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
         el("span",{style:{fontSize:"15px"}},"🏃"),
@@ -2399,7 +2399,7 @@ function renderDashboard() {
       ),
       el("span",{style:{color:"#22c55e",fontSize:"14px",fontWeight:"700"}},pctKm+"%")
     ),
-    el("div",{style:{height:"4px",background:"#232738",borderRadius:"2px",marginBottom:"8px"}},
+    el("div",{style:{height:"4px",background:"#E5E9F0",borderRadius:"2px",marginBottom:"8px"}},
       el("div",{style:{width:pctKm+"%",height:"100%",background:"#22c55e",borderRadius:"2px"}})
     ),
     el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}},
@@ -2409,7 +2409,7 @@ function renderDashboard() {
       ),
       el("span",{style:{color:"#22c55e",fontSize:"14px",fontWeight:"700"}},pctMin+"%")
     ),
-    el("div",{style:{height:"4px",background:"#232738",borderRadius:"2px"}},
+    el("div",{style:{height:"4px",background:"#E5E9F0",borderRadius:"2px"}},
       el("div",{style:{width:pctMin+"%",height:"100%",background:"#22c55e",borderRadius:"2px"}})
     )
   ) : null;
@@ -2465,18 +2465,18 @@ function renderDashboard() {
   const verdictText = validationRate >= 0.8 ? "Bonne progression" : validationRate >= 0.6 ? "Progression correcte" : "Attention à la régularité";
 
   // Contenu détaillé (caché par défaut)
-  const phaseDetailEl = el("div",{style:{display:"none",marginTop:"12px",borderTop:"1px solid #2e3347",paddingTop:"12px"}},
+  const phaseDetailEl = el("div",{style:{display:"none",marginTop:"12px",borderTop:"1px solid #D6DCE5",paddingTop:"12px"}},
     // Stats clés
     el("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginBottom:"12px"}},
-      el("div",{style:{background:"#232738",borderRadius:"8px",padding:"10px",textAlign:"center"}},
-        el("div",{style:{color:"#f1f5f9",fontSize:"16px",fontWeight:"700"}},phaseKm+" km"),
+      el("div",{style:{background:"#E5E9F0",borderRadius:"8px",padding:"10px",textAlign:"center"}},
+        el("div",{style:{color:"#1F2937",fontSize:"16px",fontWeight:"700"}},phaseKm+" km"),
         el("div",{class:"muted",style:{fontSize:"12px"}},"courus")
       ),
-      efAvgPace ? el("div",{style:{background:"#232738",borderRadius:"8px",padding:"10px",textAlign:"center"}},
+      efAvgPace ? el("div",{style:{background:"#E5E9F0",borderRadius:"8px",padding:"10px",textAlign:"center"}},
         el("div",{style:{color:"#60a5fa",fontSize:"16px",fontWeight:"700"}},efAvgPace),
         el("div",{class:"muted",style:{fontSize:"12px"}},"allure EF")
       ) : null,
-      intensiveAvgPace ? el("div",{style:{background:"#232738",borderRadius:"8px",padding:"10px",textAlign:"center"}},
+      intensiveAvgPace ? el("div",{style:{background:"#E5E9F0",borderRadius:"8px",padding:"10px",textAlign:"center"}},
         el("div",{style:{color:"#1E4ED8",fontSize:"16px",fontWeight:"700"}},intensiveAvgPace),
         el("div",{class:"muted",style:{fontSize:"12px"}},"allure int.")
       ) : null
@@ -2488,10 +2488,10 @@ function renderDashboard() {
         const pct = t.total > 0 ? Math.round(t.done/t.total*100) : 0;
         return el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
           el("span",{style:{background:st.color+"22",color:st.color,border:"1px solid "+st.color+"44",borderRadius:"4px",padding:"2px 7px",fontSize:"12px",fontWeight:"700",minWidth:"50px",textAlign:"center"}},t.type),
-          el("div",{style:{flex:"1",height:"4px",background:"#232738",borderRadius:"2px"}},
+          el("div",{style:{flex:"1",height:"4px",background:"#E5E9F0",borderRadius:"2px"}},
             el("div",{style:{width:pct+"%",height:"100%",background:st.color,borderRadius:"2px"}})
           ),
-          el("span",{style:{color:"#f1f5f9",fontSize:"13px"}},t.done+" / "+t.total)
+          el("span",{style:{color:"#1F2937",fontSize:"13px"}},t.done+" / "+t.total)
         );
       })
     ),
@@ -2507,7 +2507,7 @@ function renderDashboard() {
 
   // Header cliquable
   let phaseOpen = false;
-  const phaseEl = el("div",{style:{background:"#1a1d27",border:"1px solid "+phase.color+"33",borderTop:"3px solid "+phase.color,borderRadius:"12px",padding:"12px 14px",marginBottom:"12px",cursor:"pointer"}},
+  const phaseEl = el("div",{style:{background:"#FFFFFF",border:"1px solid "+phase.color+"33",borderTop:"3px solid "+phase.color,borderRadius:"12px",padding:"12px 14px",marginBottom:"12px",cursor:"pointer"}},
     el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}},
       el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
         el("span",{style:{color:phase.color,fontSize:"15px",fontWeight:"700"}},phase.label),
@@ -2518,7 +2518,7 @@ function renderDashboard() {
         el("span",{class:"muted",style:{fontSize:"14px"}},"›")
       )
     ),
-    el("div",{style:{height:"4px",background:"#232738",borderRadius:"2px"}},
+    el("div",{style:{height:"4px",background:"#E5E9F0",borderRadius:"2px"}},
       el("div",{style:{width:phasePct+"%",height:"100%",background:phase.color,borderRadius:"2px"}})
     ),
     phaseDetailEl
@@ -2531,21 +2531,21 @@ function renderDashboard() {
   });
 
   const helpBtn = el("button",{style:{
-    background:"#232738",border:"1px solid #2e3347",borderRadius:"50%",
+    background:"#E5E9F0",border:"1px solid #D6DCE5",borderRadius:"50%",
     width:"26px",height:"26px",display:"flex",alignItems:"center",justifyContent:"center",
-    color:"#94a3b8",fontSize:"15px",fontWeight:"700",cursor:"pointer",flexShrink:"0"
+    color:"#64748B",fontSize:"15px",fontWeight:"700",cursor:"pointer",flexShrink:"0"
   }}, "?");
   helpBtn.addEventListener("click",()=>{ setView("help"); });
 
   const dashHeaderEl = el("div",{style:{
     display:"flex",alignItems:"center",gap:"8px",
     padding:"12px 0 10px",marginBottom:"4px",
-    borderBottom:"1px solid #2e3347"
+    borderBottom:"1px solid #D6DCE5"
   }},
     runByLeaIcon(24, 6),
-    el("div",{style:{color:"#f1f5f9",fontSize:"16px",fontWeight:"800"}},"Yoria"),
+    el("div",{style:{color:"#1F2937",fontSize:"16px",fontWeight:"800"}},"Yoria"),
     el("div",{style:{flex:"1"}}),
-    ESTMODEFORME ? null : el("div",{style:{background:"#232738",borderRadius:"8px",padding:"4px 10px",color:"#1E4ED8",fontSize:"14px",fontWeight:"700"}},"J–"+countdown()),
+    ESTMODEFORME ? null : el("div",{style:{background:"#E5E9F0",borderRadius:"8px",padding:"4px 10px",color:"#1E4ED8",fontSize:"14px",fontWeight:"700"}},"J–"+countdown()),
     helpBtn
   );
 
@@ -2563,21 +2563,21 @@ function renderDashboard() {
 function renderWeeks() {
   const cw=currentWeek();
   return el("div",{style:{padding:"0 16px 100px"}},
-    el("div",{style:{marginTop:"8px",marginBottom:"12px",color:"#e2e8f0",fontSize:"14px"}},"Semaine actuelle : ",el("span",{style:{color:"#1E4ED8",fontWeight:"700"}},"S"+cw)),
+    el("div",{style:{marginTop:"8px",marginBottom:"12px",color:"#374151",fontSize:"14px"}},"Semaine actuelle : ",el("span",{style:{color:"#1E4ED8",fontWeight:"700"}},"S"+cw)),
     ...PLAN.map(week=>{
       const pct=weekPct(week), isActive=week.week===cw, color=phaseOf(week.week).color, decharge=estSemaineDecharge(week.week);
-      const b=el("button",{style:{width:"100%",background:isActive?"#232738":"#1a1d27",border:`1px solid ${isActive?"#1E4ED855":"#2e3347"}`,borderLeft:`3px solid ${color}`,borderRadius:"10px",padding:"12px 14px",marginBottom:"8px",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"12px"}},
+      const b=el("button",{style:{width:"100%",background:isActive?"#E5E9F0":"#FFFFFF",border:`1px solid ${isActive?"#1E4ED855":"#D6DCE5"}`,borderLeft:`3px solid ${color}`,borderRadius:"10px",padding:"12px 14px",marginBottom:"8px",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"12px"}},
         el("div",{style:{textAlign:"center",minWidth:"36px"}},
           el("div",{style:{color,fontSize:"18px",fontWeight:"800",lineHeight:"1"}},"S"+week.week),
           isActive?el("div",{style:{color:"#1E4ED8",fontSize:"13px",fontWeight:"700"}},"NOW"):null
         ),
         el("div",{style:{flex:"1"}},
           el("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
-            el("div",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"600"}},phaseOf(week.week).label),
+            el("div",{style:{color:"#1F2937",fontSize:"15px",fontWeight:"600"}},phaseOf(week.week).label),
             decharge?el("span",{class:"pill",style:{background:"#1E4ED822",color:"#1E4ED8"}},"Décharge"):null
           ),
           el("div",{class:"muted",style:{fontSize:"13px",marginTop:"2px"}},fmtDate(week.sessions[0].date)+" → "+fmtDate(week.sessions[6].date)),
-          el("div",{style:{height:"3px",background:"#232738",borderRadius:"2px",marginTop:"6px",marginBottom:"6px"}},
+          el("div",{style:{height:"3px",background:"#E5E9F0",borderRadius:"2px",marginTop:"6px",marginBottom:"6px"}},
             el("div",{style:{height:"100%",width:pct+"%",background:color,borderRadius:"2px"}})
           ),
           (()=>{
@@ -2683,12 +2683,12 @@ function renderStructureAProgrammer(structure) {
 function renderBoutonStructureAProgrammer(structure) {
   const lignes = renderStructureAProgrammer(structure);
   if (!lignes) return null;
-  const progBlock = el("div",{style:{display:"none",background:"#232738",borderRadius:"8px",padding:"10px 12px",marginBottom:"8px",border:"1px solid #2e3347"}},
+  const progBlock = el("div",{style:{display:"none",background:"#E5E9F0",borderRadius:"8px",padding:"10px 12px",marginBottom:"8px",border:"1px solid #D6DCE5"}},
     ...lignes.map(l => el("div",{class:"muted",style:{fontSize:"13px",lineHeight:"1.6"}},l))
   );
   let progOpen = false;
   const progBtn = el("button",{style:{
-    width:"100%",marginBottom:"8px",background:"none",border:"1px solid #2e3347",
+    width:"100%",marginBottom:"8px",background:"none",border:"1px solid #D6DCE5",
     borderRadius:"8px",padding:"6px",color:"#64748b",fontSize:"12px",cursor:"pointer"
   }},"📱 À programmer sur ta montre");
   progBtn.addEventListener("click",(e)=>{
@@ -2714,15 +2714,15 @@ function renderStatusRow(uid) {
     const cur = statuses[uid]||"—";
     boutons.forEach(({b, opt}) => {
       const actif = cur===opt;
-      b.style.background = actif ? SCOLORS[opt]+"33" : "#232738";
-      b.style.border = `1px solid ${actif ? SCOLORS[opt] : "#2e3347"}`;
-      b.style.color = actif ? SCOLORS[opt] : "#475569";
+      b.style.background = actif ? SCOLORS[opt]+"33" : "#E5E9F0";
+      b.style.border = `1px solid ${actif ? SCOLORS[opt] : "#D6DCE5"}`;
+      b.style.color = actif ? SCOLORS[opt] : "#6B7280";
       b.style.fontWeight = actif ? "700" : "400";
     });
   };
   SOPTS.forEach(opt=>{
     const cur=statuses[uid]||"—";
-    const b=el("button",{style:{background:cur===opt?SCOLORS[opt]+"33":"#232738",border:`1px solid ${cur===opt?SCOLORS[opt]:"#2e3347"}`,borderRadius:"6px",padding:"5px 10px",cursor:"pointer",color:cur===opt?SCOLORS[opt]:"#475569",fontSize:"15px",fontWeight:cur===opt?"700":"400"}},opt==="—"?"–":opt);
+    const b=el("button",{style:{background:cur===opt?SCOLORS[opt]+"33":"#E5E9F0",border:`1px solid ${cur===opt?SCOLORS[opt]:"#D6DCE5"}`,borderRadius:"6px",padding:"5px 10px",cursor:"pointer",color:cur===opt?SCOLORS[opt]:"#6B7280",fontSize:"15px",fontWeight:cur===opt?"700":"400"}},opt==="—"?"–":opt);
     boutons.push({ b, opt });
     b.addEventListener("click",avecRetourTactile(()=>{
       statuses[uid]=opt; save(clePourPlan("lk_statuses"),statuses);
@@ -2772,7 +2772,7 @@ function renderManualPerfRow(uid, s, stravaRun) {
   };
   rebuildSummary();
 
-  const formWrap = el("div",{style:{display:"none",marginTop:"8px",background:"#232738",borderRadius:"8px",padding:"10px 12px"}});
+  const formWrap = el("div",{style:{display:"none",marginTop:"8px",background:"#E5E9F0",borderRadius:"8px",padding:"10px 12px"}});
 
   const rebuildForm = () => {
     formWrap.innerHTML = "";
@@ -2789,12 +2789,12 @@ function renderManualPerfRow(uid, s, stravaRun) {
       : target ? Math.round((target.targetMin+target.targetMax)/2) : 360;
     let paceSec = paceInitSec;
 
-    const paceValueEl = el("span",{style:{fontSize:"18px",fontWeight:"700",color:"#f1f5f9",minWidth:"64px",textAlign:"center"}}, fmtPace(1000/paceSec)+"/km");
+    const paceValueEl = el("span",{style:{fontSize:"18px",fontWeight:"700",color:"#1F2937",minWidth:"64px",textAlign:"center"}}, fmtPace(1000/paceSec)+"/km");
     const stepBtn = (delta, label) => {
       const b = el("button",{type:"button",style:{
         width:"38px",height:"38px",fontSize:"18px",fontWeight:"700",
-        background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"8px",
-        color:"#94a3b8",cursor:"pointer"
+        background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"8px",
+        color:"#64748B",cursor:"pointer"
       }}, label);
       b.addEventListener("click", avecRetourTactile(()=>{
         paceSec = Math.max(120, paceSec + delta); // plancher 2:00/km, garde-fou anti-saisie absurde
@@ -2808,12 +2808,12 @@ function renderManualPerfRow(uid, s, stravaRun) {
       stepBtn(-5,"+") // +5s/km = plus lent
     );
     if (target) {
-      formWrap.appendChild(el("div",{style:{fontSize:"11px",color:"#475569",textAlign:"center",marginTop:"2px"}},
+      formWrap.appendChild(el("div",{style:{fontSize:"11px",color:"#6B7280",textAlign:"center",marginTop:"2px"}},
         "cible plan : "+fmtPace(1000/target.targetMin)+"–"+fmtPace(1000/target.targetMax)+"/km"));
     }
 
     const hrInput = el("input",{type:"number",placeholder:"165",value:cur.average_heartrate||"",
-      style:{width:"100%",background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"6px",padding:"6px 8px",color:"#f1f5f9",fontSize:"14px",textAlign:"center"}});
+      style:{width:"100%",background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"6px",padding:"6px 8px",color:"#1F2937",fontSize:"14px",textAlign:"center"}});
     const rpeOpts = [{v:1,e:"🙂"},{v:2,e:"😐"},{v:3,e:"😓"}];
     let rpeVal = cur.rpe || null;
     const rpeRow = el("div",{style:{display:"flex",gap:"6px"}});
@@ -2822,8 +2822,8 @@ function renderManualPerfRow(uid, s, stravaRun) {
       rpeOpts.forEach(o=>{
         const b = el("button",{type:"button",style:{
           flex:"1",padding:"6px 0",fontSize:"16px",
-          background:rpeVal===o.v?"#eab30822":"#1a1d27",
-          border:`1px solid ${rpeVal===o.v?"#eab308":"#2e3347"}`,borderRadius:"6px",cursor:"pointer"
+          background:rpeVal===o.v?"#eab30822":"#FFFFFF",
+          border:`1px solid ${rpeVal===o.v?"#eab308":"#D6DCE5"}`,borderRadius:"6px",cursor:"pointer"
         }}, o.e);
         b.addEventListener("click",()=>{ rpeVal = rpeVal===o.v?null:o.v; rebuildRpe(); });
         rpeRow.appendChild(b);
@@ -2831,16 +2831,16 @@ function renderManualPerfRow(uid, s, stravaRun) {
     };
     rebuildRpe();
 
-    formWrap.appendChild(el("div",{style:{fontSize:"12px",color:"#94a3b8",marginBottom:"10px"}},
+    formWrap.appendChild(el("div",{style:{fontSize:"12px",color:"#64748B",marginBottom:"10px"}},
       stravaRun ? "Strava a une activité ce jour-là — ta saisie primera dessus si tu valides." :
         "Pas de donnée Strava ce jour-là. Ajuste l'allure ci-dessous si besoin."));
 
-    formWrap.appendChild(el("div",{style:{fontSize:"11px",color:"#475569",textAlign:"center",marginBottom:"4px"}},"Allure effort"));
+    formWrap.appendChild(el("div",{style:{fontSize:"11px",color:"#6B7280",textAlign:"center",marginBottom:"4px"}},"Allure effort"));
     formWrap.appendChild(paceStepper);
     formWrap.appendChild(el("div",{style:{marginTop:"12px"}},
-      el("div",{style:{fontSize:"11px",color:"#475569",marginBottom:"4px"}},"FC moyenne (optionnel)"),hrInput
+      el("div",{style:{fontSize:"11px",color:"#6B7280",marginBottom:"4px"}},"FC moyenne (optionnel)"),hrInput
     ));
-    formWrap.appendChild(el("div",{style:{fontSize:"11px",color:"#475569",marginTop:"10px",marginBottom:"6px"}},"Ressenti"));
+    formWrap.appendChild(el("div",{style:{fontSize:"11px",color:"#6B7280",marginTop:"10px",marginBottom:"6px"}},"Ressenti"));
     formWrap.appendChild(rpeRow);
 
     const btnRow = el("div",{style:{display:"flex",gap:"8px",marginTop:"10px"}});
@@ -2858,7 +2858,7 @@ function renderManualPerfRow(uid, s, stravaRun) {
     }));
     btnRow.appendChild(saveBtn);
     if (hasManualNow()) {
-      const delBtn = el("button",{type:"button",style:{background:"none",border:"1px solid #2e3347",borderRadius:"8px",padding:"8px 12px",color:"#475569",fontSize:"14px",cursor:"pointer"}},"🗑️");
+      const delBtn = el("button",{type:"button",style:{background:"none",border:"1px solid #D6DCE5",borderRadius:"8px",padding:"8px 12px",color:"#6B7280",fontSize:"14px",cursor:"pointer"}},"🗑️");
       delBtn.addEventListener("click", avecRetourTactile(()=>{
         const avaitAllure = !!manualPerf[uid]?.average_speed;
         delete manualPerf[uid];
@@ -2919,7 +2919,7 @@ function renderWeekDetail(weekNum) {
 
     // Seance masquee
     if (isHidden) {
-      const hCard = el("div",{style:{background:"#1a1d2766",border:"1px dashed #2e3347",borderRadius:"12px",padding:"10px 14px",marginBottom:"8px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",opacity:"0.5"}},
+      const hCard = el("div",{style:{background:"#FFFFFF66",border:"1px dashed #D6DCE5",borderRadius:"12px",padding:"10px 14px",marginBottom:"8px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",opacity:"0.5"}},
         el("span",{class:"muted",style:{fontSize:"13px"}},"[supprimee] "+effSess.type+" - "+effSess.session.slice(0,30)),
         el("span",{class:"muted",style:{fontSize:"11px"}},s.date)
       );
@@ -2935,7 +2935,7 @@ function renderWeekDetail(weekNum) {
     const isDoneSession = (uidStatus==="✅"||uidStatus==="⚠️") && effSess.type!=="REPOS";
     let cardExpanded = false;
     const card=el("div",{style:{
-      background:isToday?"#232738":"#1a1d27",
+      background:isToday?"#E5E9F0":"#FFFFFF",
       border:`1px solid ${isToday?"#1E4ED833":st.color+"22"}`,
       borderTop:`3px solid ${st.color}`,
       borderRadius:"12px",
@@ -2946,19 +2946,19 @@ function renderWeekDetail(weekNum) {
       transition:"opacity 0.2s ease"
     }},
       el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"6px"}},
-        el("div",{style:{color:isPast?"#475569":"#e2e8f0",fontSize:"13px",fontWeight:"700",minWidth:"60px"}},s.day+" "+s.date.slice(8)),
+        el("div",{style:{color:isPast?"#6B7280":"#374151",fontSize:"13px",fontWeight:"700",minWidth:"60px"}},s.day+" "+s.date.slice(8)),
         isToday?el("span",{style:{background:"#1E4ED833",color:"#1E4ED8",fontSize:"13px",fontWeight:"700",padding:"1px 5px",borderRadius:"3px"}},"AUJOURD\'HUI"):null,
         badge(effSess.type),
         el("div",{style:{flex:"1"}}),
         isDoneSession?el("span",{style:{
           background:uidStatus==="✅"?"#22c55e":"#eab308",
-          color:uidStatus==="✅"?"#fff":"#1a1d27",
+          color:uidStatus==="✅"?"#fff":"#FFFFFF",
           borderRadius:"50%",width:"20px",height:"20px",
           display:"flex",alignItems:"center",justifyContent:"center",
           fontSize:"14px",fontWeight:"900",flexShrink:"0"
         }}, uidStatus==="✅"?"✓":"!") : null
       ),
-      el("div",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"600",marginBottom:"4px"}},effSess.session),
+      el("div",{style:{color:"#1F2937",fontSize:"15px",fontWeight:"600",marginBottom:"4px"}},effSess.session),
       (effSess.warmup||effSess.cooldown)?el("div",{style:{display:"flex",gap:"12px",marginBottom:"6px",flexWrap:"wrap"}},
         effSess.warmup?el("div",{class:"muted",style:{fontSize:"13px"}},"▶ "+effSess.warmup):null,
         effSess.cooldown?el("div",{class:"muted",style:{fontSize:"13px"}},"◀ "+effSess.cooldown):null
@@ -3005,10 +3005,10 @@ function renderWeekDetail(weekNum) {
           );
         })(),
         stravaRun&&stravaRun.start_latlng?.length===2&&s.date?
-          el("div",{style:{fontSize:"13px",color:"#e2e8f0",paddingTop:"4px",paddingBottom:"4px"}},
+          el("div",{style:{fontSize:"13px",color:"#374151",paddingTop:"4px",paddingBottom:"4px"}},
             historicalWeatherCache[s.date]!=null
               ? "🌡️ "+historicalWeatherCache[s.date]+"°C au départ"+(historicalWeatherCache[s.date]>28?" 🔥":"")
-              : el("span",{style:{color:"#475569",fontStyle:"italic"}},"🌡️ Chargement météo...")
+              : el("span",{style:{color:"#6B7280",fontStyle:"italic"}},"🌡️ Chargement météo...")
           ):null,
         effortLaps.length>0?el("div",{style:{borderTop:"1px solid #fc4c0222",paddingTop:"8px"}},
           el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}},
@@ -3057,14 +3057,14 @@ function renderWeekDetail(weekNum) {
       // bloc que sur la carte du jour, pour pouvoir corriger une séance
       // passée depuis le détail de semaine.
       card.appendChild(renderManualPerfRow(uid, s, stravaRun));
-      const noteInput=el("input",{type:"text",placeholder:"💬 Note sur cette séance...",style:{marginTop:"8px",background:"#07162F",border:"1px solid #2e3347",borderRadius:"8px",padding:"7px 10px",color:"#f1f5f9",fontSize:"14px",outline:"none",width:"100%"}});
+      const noteInput=el("input",{type:"text",placeholder:"💬 Note sur cette séance...",style:{marginTop:"8px",background:"#F8FAFC",border:"1px solid #D6DCE5",borderRadius:"8px",padding:"7px 10px",color:"#1F2937",fontSize:"14px",outline:"none",width:"100%"}});
       noteInput.value=sessionNotes[uid]||"";
       noteInput.addEventListener("change",()=>{
         if(noteInput.value.trim()){sessionNotes[uid]=noteInput.value.trim();}
         else{delete sessionNotes[uid];}
         save(clePourPlan("lk_session_notes"),sessionNotes);
       });
-      if(sessionNotes[uid]){card.appendChild(el("div",{style:{color:"#e2e8f0",fontSize:"14px",fontStyle:"italic",marginTop:"4px"}},"💬 "+sessionNotes[uid]));}
+      if(sessionNotes[uid]){card.appendChild(el("div",{style:{color:"#374151",fontSize:"14px",fontStyle:"italic",marginTop:"4px"}},"💬 "+sessionNotes[uid]));}
       card.appendChild(noteInput);
     }
 
@@ -3082,7 +3082,7 @@ function renderWeekDetail(weekNum) {
         const summaryHr = isIntensiveSummary
           ? (summaryHrVals.length ? summaryHrVals.reduce((s,l)=>s+l.average_heartrate,0)/summaryHrVals.length : null)
           : stravaRun.average_heartrate;
-        const summaryRow = el("div",{style:{display:"flex",alignItems:"center",gap:"14px",paddingTop:"6px",borderTop:"1px solid #2e334766"}},
+        const summaryRow = el("div",{style:{display:"flex",alignItems:"center",gap:"14px",paddingTop:"6px",borderTop:"1px solid #D6DCE566"}},
           el("span",{style:{color:"#1E4ED8",fontSize:"14px",fontWeight:"700"}},(stravaRun.distance/1000).toFixed(1)+" km"),
           el("span",{style:{color:"#1E4ED8",fontSize:"14px",fontWeight:"700"}},fmtPace(summaryPace)+"/km"),
           summaryHr?el("span",{style:{color:"#1E4ED8",fontSize:"14px",fontWeight:"700"}},Math.round(summaryHr)+" bpm"):null,
@@ -3120,7 +3120,7 @@ function renderWeekDetail(weekNum) {
     el("div",{style:{display:"flex",alignItems:"center",gap:"12px",marginTop:"8px",marginBottom:"16px"}},
       el("div",{style:{flex:"1"}},
         el("div",{class:"muted",style:{fontSize:"13px",textTransform:"uppercase",letterSpacing:"1px"}},phaseOf(weekNum).label),
-        el("div",{style:{color:"#f1f5f9",fontSize:"20px",fontWeight:"800"}},"Semaine "+weekNum),
+        el("div",{style:{color:"#1F2937",fontSize:"20px",fontWeight:"800"}},"Semaine "+weekNum),
         el("div",{class:"muted",style:{fontSize:"14px"}},fmtDate(week.sessions[0].date)+" – "+fmtDate(week.sessions[6].date))
       ),
       weekRuns.length>0?el("div",{style:{background:"#fc4c0111",border:"1px solid #fc4c0133",borderRadius:"8px",padding:"6px 10px",textAlign:"center"}},
@@ -3142,7 +3142,7 @@ function renderStats() {
   // ── Graphique évolution ───────────────────────────────────────────────
   let graphEl = null;
   if (isRebuilding) {
-    graphEl = el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"16px",marginBottom:"16px",textAlign:"center"}},
+    graphEl = el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"12px",padding:"16px",marginBottom:"16px",textAlign:"center"}},
       el("div",{class:"muted",style:{fontSize:"14px",fontStyle:"italic"}},"⏳ Recalcul de l\'historique...")
     );
   } else if (predHistory.length >= 2) {
@@ -3159,7 +3159,7 @@ function renderStats() {
     svg.setAttribute("width","100%");
     svg.style.display="block";
     const mk=(tag,attrs)=>{const e=document.createElementNS("http://www.w3.org/2000/svg",tag);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));return e;};
-    svg.appendChild(mk("rect",{x:0,y:0,width:W,height:H,fill:"#1a1d27"}));
+    svg.appendChild(mk("rect",{x:0,y:0,width:W,height:H,fill:"#FFFFFF"}));
     const yTarget=yScale(TARGET);
     svg.appendChild(mk("line",{x1:PAD.l,y1:yTarget,x2:W-PAD.r,y2:yTarget,stroke:"#1E4ED844",strokeWidth:"1","stroke-dasharray":"4,3"}));
     const tl=document.createElementNS("http://www.w3.org/2000/svg","text");
@@ -3175,13 +3175,13 @@ function renderStats() {
     [BASE,TARGET].forEach(t=>{
       const lbl=document.createElementNS("http://www.w3.org/2000/svg","text");
       lbl.setAttribute("x",PAD.l-4);lbl.setAttribute("y",yScale(t)+4);
-      lbl.setAttribute("fill","#e2e8f0");lbl.setAttribute("font-size","9");lbl.setAttribute("text-anchor","end");
+      lbl.setAttribute("fill","#374151");lbl.setAttribute("font-size","9");lbl.setAttribute("text-anchor","end");
       lbl.textContent=fmtTime(t);svg.appendChild(lbl);
     });
     const lastVal=predHistory[predHistory.length-1];
     const lvl=document.createElementNS("http://www.w3.org/2000/svg","text");
     lvl.setAttribute("x",xScale(predHistory.length-1));lvl.setAttribute("y",yScale(lastVal.time)-6);
-    lvl.setAttribute("fill","#f1f5f9");lvl.setAttribute("font-size","10");lvl.setAttribute("text-anchor","middle");lvl.setAttribute("font-weight","700");
+    lvl.setAttribute("fill","#1F2937");lvl.setAttribute("font-size","10");lvl.setAttribute("text-anchor","middle");lvl.setAttribute("font-weight","700");
     lvl.textContent=fmtTime(lastVal.time);svg.appendChild(lvl);
     // Labels semaines sur l'axe X
     // Positionner selon la date dans predHistory
@@ -3192,14 +3192,14 @@ function renderStats() {
       if (idx < 0) return;
       const xPos = xScale(idx);
       // Petite marque verticale pour toutes les semaines
-      const tick = mk("line",{x1:xPos,y1:PAD.t+iH,x2:xPos,y2:PAD.t+iH+4,stroke:"#2e3347",strokeWidth:"1"});
+      const tick = mk("line",{x1:xPos,y1:PAD.t+iH,x2:xPos,y2:PAD.t+iH+4,stroke:"#D6DCE5",strokeWidth:"1"});
       svg.appendChild(tick);
       // Label uniquement pour les semaines impaires
       if ((wi+1) % 2 === 1) {
         const lbl = document.createElementNS("http://www.w3.org/2000/svg","text");
         lbl.setAttribute("x", xPos);
         lbl.setAttribute("y", PAD.t+iH+14);
-        lbl.setAttribute("fill","#e2e8f0");
+        lbl.setAttribute("fill","#374151");
         lbl.setAttribute("font-size","9");
         lbl.setAttribute("text-anchor","middle");
         lbl.textContent = "S"+(wi+1);
@@ -3210,11 +3210,11 @@ function renderStats() {
     // Tooltip au tap
     const tooltip = document.createElementNS("http://www.w3.org/2000/svg","g");
     tooltip.style.display = "none";
-    const tooltipBg = mk("rect",{x:0,y:0,width:80,height:32,rx:"4",fill:"#232738",stroke:"#2e3347",strokeWidth:"1"});
+    const tooltipBg = mk("rect",{x:0,y:0,width:80,height:32,rx:"4",fill:"#E5E9F0",stroke:"#D6DCE5",strokeWidth:"1"});
     const tooltipDate = document.createElementNS("http://www.w3.org/2000/svg","text");
-    tooltipDate.setAttribute("font-size","9"); tooltipDate.setAttribute("fill","#e2e8f0");
+    tooltipDate.setAttribute("font-size","9"); tooltipDate.setAttribute("fill","#374151");
     const tooltipVal = document.createElementNS("http://www.w3.org/2000/svg","text");
-    tooltipVal.setAttribute("font-size","11"); tooltipVal.setAttribute("fill","#f1f5f9"); tooltipVal.setAttribute("font-weight","700");
+    tooltipVal.setAttribute("font-size","11"); tooltipVal.setAttribute("fill","#1F2937"); tooltipVal.setAttribute("font-weight","700");
     tooltip.appendChild(tooltipBg); tooltip.appendChild(tooltipDate); tooltip.appendChild(tooltipVal);
     svg.appendChild(tooltip);
 
@@ -3245,7 +3245,7 @@ function renderStats() {
 
     const wrap=el("div",{style:{marginBottom:"16px"}},
       el("div",{class:"label"},"Évolution de l\'estimation"),
-      el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"12px",overflow:"hidden"}})
+      el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"12px",padding:"12px",overflow:"hidden"}})
     );
     wrap.lastChild.appendChild(svg);
     graphEl=wrap;
@@ -3254,12 +3254,12 @@ function renderStats() {
   // ── Projections Riegel ────────────────────────────────────────────────
   const projEl=el("div",{style:{marginBottom:"16px"}},
     el("div",{class:"label"},"Projections Riegel"),
-    el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"14px"}},
+    el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"12px",padding:"14px"}},
       el("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}},
         ...riegelProjections(pred.time).map(p=>
-          el("div",{style:{background:p.target?"#1E4ED822":"#232738",border:p.target?"1px solid #1E4ED844":"none",borderRadius:"8px",padding:"10px 12px"}},
-            el("div",{style:{color:p.target?"#1E4ED8":"#e2e8f0",fontSize:"13px",marginBottom:"4px"}},p.label+(p.target?" 🎯":"")),
-            el("div",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"700"}},p.timeStr),
+          el("div",{style:{background:p.target?"#1E4ED822":"#E5E9F0",border:p.target?"1px solid #1E4ED844":"none",borderRadius:"8px",padding:"10px 12px"}},
+            el("div",{style:{color:p.target?"#1E4ED8":"#374151",fontSize:"13px",marginBottom:"4px"}},p.label+(p.target?" 🎯":"")),
+            el("div",{style:{color:"#1F2937",fontSize:"15px",fontWeight:"700"}},p.timeStr),
             el("div",{class:"muted",style:{fontSize:"13px"}},p.paceStr)
           )
         )
@@ -3334,10 +3334,10 @@ function renderStats() {
       const ry = PT+(1-(refLine-minY)/(maxY-minY))*H;
       const l = document.createElementNS("http://www.w3.org/2000/svg","line");
       l.setAttribute("x1",PL); l.setAttribute("x2",W); l.setAttribute("y1",ry); l.setAttribute("y2",ry);
-      l.setAttribute("stroke","#475569"); l.setAttribute("stroke-width","1"); l.setAttribute("stroke-dasharray","4,3");
+      l.setAttribute("stroke","#6B7280"); l.setAttribute("stroke-width","1"); l.setAttribute("stroke-dasharray","4,3");
       svg.appendChild(l);
       const t = document.createElementNS("http://www.w3.org/2000/svg","text");
-      t.setAttribute("x",PL-2); t.setAttribute("y",ry+3); t.setAttribute("fill","#475569"); t.setAttribute("font-size","8"); t.setAttribute("text-anchor","end");
+      t.setAttribute("x",PL-2); t.setAttribute("y",ry+3); t.setAttribute("fill","#6B7280"); t.setAttribute("font-size","8"); t.setAttribute("text-anchor","end");
       t.textContent=refLine; svg.appendChild(t);
     }
 
@@ -3347,17 +3347,17 @@ function renderStats() {
       const tick = document.createElementNS("http://www.w3.org/2000/svg","line");
       tick.setAttribute("x1",x); tick.setAttribute("x2",x);
       tick.setAttribute("y1",PT+H); tick.setAttribute("y2",PT+H+4);
-      tick.setAttribute("stroke","#2e3347"); tick.setAttribute("stroke-width","1");
+      tick.setAttribute("stroke","#D6DCE5"); tick.setAttribute("stroke-width","1");
       svg.appendChild(tick);
       const lbl = document.createElementNS("http://www.w3.org/2000/svg","text");
       lbl.setAttribute("x",x); lbl.setAttribute("y",PT+H+12);
-      lbl.setAttribute("fill","#475569"); lbl.setAttribute("font-size","8"); lbl.setAttribute("text-anchor","middle");
+      lbl.setAttribute("fill","#6B7280"); lbl.setAttribute("font-size","8"); lbl.setAttribute("text-anchor","middle");
       lbl.textContent="S"+w; svg.appendChild(lbl);
     });
 
     let legendX = PL;
     Object.entries(data).forEach(([type,pts]) => {
-      const color=typeColors2[type]||"#e2e8f0";
+      const color=typeColors2[type]||"#374151";
       const vp=pts.filter(p=>p[yKey]!==null);
       if (!vp.length) return;
       if (vp.length>=2) {
@@ -3382,7 +3382,7 @@ function renderStats() {
           if (existing) existing.remove();
           const tip = document.createElement("div");
           tip.className = "ie-tooltip";
-          tip.style.cssText = "position:absolute;background:#232738;border:1px solid #2e3347;border-radius:8px;padding:8px 10px;font-size:11px;color:#f1f5f9;pointer-events:none;z-index:10;white-space:nowrap;";
+          tip.style.cssText = "position:absolute;background:#E5E9F0;border:1px solid #D6DCE5;border-radius:8px;padding:8px 10px;font-size:11px;color:#1F2937;pointer-events:none;z-index:10;white-space:nowrap;";
           tip.innerHTML = `<span style="color:${color};font-weight:700">${type} · S${p.week}</span><br>${yKey==="ie"?"IE":"Cadence"} : <b>${p[yKey]}</b>${yKey==="cad"?" spm":""}`;
           const svgRect = svg.getBoundingClientRect();
           const parentRect = svg.parentNode.getBoundingClientRect();
@@ -3410,7 +3410,7 @@ function renderStats() {
     });
     return el("div",{style:{marginBottom:"16px"}},
       el("div",{class:"label"},label),
-      el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"12px"}},svg)
+      el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"12px",padding:"12px"}},svg)
     );
   }
 
@@ -3493,12 +3493,12 @@ function renderStats() {
           const c = document.createElementNS("http://www.w3.org/2000/svg","circle");
           c.setAttribute("cx",cx); c.setAttribute("cy",cy);
           c.setAttribute("r","4"); c.setAttribute("fill","none");
-          c.setAttribute("stroke","#2e3347"); c.setAttribute("stroke-width","1.5");
+          c.setAttribute("stroke","#D6DCE5"); c.setAttribute("stroke-width","1.5");
           c.setAttribute("stroke-dasharray","2,2");
           svg.appendChild(c);
           const t = document.createElementNS("http://www.w3.org/2000/svg","text");
           t.setAttribute("x",cx); t.setAttribute("y",H-4);
-          t.setAttribute("text-anchor","middle"); t.setAttribute("fill","#475569");
+          t.setAttribute("text-anchor","middle"); t.setAttribute("fill","#6B7280");
           t.setAttribute("font-size","9"); t.textContent = "S"+w;
           svg.appendChild(t);
         }
@@ -3522,17 +3522,17 @@ function renderStats() {
         svg.appendChild(c);
         const t = document.createElementNS("http://www.w3.org/2000/svg","text");
         t.setAttribute("x",cx); t.setAttribute("y",cy-8);
-        t.setAttribute("text-anchor","middle"); t.setAttribute("fill","#f1f5f9");
+        t.setAttribute("text-anchor","middle"); t.setAttribute("fill","#1F2937");
         t.setAttribute("font-size","9"); t.textContent = p.fc;
         svg.appendChild(t);
         const tw = document.createElementNS("http://www.w3.org/2000/svg","text");
         tw.setAttribute("x",cx); tw.setAttribute("y",H-4);
-        tw.setAttribute("text-anchor","middle"); tw.setAttribute("fill","#94a3b8");
+        tw.setAttribute("text-anchor","middle"); tw.setAttribute("fill","#64748B");
         tw.setAttribute("font-size","9"); tw.textContent = "S"+p.week;
         svg.appendChild(tw);
       });
 
-      const card = el("div",{style:{background:"#1a1d27",border:`1px solid ${color}33`,borderTop:`3px solid ${color}`,borderRadius:"12px",padding:"14px",marginBottom:"10px"}},
+      const card = el("div",{style:{background:"#FFFFFF",border:`1px solid ${color}33`,borderTop:`3px solid ${color}`,borderRadius:"12px",padding:"14px",marginBottom:"10px"}},
         el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}},
           el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
             el("span",{style:{background:color+"22",color,border:`1px solid ${color}44`,borderRadius:"4px",padding:"2px 8px",fontSize:"12px",fontWeight:"700"}},type),
@@ -3559,11 +3559,11 @@ function renderStats() {
 
   const paceEl=el("div",{style:{marginBottom:"16px"}},
     el("div",{class:"label"},"Référentiel allures & FC"),
-    el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",overflow:"hidden"}},
-      ...paceRows.map((r,i)=>el("div",{style:{padding:"10px 14px",borderBottom:i<paceRows.length-1?"1px solid #2e3347":"none",display:"flex",alignItems:"center",gap:"12px"}},
+    el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"12px",overflow:"hidden"}},
+      ...paceRows.map((r,i)=>el("div",{style:{padding:"10px 14px",borderBottom:i<paceRows.length-1?"1px solid #D6DCE5":"none",display:"flex",alignItems:"center",gap:"12px"}},
         el("div",{style:{width:"4px",height:"32px",borderRadius:"2px",background:r.color,flexShrink:"0"}}),
         el("div",{style:{flex:"1"}},
-          el("div",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"600",marginBottom:"2px"}},r.label),
+          el("div",{style:{color:"#1F2937",fontSize:"14px",fontWeight:"600",marginBottom:"2px"}},r.label),
           el("div",{class:"muted",style:{fontSize:"13px"}},r.heat?"Chaud : "+r.heat:SESSION_TARGETS[r.type]?"Tolérance "+SESSION_TARGETS[r.type].tolerance:"—")
         ),
         el("div",{style:{textAlign:"right"}},
@@ -3609,27 +3609,27 @@ function renderStats() {
 
     progressionEl = el("div",{style:{marginBottom:"16px"}},
       el("div",{class:"label"},"🎯 Trajectoire au "+fmtDate(DATE_COURSE_REFERENCE)),
-      el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"14px"}},
+      el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"12px",padding:"14px"}},
         el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}},
           el("div",{},
             el("div",{class:"muted",style:{fontSize:"13px",marginBottom:"2px"}},"Projection"),
-            el("div",{style:{color:"#f1f5f9",fontSize:"22px",fontWeight:"800",letterSpacing:"-0.5px"}},projLow+" – "+projHigh)
+            el("div",{style:{color:"#1F2937",fontSize:"22px",fontWeight:"800",letterSpacing:"-0.5px"}},projLow+" – "+projHigh)
           ),
           el("div",{style:{textAlign:"right"}},
             el("div",{class:"muted",style:{fontSize:"12px",marginBottom:"4px"}},"Fiabilité"),
             el("div",{style:{
-              color:daySpan>=21?"#22c55e":daySpan>=14?"#eab308":"#e2e8f0",
+              color:daySpan>=21?"#22c55e":daySpan>=14?"#eab308":"#374151",
               fontSize:"14px",fontWeight:"700"
             }},daySpan>=21?"Bonne":"Faible — peu de données")
           )
         ),
-        hasVerdict ? el("div",{style:{display:"flex",justifyContent:"space-between",paddingTop:"8px",borderTop:"1px solid #2e3347"}},
+        hasVerdict ? el("div",{style:{display:"flex",justifyContent:"space-between",paddingTop:"8px",borderTop:"1px solid #D6DCE5"}},
           el("span",{class:"muted",style:{fontSize:"13px"}},"vs objectif "+fmtTime(raceGoalTime)),
           el("span",{style:{
             color:projectedTime<=raceGoalTime?"#22c55e":projectedTime<=raceGoalTime+30?"#eab308":"#ef4444",
             fontSize:"14px",fontWeight:"700"
           }},projectedTime<=raceGoalTime?"✅ Atteignable !":projectedTime<=raceGoalTime+30?"⚠️ Serré":"❌ À risque")
-        ) : el("div",{style:{paddingTop:"8px",borderTop:"1px solid #2e3347"}},
+        ) : el("div",{style:{paddingTop:"8px",borderTop:"1px solid #D6DCE5"}},
           el("span",{class:"muted",style:{fontSize:"13px",fontStyle:"italic"}},"Verdict disponible à partir de 3 semaines de données")
         )
       )
@@ -3640,9 +3640,9 @@ function renderStats() {
     const availStr = availDate.toLocaleDateString("fr-FR",{day:"numeric",month:"long"});
     progressionEl = el("div",{style:{marginBottom:"16px"}},
       el("div",{class:"label"},"🎯 Trajectoire au "+fmtDate(DATE_COURSE_REFERENCE)),
-      el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"14px",textAlign:"center"}},
+      el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"12px",padding:"14px",textAlign:"center"}},
         el("div",{style:{fontSize:"24px",marginBottom:"8px"}},"📊"),
-        el("div",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"600",marginBottom:"4px"}},"Données insuffisantes"),
+        el("div",{style:{color:"#1F2937",fontSize:"14px",fontWeight:"600",marginBottom:"4px"}},"Données insuffisantes"),
         el("div",{class:"muted",style:{fontSize:"13px"}},"Projection disponible à partir du "+availStr)
       )
     );
@@ -3660,7 +3660,7 @@ function renderStats() {
     if (!acwr) {
       return el("div",{style:{marginBottom:"16px"}},
         el("div",{class:"label"},"⚖️ Charge d'entraînement (ACWR)"),
-        el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"14px",textAlign:"center"}},
+        el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"12px",padding:"14px",textAlign:"center"}},
           el("div",{class:"muted",style:{fontSize:"13px",fontStyle:"italic"}},"Disponible après 4 semaines d'activités Strava enregistrées")
         )
       );
@@ -3680,16 +3680,16 @@ function renderStats() {
     svg1.style.width = "100%"; svg1.style.display = "block";
     const maxCharge = Math.max(...hist.map(h => Math.max(h.chargeAigue, h.chargeChronique))) * 1.1;
     const yScale1 = v => PAD.t + iH - (v / maxCharge) * iH;
-    svg1.appendChild(mk("rect", { x: 0, y: 0, width: W, height: H, fill: "#1a1d27" }));
+    svg1.appendChild(mk("rect", { x: 0, y: 0, width: W, height: H, fill: "#FFFFFF" }));
     [0, Math.round(maxCharge / 2), Math.round(maxCharge)].forEach(v => {
       const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
       t.setAttribute("x", PAD.l - 4); t.setAttribute("y", yScale1(v) + 3);
-      t.setAttribute("fill", "#94a3b8"); t.setAttribute("font-size", "8"); t.setAttribute("text-anchor", "end");
+      t.setAttribute("fill", "#64748B"); t.setAttribute("font-size", "8"); t.setAttribute("text-anchor", "end");
       t.textContent = v; svg1.appendChild(t);
     });
     const ptsAigue = hist.map((h, i) => `${xScale(i)},${yScale1(h.chargeAigue)}`).join(" ");
     const ptsChronique = hist.map((h, i) => `${xScale(i)},${yScale1(h.chargeChronique)}`).join(" ");
-    svg1.appendChild(mk("polyline", { points: ptsChronique, fill: "none", stroke: "#94a3b8", "stroke-width": "2", "stroke-dasharray": "4,3", "stroke-linejoin": "round" }));
+    svg1.appendChild(mk("polyline", { points: ptsChronique, fill: "none", stroke: "#64748B", "stroke-width": "2", "stroke-dasharray": "4,3", "stroke-linejoin": "round" }));
     svg1.appendChild(mk("polyline", { points: ptsAigue, fill: "none", stroke: "#60a5fa", "stroke-width": "2.5", "stroke-linejoin": "round", "stroke-linecap": "round" }));
 
     // ── Graphique 2 : ratio ACWR avec zones ────────────────────────────────
@@ -3699,7 +3699,7 @@ function renderStats() {
     const ratios = hist.map(h => h.ratio).filter(r => r !== null);
     const maxRatio = Math.max(1.6, ...ratios) * 1.05;
     const yScale2 = v => PAD.t + iH - (v / maxRatio) * iH;
-    svg2.appendChild(mk("rect", { x: 0, y: 0, width: W, height: H, fill: "#1a1d27" }));
+    svg2.appendChild(mk("rect", { x: 0, y: 0, width: W, height: H, fill: "#FFFFFF" }));
     // Zone de risque (>1.5)
     const yRisque = yScale2(ACWR_SEUIL_RISQUE);
     svg2.appendChild(mk("rect", { x: PAD.l, y: PAD.t, width: iW, height: yRisque - PAD.t, fill: "#ef4444", opacity: "0.08" }));
@@ -3710,7 +3710,7 @@ function renderStats() {
     [ACWR_SEUIL_RISQUE, 1, ACWR_SEUIL_SOUS_CHARGE].forEach(v => {
       const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
       t.setAttribute("x", PAD.l - 4); t.setAttribute("y", yScale2(v) + 3);
-      t.setAttribute("fill", "#94a3b8"); t.setAttribute("font-size", "8"); t.setAttribute("text-anchor", "end");
+      t.setAttribute("fill", "#64748B"); t.setAttribute("font-size", "8"); t.setAttribute("text-anchor", "end");
       t.textContent = v; svg2.appendChild(t);
     });
     const ptsRatio = hist.filter(h => h.ratio !== null).map((h) => {
@@ -3726,7 +3726,7 @@ function renderStats() {
     const dernierRatioVal = acwr.dernierRatio;
     const dernierLbl = document.createElementNS("http://www.w3.org/2000/svg", "text");
     dernierLbl.setAttribute("x", xScale(hist.length - 1)); dernierLbl.setAttribute("y", yScale2(dernierRatioVal) - 8);
-    dernierLbl.setAttribute("fill", "#f1f5f9"); dernierLbl.setAttribute("font-size", "10"); dernierLbl.setAttribute("text-anchor", "end"); dernierLbl.setAttribute("font-weight", "700");
+    dernierLbl.setAttribute("fill", "#1F2937"); dernierLbl.setAttribute("font-size", "10"); dernierLbl.setAttribute("text-anchor", "end"); dernierLbl.setAttribute("font-weight", "700");
     dernierLbl.textContent = dernierRatioVal.toFixed(2); svg2.appendChild(dernierLbl);
 
     const statutColor = dernierRatioVal > ACWR_SEUIL_RISQUE ? "#ef4444" : dernierRatioVal > ACWR_SEUIL_VIGILANCE ? "#eab308" : dernierRatioVal < ACWR_SEUIL_SOUS_CHARGE ? "#60a5fa" : "#22c55e";
@@ -3737,14 +3737,14 @@ function renderStats() {
 
     return el("div",{style:{marginBottom:"16px"}},
       el("div",{class:"label"},"⚖️ Charge d'entraînement (ACWR)"),
-      el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"12px",marginBottom:"8px"}},
+      el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"12px",padding:"12px",marginBottom:"8px"}},
         el("div",{class:"muted",style:{fontSize:"11px",marginBottom:"6px",display:"flex",gap:"12px"}},
           el("span",{},el("span",{style:{color:"#60a5fa"}},"⎯"),"  Aiguë (7j)"),
-          el("span",{},el("span",{style:{color:"#94a3b8"}},"⎯⎯"),"  Chronique (moy./sem sur 28j)")
+          el("span",{},el("span",{style:{color:"#64748B"}},"⎯⎯"),"  Chronique (moy./sem sur 28j)")
         ),
         svg1
       ),
-      el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"12px",padding:"12px",marginBottom:"8px"}},
+      el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"12px",padding:"12px",marginBottom:"8px"}},
         el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}},
           el("span",{class:"muted",style:{fontSize:"11px"}},"Ratio charge aiguë / chronique"),
           el("span",{style:{color:statutColor,fontSize:"12px",fontWeight:"700"}},statutTexte)
@@ -3763,11 +3763,11 @@ function renderStats() {
     el("div",{class:"card"},
       ...[
         ["Course",RACE_NAME,"#1E4ED8"],
-        ["Date",new Date(DATE_COURSE_REFERENCE+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})+" · "+RACE_LOCATION,"#f1f5f9"],
+        ["Date",new Date(DATE_COURSE_REFERENCE+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})+" · "+RACE_LOCATION,"#1F2937"],
         ["Objectif",fmtTime(raceGoalTime)+" · "+fmtPace(DISTANCE_M_REFERENCE/raceGoalTime)+"/km","#1E4ED8"],
-        ["Référence",fmtTime(BASE_TIME_REFERENCE),"#f1f5f9"],
+        ["Référence",fmtTime(BASE_TIME_REFERENCE),"#1F2937"],
         ["Allure EF",alluresEF+"/km · "+chaleurEF+"/km si chaud","#60a5fa"],
-        ["FC max",runnerFcMax+" bpm","#f1f5f9"],
+        ["FC max",runnerFcMax+" bpm","#1F2937"],
         // Km courus DEPUIS LE DÉBUT DU PLAN ACTUEL, pas toutes les activités
         // Strava jamais bornées — bug trouvé le 7 juillet 2026 : Laurent, sur
         // un plan Semi démarrant le 14 septembre, voyait les km d'une séance
@@ -3778,7 +3778,7 @@ function renderStats() {
         ["Km courus",Math.round(activitesDuPlan().reduce((s,a)=>s+a.distance,0)/100)/10+" km","#22c55e"],
       ].map(([label,val,color])=>el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"6px"}},
         el("span",{class:"muted",style:{fontSize:"14px"}},label),
-        el("span",{style:{color,fontSize:"14px",fontWeight:color==="#f1f5f9"?"400":"700"}},val)
+        el("span",{style:{color,fontSize:"14px",fontWeight:color==="#1F2937"?"400":"700"}},val)
       ))
     )
   );
@@ -3803,26 +3803,26 @@ function renderStats() {
 function renderCourse() {
   const cd = countdown();
 
-  const infoCard = el("div",{style:{background:"linear-gradient(135deg,#1a1d27 0%,#1e1030 100%)",border:"1px solid #1E4ED833",borderRadius:"12px",padding:"16px",marginBottom:"16px"}},
+  const infoCard = el("div",{style:{background:"linear-gradient(135deg,#FFFFFF 0%,#EEF1F8 100%)",border:"1px solid #1E4ED833",borderRadius:"12px",padding:"16px",marginBottom:"16px"}},
     el("div",{style:{display:"flex",alignItems:"center",gap:"14px",marginBottom:"12px"}},
       runByLeaIcon(52, 12),
       el("div",{},
         el("div",{style:{color:"#1E4ED8",fontSize:"17px",fontWeight:"800",marginBottom:"2px"}},"🏁 "+RACE_NAME),
         el("div",{class:"muted",style:{fontSize:"14px",marginBottom:"2px"}},new Date(DATE_COURSE_REFERENCE+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})+" · "+RACE_LOCATION),
-        el("div",{style:{color:"#475569",fontSize:"13px"}},"Yoria")
+        el("div",{style:{color:"#6B7280",fontSize:"13px"}},"Yoria")
       )
     ),
     el("a",{href:RACE_URL,target:"_blank",style:{display:"block",background:"#1E4ED822",border:"1px solid #1E4ED844",borderRadius:"8px",padding:"10px 14px",color:"#1E4ED8",fontSize:"15px",fontWeight:"700",textDecoration:"none",textAlign:"center",marginBottom:"12px"}},"🔗 Organisateur"),
     el("div",{style:{display:"flex",gap:"8px"}},
-      el("div",{style:{flex:"1",background:"#232738",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
+      el("div",{style:{flex:"1",background:"#E5E9F0",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
         el("div",{style:{color:"#1E4ED8",fontSize:"15px",fontWeight:"700"}},fmtTime(raceGoalTime)),
         el("div",{class:"muted",style:{fontSize:"12px"}},"Objectif")
       ),
-      el("div",{style:{flex:"1",background:"#232738",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
+      el("div",{style:{flex:"1",background:"#E5E9F0",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
         el("div",{style:{color:"#1E4ED8",fontSize:"15px",fontWeight:"700"}},"J–"+cd),
         el("div",{class:"muted",style:{fontSize:"12px"}},"Avant la course")
       ),
-      el("div",{style:{flex:"1",background:"#232738",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
+      el("div",{style:{flex:"1",background:"#E5E9F0",borderRadius:"8px",padding:"8px 10px",textAlign:"center"}},
         el("div",{style:{color:"#1E4ED8",fontSize:"15px",fontWeight:"700"}},fmtPace(DISTANCE_M_REFERENCE/raceGoalTime)+"/km"),
         el("div",{class:"muted",style:{fontSize:"12px"}},"Allure cible")
       )
@@ -3831,13 +3831,13 @@ function renderCourse() {
 
   const horairesCard = el("div",{style:{marginBottom:"16px"}},
     el("div",{class:"label"},"⏰ Horaires"),
-    el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",display:"flex",flexDirection:"column",gap:"10px"}},
+    el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"10px",padding:"14px",display:"flex",flexDirection:"column",gap:"10px"}},
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
         el("span",{class:"muted",style:{fontSize:"15px"}},"Retrait dossards"),
         (()=>{
           const inp = document.createElement("input");
           inp.type = "time"; inp.id = "horaire-dossard-input";
-          inp.style.cssText = "width:110px;background:#232738;border:1px solid #2e3347;border-radius:6px;padding:4px 8px;color:#f1f5f9;font-size:13px;text-align:right;box-sizing:border-box;";
+          inp.style.cssText = "width:110px;background:#E5E9F0;border:1px solid #D6DCE5;border-radius:6px;padding:4px 8px;color:#1F2937;font-size:13px;text-align:right;box-sizing:border-box;";
           inp.value = raceHoraires.dossard || "";
           inp.addEventListener("change", (e)=>{ raceHoraires.dossard=e.target.value; save(clePourPlan("lk_race_horaires"),raceHoraires); });
           return inp;
@@ -3848,7 +3848,7 @@ function renderCourse() {
         (()=>{
           const inp = document.createElement("input");
           inp.type = "time"; inp.id = "horaire-depart-input";
-          inp.style.cssText = "width:110px;background:#232738;border:1px solid #2e3347;border-radius:6px;padding:4px 8px;color:#f1f5f9;font-size:13px;text-align:right;box-sizing:border-box;";
+          inp.style.cssText = "width:110px;background:#E5E9F0;border:1px solid #D6DCE5;border-radius:6px;padding:4px 8px;color:#1F2937;font-size:13px;text-align:right;box-sizing:border-box;";
           inp.value = raceHoraires.depart || "";
           inp.addEventListener("change", (e)=>{ raceHoraires.depart=e.target.value; save(clePourPlan("lk_race_horaires"),raceHoraires); });
           return inp;
@@ -3868,17 +3868,17 @@ function renderCourse() {
 
   const checklistCard = el("div",{style:{marginBottom:"16px"}},
     el("div",{class:"label"},"🎽 Checklist équipement"),
-    el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",display:"flex",flexDirection:"column",gap:"10px"}},
+    el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"10px",padding:"14px",display:"flex",flexDirection:"column",gap:"10px"}},
       ...CHECKLIST.map(item=>{
         const checked = checklistItems[item.key]||false;
         const row = el("div",{style:{display:"flex",alignItems:"center",gap:"10px",cursor:"pointer"}},
           el("div",{style:{
             width:"18px",height:"18px",borderRadius:"4px",flexShrink:"0",
-            background:checked?"#1E4ED8":"#232738",
-            border:checked?"1px solid #1E4ED8":"1px solid #2e3347",
+            background:checked?"#1E4ED8":"#E5E9F0",
+            border:checked?"1px solid #1E4ED8":"1px solid #D6DCE5",
             display:"flex",alignItems:"center",justifyContent:"center"
           }}, checked?el("span",{style:{color:"#fff",fontSize:"14px",fontWeight:"700"}},"✓"):null),
-          el("span",{style:{color:checked?"#e2e8f0":"#f1f5f9",fontSize:"15px",textDecoration:checked?"line-through":"none"}},item.label)
+          el("span",{style:{color:checked?"#374151":"#1F2937",fontSize:"15px",textDecoration:checked?"line-through":"none"}},item.label)
         );
         row.addEventListener("click",()=>{
           checklistItems[item.key]=!checked;
@@ -3901,7 +3901,7 @@ function renderCourse() {
       (()=>{
         const inp = document.createElement("input");
         inp.type = "text"; inp.placeholder = "Lien GPX ou carte du parcours...";
-        inp.style.cssText = "width:100%;background:#232738;border:1px solid #2e3347;border-radius:6px;padding:8px 12px;color:#f1f5f9;font-size:13px;box-sizing:border-box;";
+        inp.style.cssText = "width:100%;background:#E5E9F0;border:1px solid #D6DCE5;border-radius:6px;padding:8px 12px;color:#1F2937;font-size:13px;box-sizing:border-box;";
         inp.value = raceParcoursUrl || "";
         inp.addEventListener("input", (e)=>{ raceParcoursUrl=e.target.value; save(clePourPlan("lk_race_parcours"),raceParcoursUrl); });
         return inp;
@@ -3918,14 +3918,14 @@ function renderCourse() {
     // La météo sera fetchée et affichée
     meteoRaceEl = el("div",{style:{marginBottom:"16px"}},
       el("div",{class:"label"},"🌡️ Météo prévue le "+fmtDate(DATE_COURSE_REFERENCE)),
-      el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",textAlign:"center"}},
+      el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"10px",padding:"14px",textAlign:"center"}},
         el("div",{class:"muted",style:{fontSize:"14px",fontStyle:"italic"}},"Disponible dans les 16 jours avant la course")
       )
     );
   } else {
     meteoRaceEl = el("div",{style:{marginBottom:"16px"}},
       el("div",{class:"label"},"🌡️ Météo prévue le "+fmtDate(DATE_COURSE_REFERENCE)),
-      el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",textAlign:"center"}},
+      el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"10px",padding:"14px",textAlign:"center"}},
         el("div",{class:"muted",style:{fontSize:"14px",fontStyle:"italic"}},"Disponible à partir du "+fmtDate(new Date(new Date(DATE_COURSE_REFERENCE+"T00:00:00").getTime()-16*86400000).toISOString().slice(0,10))+" · J–"+daysToRace+" actuellement")
       )
     );
@@ -4018,8 +4018,8 @@ function renderCourse() {
 
   const splitsCard = el("div",{style:{marginBottom:"16px"}},
     el("div",{class:"label"},"🏃 Allures de passage"),
-    el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",overflow:"hidden"}},
-      el("div",{style:{display:"grid",gridTemplateColumns:"60px 1fr 70px 70px",gap:"0",padding:"8px 12px",borderBottom:"1px solid #2e3347"}},
+    el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"10px",overflow:"hidden"}},
+      el("div",{style:{display:"grid",gridTemplateColumns:"60px 1fr 70px 70px",gap:"0",padding:"8px 12px",borderBottom:"1px solid #D6DCE5"}},
         el("span",{class:"muted",style:{fontSize:"12px",fontWeight:"700"}},"SEGMENT"),
         el("span",{class:"muted",style:{fontSize:"12px",fontWeight:"700"}},"STRATÉGIE"),
         el("span",{class:"muted",style:{fontSize:"12px",fontWeight:"700",textAlign:"right"}},"ALLURE"),
@@ -4031,10 +4031,10 @@ function renderCourse() {
         const segLabel = s.from+"→"+s.to+" km";
         const posRelative = i / (splits.length - 1 || 1); // 0 = premier segment, 1 = dernier
         const color = posRelative < 0.4 ? "#60a5fa" : posRelative < 0.7 ? "#1E4ED8" : "#22c55e";
-        return el("div",{style:{display:"grid",gridTemplateColumns:"60px 1fr 70px 70px",gap:"0",padding:"10px 12px",borderBottom:i<splits.length-1?"1px solid #2e3347":"none",alignItems:"center"}},
+        return el("div",{style:{display:"grid",gridTemplateColumns:"60px 1fr 70px 70px",gap:"0",padding:"10px 12px",borderBottom:i<splits.length-1?"1px solid #D6DCE5":"none",alignItems:"center"}},
           el("span",{style:{color,fontSize:"13px",fontWeight:"700"}},segLabel),
           el("span",{class:"muted",style:{fontSize:"13px"}},s.note),
-          el("span",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"600",textAlign:"right"}},paceStr),
+          el("span",{style:{color:"#1F2937",fontSize:"14px",fontWeight:"600",textAlign:"right"}},paceStr),
           el("span",{style:{color,fontSize:"14px",fontWeight:"700",textAlign:"right"}},passageStr)
         );
       })
@@ -4054,18 +4054,18 @@ function renderCourse() {
 
   const prepCard = el("div",{style:{marginBottom:"12px"}},
     el("div",{class:"label"},"📋 Résumé de préparation"),
-    el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px"}},
+    el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"10px",padding:"14px"}},
       el("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginBottom:"12px"}},
-        el("div",{style:{background:"#232738",borderRadius:"8px",padding:"10px",textAlign:"center"}},
+        el("div",{style:{background:"#E5E9F0",borderRadius:"8px",padding:"10px",textAlign:"center"}},
           el("div",{style:{color:"#22c55e",fontSize:"20px",fontWeight:"800"}},totalDone+""),
           el("div",{class:"muted",style:{fontSize:"12px"}},"✅ validées")
         ),
-        el("div",{style:{background:"#232738",borderRadius:"8px",padding:"10px",textAlign:"center"}},
-          el("div",{style:{color:"#f1f5f9",fontSize:"20px",fontWeight:"800"}},totalKmRace+" km"),
+        el("div",{style:{background:"#E5E9F0",borderRadius:"8px",padding:"10px",textAlign:"center"}},
+          el("div",{style:{color:"#1F2937",fontSize:"20px",fontWeight:"800"}},totalKmRace+" km"),
           el("div",{class:"muted",style:{fontSize:"12px"}},"courus")
         ),
-        el("div",{style:{background:"#232738",borderRadius:"8px",padding:"10px",textAlign:"center"}},
-          el("div",{style:{color:pred.time?verdictRaceColor:"#94a3b8",fontSize:"20px",fontWeight:"800"}},pred.time?fmtTime(pred.time):"—"),
+        el("div",{style:{background:"#E5E9F0",borderRadius:"8px",padding:"10px",textAlign:"center"}},
+          el("div",{style:{color:pred.time?verdictRaceColor:"#64748B",fontSize:"20px",fontWeight:"800"}},pred.time?fmtTime(pred.time):"—"),
           el("div",{class:"muted",style:{fontSize:"12px"}},"estimation")
         )
       ),
@@ -4094,9 +4094,9 @@ function renderCourse() {
 
   const coachRaceEl = el("div",{style:{marginBottom:"12px"}},
     el("div",{class:"label"},"🤖 Conseil de Léa pour la course"),
-    el("div",{style:{background:"#232738",borderRadius:"10px",padding:"14px",display:"flex",gap:"10px"}},
+    el("div",{style:{background:"#E5E9F0",borderRadius:"10px",padding:"14px",display:"flex",gap:"10px"}},
       el("span",{style:{fontSize:"20px",flexShrink:"0"}},"🤖"),
-      el("div",{style:{color:"#e2e8f0",fontSize:"14px",lineHeight:"1.6",flex:"1"}},
+      el("div",{style:{color:"#374151",fontSize:"14px",lineHeight:"1.6",flex:"1"}},
         coachRaceMsg || "Léa réfléchit à un conseil pour ta course…"
       ),
       el("button",{style:{background:"none",border:"none",color:"#64748b",fontSize:"16px",cursor:"pointer",flexShrink:"0"},
@@ -4114,7 +4114,7 @@ function renderCourse() {
       const existingResult = load(clePourPlan("lk_race_result"), null);
       const inp2 = document.createElement("input");
       inp2.type="time"; inp2.step="1";
-      inp2.style.cssText="flex:1;background:#232738;border:1px solid #2e3347;border-radius:8px;padding:8px 12px;color:#f1f5f9;font-size:16px;";
+      inp2.style.cssText="flex:1;background:#E5E9F0;border:1px solid #D6DCE5;border-radius:8px;padding:8px 12px;color:#1F2937;font-size:16px;";
       if (existingResult) {
         const hh=Math.floor(existingResult/3600), mm=Math.floor((existingResult%3600)/60), ss3=existingResult%60;
         inp2.value=hh.toString().padStart(2,"0")+":"+mm.toString().padStart(2,"0")+":"+ss3.toString().padStart(2,"0");
@@ -4130,8 +4130,8 @@ function renderCourse() {
       row2.appendChild(inp2); row2.appendChild(btn2);
       const card2=el("div",{style:{marginBottom:"16px"}},
         el("div",{class:"label"},"Mon resultat officiel"),
-        el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px"}},
-          el("div",{style:{color:"#94a3b8",fontSize:"13px"}},existingResult?"Resultat : "+fmtTime(existingResult):"Saisis ton temps apres la course")
+        el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"10px",padding:"14px"}},
+          el("div",{style:{color:"#64748B",fontSize:"13px"}},existingResult?"Resultat : "+fmtTime(existingResult):"Saisis ton temps apres la course")
         )
       );
       card2.querySelector("div:last-child").appendChild(row2);
@@ -4186,13 +4186,13 @@ function showSessionMenu(week, slotIdx) {
   overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:flex-end;justify-content:center;";
 
   const panel = document.createElement("div");
-  panel.style.cssText = "background:#1a1d27;border-radius:16px 16px 0 0;padding:20px 16px 36px;width:100%;max-width:430px;";
+  panel.style.cssText = "background:#FFFFFF;border-radius:16px 16px 0 0;padding:20px 16px 36px;width:100%;max-width:430px;";
 
   const t1 = document.createElement("div");
-  t1.style.cssText = "color:#f1f5f9;font-size:15px;font-weight:700;margin-bottom:2px;";
+  t1.style.cssText = "color:#1F2937;font-size:15px;font-weight:700;margin-bottom:2px;";
   t1.textContent = sess.type+" - "+sess.session.slice(0,40);
   const t2 = document.createElement("div");
-  t2.style.cssText = "color:#94a3b8;font-size:13px;margin-bottom:16px;";
+  t2.style.cssText = "color:#64748B;font-size:13px;margin-bottom:16px;";
   t2.textContent = week.sessions[slotIdx].date;
   panel.appendChild(t1); panel.appendChild(t2);
 
@@ -4257,7 +4257,7 @@ function showSessionMenu(week, slotIdx) {
   }
 
   const cancelBtn = document.createElement("button");
-  cancelBtn.style.cssText = btnStyle+"background:#232738;color:#94a3b8;";
+  cancelBtn.style.cssText = btnStyle+"background:#E5E9F0;color:#64748B;";
   cancelBtn.textContent = "Annuler";
   cancelBtn.addEventListener("click", () => overlay.remove());
   panel.appendChild(cancelBtn);
@@ -4277,14 +4277,14 @@ function showMoveMenu(week, slotIdx) {
   overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:flex-end;justify-content:center;";
 
   const panel = document.createElement("div");
-  panel.style.cssText = "background:#1a1d27;border-radius:16px 16px 0 0;padding:20px 16px 36px;width:100%;max-width:430px;";
+  panel.style.cssText = "background:#FFFFFF;border-radius:16px 16px 0 0;padding:20px 16px 36px;width:100%;max-width:430px;";
 
   const t1 = document.createElement("div");
-  t1.style.cssText = "color:#f1f5f9;font-size:15px;font-weight:700;margin-bottom:16px;";
+  t1.style.cssText = "color:#1F2937;font-size:15px;font-weight:700;margin-bottom:16px;";
   t1.textContent = "Deplacer vers...";
   panel.appendChild(t1);
 
-  const btnStyle = "width:100%;padding:13px;border-radius:10px;border:1px solid #2e3347;background:#232738;color:#f1f5f9;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px;text-align:left;display:block;";
+  const btnStyle = "width:100%;padding:13px;border-radius:10px;border:1px solid #D6DCE5;background:#E5E9F0;color:#1F2937;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px;text-align:left;display:block;";
 
   slots.forEach(slot => {
     const btn = document.createElement("button");
@@ -4336,17 +4336,17 @@ function showRestoreMenu(week, slotIdx) {
   overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:flex-end;justify-content:center;";
 
   const panel = document.createElement("div");
-  panel.style.cssText = "background:#1a1d27;border-radius:16px 16px 0 0;padding:20px 16px 36px;width:100%;max-width:430px;";
+  panel.style.cssText = "background:#FFFFFF;border-radius:16px 16px 0 0;padding:20px 16px 36px;width:100%;max-width:430px;";
 
   const t1 = document.createElement("div");
-  t1.style.cssText = "color:#f1f5f9;font-size:15px;font-weight:700;margin-bottom:4px;";
+  t1.style.cssText = "color:#1F2937;font-size:15px;font-weight:700;margin-bottom:4px;";
   t1.textContent = "Restaurer vers...";
   const t2 = document.createElement("div");
-  t2.style.cssText = "color:#94a3b8;font-size:13px;margin-bottom:16px;";
+  t2.style.cssText = "color:#64748B;font-size:13px;margin-bottom:16px;";
   t2.textContent = "Le jour original est occupe. Choisir un autre jour :";
   panel.appendChild(t1); panel.appendChild(t2);
 
-  const btnStyle = "width:100%;padding:13px;border-radius:10px;border:1px solid #2e3347;background:#232738;color:#f1f5f9;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px;text-align:left;display:block;";
+  const btnStyle = "width:100%;padding:13px;border-radius:10px;border:1px solid #D6DCE5;background:#E5E9F0;color:#1F2937;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px;text-align:left;display:block;";
 
   slots.forEach(slot => {
     const btn = document.createElement("button");
@@ -4368,7 +4368,7 @@ function showRestoreMenu(week, slotIdx) {
   });
 
   const cancelBtn = document.createElement("button");
-  cancelBtn.style.cssText = "width:100%;padding:13px;border-radius:10px;border:none;background:#232738;color:#94a3b8;font-size:14px;font-weight:700;cursor:pointer;display:block;";
+  cancelBtn.style.cssText = "width:100%;padding:13px;border-radius:10px;border:none;background:#E5E9F0;color:#64748B;font-size:14px;font-weight:700;cursor:pointer;display:block;";
   cancelBtn.textContent = "Annuler";
   cancelBtn.addEventListener("click", () => overlay.remove());
   panel.appendChild(cancelBtn);
@@ -4526,7 +4526,7 @@ function renderHelp() {
       text:"Ta progression vers l\'objectif, ton Indice d\'Économie (IE) et ta cadence par type de séance, ainsi qu\'un référentiel complet des allures et zones FC." },
     { icon:"🏁", color:"#22c55e", title:"Course",
       text:"Toutes les infos du jour J — horaires, checklist équipement, stratégie de course et allures de passage aux km clés." },
-    { icon:"⚙️", color:"#e2e8f0", title:"Paramètres",
+    { icon:"⚙️", color:"#374151", title:"Paramètres",
       text:"Ton profil (poids, taille, FC max), ton objectif de temps, ton PPS, et la connexion Strava. Ta sauvegarde se fait automatiquement dans le cloud." },
   ];
 
@@ -4549,8 +4549,8 @@ function renderHelp() {
       a:"La cadence (pas par minute) est un indicateur de technique de course. Idéalement entre 170 et 180 spm — une cadence stable ou en hausse au fil du plan indique une meilleure efficacité de foulée." },
   ];
 
-  const faqCards = faqItems.map(f => el("div",{style:{marginBottom:"12px",paddingBottom:"12px",borderBottom:"1px solid #2e3347"}},
-    el("div",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"600",marginBottom:"4px"}},f.q),
+  const faqCards = faqItems.map(f => el("div",{style:{marginBottom:"12px",paddingBottom:"12px",borderBottom:"1px solid #D6DCE5"}},
+    el("div",{style:{color:"#1F2937",fontSize:"15px",fontWeight:"600",marginBottom:"4px"}},f.q),
     el("div",{class:"muted",style:{fontSize:"14px",lineHeight:"1.6"}},f.a)
   ));
 
@@ -4573,7 +4573,7 @@ function renderSettings() {
     el("div",{class:"label"},"👤 Compte"),
     card(
       el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
-        el("div",{style:{color:"#f1f5f9",fontSize:"15px"}},
+        el("div",{style:{color:"#1F2937",fontSize:"15px"}},
           window.__UTILISATEUR__?.email || "Connecté"
         ),
         el("button",{style:{background:"#f8717122",border:"1px solid #f8717155",borderRadius:"8px",padding:"8px 14px",color:"#f87171",fontWeight:"700",fontSize:"14px",cursor:"pointer"},
@@ -4598,7 +4598,7 @@ function renderSettings() {
     el("div",{class:"label"},"👤 Profil & objectif"),
     (()=>{
       const wrap = document.createElement("div");
-      wrap.style.cssText = "background:#1a1d27;border:1px solid #2e3347;border-radius:10px;padding:14px;";
+      wrap.style.cssText = "background:#FFFFFF;border:1px solid #D6DCE5;border-radius:10px;padding:14px;";
       const tbl = document.createElement("table");
       tbl.style.cssText = "width:100%;border-collapse:collapse;";
       const rows = [
@@ -4620,26 +4620,26 @@ function renderSettings() {
         if (r.label==="separator") {
           const td = document.createElement("td");
           td.colSpan = 3;
-          td.style.cssText = "padding:0;border-top:1px solid #2e3347;";
+          td.style.cssText = "padding:0;border-top:1px solid #D6DCE5;";
           tr.appendChild(td);
           tbl.appendChild(tr);
           return;
         }
-        if (i>0) tr.style.cssText = "border-top:1px solid #2e334722;";
+        if (i>0) tr.style.cssText = "border-top:1px solid #D6DCE522;";
         const tdLabel = document.createElement("td");
-        tdLabel.style.cssText = "padding:8px 0;color:#94a3b8;font-size:15px;";
+        tdLabel.style.cssText = "padding:8px 0;color:#64748B;font-size:15px;";
         tdLabel.textContent = r.label;
         const tdInput = document.createElement("td");
         tdInput.style.cssText = "padding:8px 0;text-align:right;";
         const inp = document.createElement("input");
         inp.type = r.type; inp.id = r.id;
-        const inputColor = r.color || "#f1f5f9";
+        const inputColor = r.color || "#1F2937";
         const inputWidth = r.width || "80px";
-        inp.style.cssText = "width:"+inputWidth+";background:#232738;border:1px solid "+(r.color?"#1E4ED844":"#2e3347")+";border-radius:6px;padding:5px 8px;color:"+inputColor+";font-size:15px;text-align:right;font-family:inherit;font-variant-numeric:tabular-nums;font-weight:"+(r.color?"700":"400")+";";
+        inp.style.cssText = "width:"+inputWidth+";background:#E5E9F0;border:1px solid "+(r.color?"#1E4ED844":"#D6DCE5")+";border-radius:6px;padding:5px 8px;color:"+inputColor+";font-size:15px;text-align:right;font-family:inherit;font-variant-numeric:tabular-nums;font-weight:"+(r.color?"700":"400")+";";
         inp.value = r.val;
         tdInput.appendChild(inp);
         const tdUnit = document.createElement("td");
-        tdUnit.style.cssText = "padding:8px 0 8px 8px;color:#94a3b8;font-size:14px;width:36px;white-space:nowrap;";
+        tdUnit.style.cssText = "padding:8px 0 8px 8px;color:#64748B;font-size:14px;width:36px;white-space:nowrap;";
         tdUnit.textContent = r.unit;
         tr.appendChild(tdLabel); tr.appendChild(tdInput); tr.appendChild(tdUnit);
         tbl.appendChild(tr);
@@ -4659,22 +4659,22 @@ function renderSettings() {
     el("div",{class:"label"},"🏅 Records personnels"),
     (()=>{
       const wrap = document.createElement("div");
-      wrap.style.cssText = "background:#1a1d27;border:1px solid #2e3347;border-radius:10px;padding:14px;";
+      wrap.style.cssText = "background:#FFFFFF;border:1px solid #D6DCE5;border-radius:10px;padding:14px;";
       ["5K","10K","Semi","Marathon"].forEach((dist,i) => {
         const rec = profilCoureur.records?.[dist];
         const row = document.createElement("div");
-        row.style.cssText = "display:flex;align-items:center;gap:8px;padding:8px 0;"+(i>0?"border-top:1px solid #2e334722;":"");
+        row.style.cssText = "display:flex;align-items:center;gap:8px;padding:8px 0;"+(i>0?"border-top:1px solid #D6DCE522;":"");
         const label = document.createElement("span");
-        label.style.cssText = "color:#94a3b8;font-size:15px;width:70px;flex-shrink:0;";
+        label.style.cssText = "color:#64748B;font-size:15px;width:70px;flex-shrink:0;";
         label.textContent = dist;
         const tempsInp = document.createElement("input");
         tempsInp.type = "text"; tempsInp.id = "rec-temps-"+dist; tempsInp.placeholder = "mm:ss";
         tempsInp.value = rec?.temps || "";
-        tempsInp.style.cssText = "width:80px;background:#232738;border:1px solid #2e3347;border-radius:6px;padding:5px 8px;color:#f1f5f9;font-size:15px;text-align:right;font-variant-numeric:tabular-nums;";
+        tempsInp.style.cssText = "width:80px;background:#E5E9F0;border:1px solid #D6DCE5;border-radius:6px;padding:5px 8px;color:#1F2937;font-size:15px;text-align:right;font-variant-numeric:tabular-nums;";
         const dateInp = document.createElement("input");
         dateInp.type = "date"; dateInp.id = "rec-date-"+dist;
         dateInp.value = rec?.date || "";
-        dateInp.style.cssText = "background:#232738;border:1px solid #2e3347;border-radius:6px;padding:5px 8px;color:#94a3b8;font-size:13px;flex:1;min-width:0;";
+        dateInp.style.cssText = "background:#E5E9F0;border:1px solid #D6DCE5;border-radius:6px;padding:5px 8px;color:#64748B;font-size:13px;flex:1;min-width:0;";
         row.appendChild(label); row.appendChild(tempsInp); row.appendChild(dateInp);
         wrap.appendChild(row);
       });
@@ -4713,10 +4713,10 @@ function renderSettings() {
           }},
             el("span",{style:{fontSize:"18px"}},opt.icon),
             el("div",{style:{flex:"1"}},
-              el("div",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:actif?"700":"400"}},opt.label),
+              el("div",{style:{color:"#1F2937",fontSize:"14px",fontWeight:actif?"700":"400"}},opt.label),
               el("div",{class:"muted",style:{fontSize:"12px"}},opt.desc)
             ),
-            !opt.available?el("span",{style:{fontSize:"11px",color:"#475569",border:"1px solid #2e3347",borderRadius:"6px",padding:"2px 6px"}},"À venir"):null
+            !opt.available?el("span",{style:{fontSize:"11px",color:"#6B7280",border:"1px solid #D6DCE5",borderRadius:"6px",padding:"2px 6px"}},"À venir"):null
           );
           if (opt.available) {
             row.addEventListener("click", avecRetourTactile(()=>{
@@ -4727,7 +4727,7 @@ function renderSettings() {
           }
           return row;
         }),
-        el("div",{class:"muted",style:{fontSize:"12px",marginTop:"10px",paddingTop:"10px",borderTop:"1px solid #2e334722"}},
+        el("div",{class:"muted",style:{fontSize:"12px",marginTop:"10px",paddingTop:"10px",borderTop:"1px solid #D6DCE522"}},
           "Change à tout moment. Le suivi du plan fonctionne dans tous les cas — cette option affine surtout l'estimation 10K."
         )
       )
@@ -4741,13 +4741,13 @@ function renderSettings() {
             el("div",{style:{width:"8px",height:"8px",borderRadius:"50%",background:"#fc4c02",flexShrink:"0"}}),
             el("div",{style:{color:"#fc4c02",fontSize:"15px",fontWeight:"600"}},"Connecté · "+stravaActivities.length+" activité"+(stravaActivities.length!==1?"s":""))
           ),
-          syncMsg?el("div",{style:{fontSize:"14px",color:syncMsg.startsWith("✅")?"#22c55e":"#e2e8f0",marginBottom:"10px",padding:"8px 10px",background:"#232738",borderRadius:"8px"}},syncMsg):null,
+          syncMsg?el("div",{style:{fontSize:"14px",color:syncMsg.startsWith("✅")?"#22c55e":"#374151",marginBottom:"10px",padding:"8px 10px",background:"#E5E9F0",borderRadius:"8px"}},syncMsg):null,
           el("button",{
-            style:{width:"100%",background:syncing?"#1a1d27":"#fc4c0222",border:"1px solid #fc4c0255",borderRadius:"10px",padding:"11px",cursor:"pointer",color:"#fc4c02",fontWeight:"700",fontSize:"15px",marginBottom:"8px"},
+            style:{width:"100%",background:syncing?"#FFFFFF":"#fc4c0222",border:"1px solid #fc4c0255",borderRadius:"10px",padding:"11px",cursor:"pointer",color:"#fc4c02",fontWeight:"700",fontSize:"15px",marginBottom:"8px"},
             feedback:true,
             onClick:()=>{ if(!syncing) syncStrava(); }
           },syncing?"⏳ "+syncMsg:"🔄 Synchroniser avec Strava"),
-          el("button",{style:{background:"none",border:"none",color:"#e2e8f0",fontSize:"14px",cursor:"pointer",padding:"0",marginTop:"12px",paddingTop:"12px",borderTop:"1px solid #2e3347"},
+          el("button",{style:{background:"none",border:"none",color:"#374151",fontSize:"14px",cursor:"pointer",padding:"0",marginTop:"12px",paddingTop:"12px",borderTop:"1px solid #D6DCE5"},
             onClick:()=>{ stravaToken=null;stravaRefresh=null;stravaExpires=0;stravaActivities=[];save("lk_strava_token",null);save("lk_strava_refresh",null);save("lk_strava_expires",0);save("lk_strava_activities",[]);render(); }
           },"🔓 Déconnecter Strava")
         )
@@ -4770,11 +4770,11 @@ function renderSettings() {
     function buildBloc(v, isLast) {
       return el("div",{style:{padding:"10px",background:v.current?"#1E4ED822":"transparent",border:v.current?"1px solid #1E4ED833":"none",borderRadius:"8px",marginBottom:isLast?"0":"8px"}},
         el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}},
-          el("span",{style:{color:v.current?"#1E4ED8":"#e2e8f0",fontSize:"15px",fontWeight:"700"}},v.current?"🟠 "+v.ver:v.ver),
-          el("span",{style:{color:"#f1f5f9",fontSize:"15px",fontWeight:"600"}},v.title),
+          el("span",{style:{color:v.current?"#1E4ED8":"#374151",fontSize:"15px",fontWeight:"700"}},v.current?"🟠 "+v.ver:v.ver),
+          el("span",{style:{color:"#1F2937",fontSize:"15px",fontWeight:"600"}},v.title),
           v.current?el("span",{style:{background:"#1E4ED833",color:"#1E4ED8",fontSize:"12px",fontWeight:"700",padding:"2px 6px",borderRadius:"10px"}},"actuelle"):null
         ),
-        ...v.notes.map(n=>el("div",{style:{color:"#e2e8f0",fontSize:"14px",marginTop:"3px"}},"• "+n))
+        ...v.notes.map(n=>el("div",{style:{color:"#374151",fontSize:"14px",marginTop:"3px"}},"• "+n))
       );
     }
 
@@ -4784,8 +4784,8 @@ function renderSettings() {
     const hiddenContainer = el("div",{style:{display:changelogExpanded?"block":"none"}}, ...hiddenBlocs);
 
     const toggleBtn = el("button",{style:{
-      width:"100%",background:"none",border:"1px solid #2e3347",borderRadius:"8px",
-      padding:"8px",color:"#e2e8f0",fontSize:"14px",cursor:"pointer",marginTop:"8px"
+      width:"100%",background:"none",border:"1px solid #D6DCE5",borderRadius:"8px",
+      padding:"8px",color:"#374151",fontSize:"14px",cursor:"pointer",marginTop:"8px"
     }}, changelogExpanded ? "▲ Réduire" : "▼ Voir tout l\'historique ("+VERSIONS.length+" versions)");
     toggleBtn.addEventListener("click", () => {
       changelogExpanded = !changelogExpanded;
@@ -4812,10 +4812,10 @@ function renderSettings() {
   // (precharger()), plus besoin de transfert manuel par QR/lien.
   const qrSection = null;
 
-  const appHeaderEl = el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",display:"flex",alignItems:"center",gap:"12px",marginBottom:"20px"}},
+  const appHeaderEl = el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"10px",padding:"14px",display:"flex",alignItems:"center",gap:"12px",marginBottom:"20px"}},
     runByLeaIcon(40, 10),
     el("div",{},
-      el("div",{style:{color:"#f1f5f9",fontSize:"16px",fontWeight:"800"}},"Yoria"),
+      el("div",{style:{color:"#1F2937",fontSize:"16px",fontWeight:"800"}},"Yoria"),
       el("div",{class:"muted",style:{fontSize:"14px"}},VERSIONS[0].ver+" · plan-10k-alpha.vercel.app")
     )
   );
@@ -4882,7 +4882,7 @@ function renderSettings() {
           el("div",{style:{display:"flex",alignItems:"center",gap:"10px"}},
             el("span",{style:{fontSize:"18px"}},"🔒"),
             el("div",{},
-              el("div",{style:{color:"#f1f5f9",fontSize:"14px",fontWeight:"600"}},
+              el("div",{style:{color:"#1F2937",fontSize:"14px",fontWeight:"600"}},
                 "Clôturé le " + new Date(dateActuelle+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})
               ),
               el("div",{class:"muted",style:{fontSize:"13px",marginTop:"2px"}},
@@ -4897,7 +4897,7 @@ function renderSettings() {
     const msgEl = el("div",{style:{marginTop:"8px",fontSize:"13px"}});
     const inp = document.createElement("input");
     inp.type = "date";
-    inp.style.cssText = "width:100%;background:#232738;border:1px solid #2e3347;border-radius:8px;padding:10px 12px;color:#f1f5f9;font-size:14px;box-sizing:border-box;";
+    inp.style.cssText = "width:100%;background:#E5E9F0;border:1px solid #D6DCE5;border-radius:8px;padding:10px 12px;color:#1F2937;font-size:14px;box-sizing:border-box;";
 
     const confirmBtn = el("button",{style:{width:"100%",marginTop:"10px",background:"#1E4ED822",border:"1px solid #1E4ED844",borderRadius:"8px",padding:"9px",color:"#1E4ED8",fontWeight:"700",fontSize:"14px",cursor:"pointer"}},
       "Clôturer définitivement à cette date");
@@ -4917,7 +4917,7 @@ function renderSettings() {
 
       window.__PLAN_BRUT__.dateCloture = val;
       msgEl.textContent = "Sauvegarde…";
-      msgEl.style.color = "#94a3b8";
+      msgEl.style.color = "#64748B";
       try {
         await sauvegarderPlan(window.__PLAN_BRUT__);
         msgEl.textContent = "✅ Plan clôturé. Tu peux maintenant planifier un plan course à partir du lendemain.";
@@ -4946,10 +4946,10 @@ function renderSettings() {
   const hasRes=!!load(clePourPlan("lk_race_result"),null);
   const pdfSection=el("div",{style:{marginBottom:"24px"}},
     el("div",{class:"label"},"Exporter en PDF"),
-    el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px",display:"flex",flexDirection:"column",gap:"8px"}},
+    el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"10px",padding:"14px",display:"flex",flexDirection:"column",gap:"8px"}},
       el("button",{style:{width:"100%",background:"#1E4ED822",border:"1px solid #1E4ED844",borderRadius:"8px",padding:"10px",color:"#1E4ED8",fontSize:"14px",fontWeight:"700",cursor:"pointer"},onClick:()=>exportPdfRecap()},"Recap de preparation"),
       el("button",{style:{width:"100%",background:"#60a5fa22",border:"1px solid #60a5fa44",borderRadius:"8px",padding:"10px",color:"#60a5fa",fontSize:"14px",fontWeight:"700",cursor:"pointer"},onClick:()=>exportPdfPlanVierge()},"Plan vierge imprimable"),
-      el("button",{style:{width:"100%",background:hasRes?"#22c55e22":"#232738",border:"1px solid "+(hasRes?"#22c55e44":"#2e3347"),borderRadius:"8px",padding:"10px",color:hasRes?"#22c55e":"#475569",fontSize:"14px",fontWeight:"700",cursor:hasRes?"pointer":"not-allowed"},onClick:()=>hasRes?exportPdfResultats():null},"Fiche resultats"+(hasRes?"":" (apres la course)"))
+      el("button",{style:{width:"100%",background:hasRes?"#22c55e22":"#E5E9F0",border:"1px solid "+(hasRes?"#22c55e44":"#D6DCE5"),borderRadius:"8px",padding:"10px",color:hasRes?"#22c55e":"#6B7280",fontSize:"14px",fontWeight:"700",cursor:hasRes?"pointer":"not-allowed"},onClick:()=>hasRes?exportPdfResultats():null},"Fiche resultats"+(hasRes?"":" (apres la course)"))
     )
   );
   return el("div",{style:{padding:"0 16px 100px"}},
@@ -5221,7 +5221,7 @@ function matchActivitiesToPlan(activities) {
 // ══════════════════════════════════════════════════════════════════════════════
 // ── Helper carte standard ────────────────────────────────────────────────
 function card(...children) {
-  return el("div",{style:{background:"#1a1d27",border:"1px solid #2e3347",borderRadius:"10px",padding:"14px"}},...children);
+  return el("div",{style:{background:"#FFFFFF",border:"1px solid #D6DCE5",borderRadius:"10px",padding:"14px"}},...children);
 }
 
 function el(tag, attrs, ...children) {
@@ -5277,7 +5277,7 @@ function svgCircle(pct, size, strokeW, color, inner) {
   svg.style.transform="rotate(-90deg)";
   const bg = document.createElementNS("http://www.w3.org/2000/svg","circle");
   bg.setAttribute("cx",size/2); bg.setAttribute("cy",size/2); bg.setAttribute("r",r);
-  bg.setAttribute("fill","none"); bg.setAttribute("stroke","#232738"); bg.setAttribute("stroke-width",strokeW);
+  bg.setAttribute("fill","none"); bg.setAttribute("stroke","#E5E9F0"); bg.setAttribute("stroke-width",strokeW);
   const fg = document.createElementNS("http://www.w3.org/2000/svg","circle");
   fg.setAttribute("cx",size/2); fg.setAttribute("cy",size/2); fg.setAttribute("r",r);
   fg.setAttribute("fill","none"); fg.setAttribute("stroke",color); fg.setAttribute("stroke-width",strokeW);
@@ -5336,14 +5336,14 @@ function render() {
     :null;
 
   const titles={weeks:"Semaines",weekDetail:"Semaine "+selectedWeek,stats:"Stats",settings:"Paramètres",course:"Course",help:"Aide"};
-  const hdr = view==="dashboard" ? null : el("div",{style:{position:"sticky",top:"0",zIndex:"10",background:"rgba(15,17,23,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid #2e3347",padding:"12px 16px 10px",display:"flex",alignItems:"center",gap:"8px"}},
+  const hdr = view==="dashboard" ? null : el("div",{style:{position:"sticky",top:"0",zIndex:"10",background:"rgba(15,17,23,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid #D6DCE5",padding:"12px 16px 10px",display:"flex",alignItems:"center",gap:"8px"}},
     backBtn||"",
     runByLeaIcon(24, 6),
     el("div",{style:{flex:"1"}},
-      el("div",{style:{color:"#f1f5f9",fontSize:"17px",fontWeight:"700",lineHeight:"1"}},titles[view]||""),
+      el("div",{style:{color:"#1F2937",fontSize:"17px",fontWeight:"700",lineHeight:"1"}},titles[view]||""),
       view==="weekDetail"?el("div",{class:"muted",style:{fontSize:"13px",marginTop:"1px"}},phaseOf(selectedWeek).label):null
     ),
-    ESTMODEFORME ? null : el("div",{style:{background:"#232738",borderRadius:"8px",padding:"4px 10px",color:"#1E4ED8",fontSize:"15px",fontWeight:"700"}},"J–"+countdown())
+    ESTMODEFORME ? null : el("div",{style:{background:"#E5E9F0",borderRadius:"8px",padding:"4px 10px",color:"#1E4ED8",fontSize:"15px",fontWeight:"700"}},"J–"+countdown())
   );
 
   // Calculer predict10K une seule fois — synchronise dashboard et graphique
@@ -5367,7 +5367,7 @@ function render() {
     {id:"settings", icon:"⚙️",label:"Paramètres"},
   ];
   const activeNav=["dashboard","stats","settings","course","help"].includes(view)?view:"weeks";
-  const nav=el("div",{style:{position:"fixed",bottom:"0",left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:"430px",background:"rgba(26,29,39,0.97)",backdropFilter:"blur(16px)",borderTop:"1px solid #2e3347",display:"flex",zIndex:"20"}},
+  const nav=el("div",{style:{position:"fixed",bottom:"0",left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:"430px",background:"rgba(26,29,39,0.97)",backdropFilter:"blur(16px)",borderTop:"1px solid #D6DCE5",display:"flex",zIndex:"20"}},
     ...NAV.map(n=>{
       const hasBadge = n.id==="dashboard" && (() => {
         if (new Date().getHours() < 18) return false;
@@ -5380,7 +5380,7 @@ function render() {
       );
       const b=el("button",{style:{flex:"1",background:"none",border:"none",cursor:"pointer",padding:"10px 0 14px",display:"flex",flexDirection:"column",alignItems:"center",gap:"3px",opacity:activeNav===n.id?"1":"0.45"}},
         iconWrap,
-        el("span",{style:{fontSize:"12px",fontWeight:"700",letterSpacing:"0.3px",color:activeNav===n.id?"#1E4ED8":"#e2e8f0"}},n.label)
+        el("span",{style:{fontSize:"12px",fontWeight:"700",letterSpacing:"0.3px",color:activeNav===n.id?"#1E4ED8":"#374151"}},n.label)
       );
       b.addEventListener("click",()=>{ if(n.id==="weeks") selectedWeek=currentWeek(); setView(n.id); });
       return b;
