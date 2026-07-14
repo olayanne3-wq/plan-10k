@@ -1229,7 +1229,7 @@ const DUREE_CIBLE_MARCHE_COURSE_MIN = 25;
 
 /**
  * Détermine le palier courant à partir du nombre de séances marche-course
- * déjà validées avec succès (statut "fait" ou équivalent positif) DEPUIS le
+ * déjà validées avec succès (statut "✅", cf. SOPTS côté app) DEPUIS le
  * dernier changement de palier. Le compteur est fourni par l'appelant
  * (dérivé des statuses du plan, même logique que nbApparitionsParSousType).
  */
@@ -1692,7 +1692,7 @@ function generatePlanMarcheCourse(profil, params) {
 
   if (totalJours < 0) {
     warnings.push({ code: 'DATE_INVALIDE', message: "La date de course doit être après le début du plan." });
-    return { semaines: [], warnings, profilOrigine: profil, paramsOrigine: params, statuses: {} };
+    return { semaines: [], warnings, profilOrigine: profil, paramsOrigine: params, statuses: {}, mode: 'marche-course', dateDebut: params.dateDebut };
   }
 
   const palierId = profil.palierMarcheCourse ?? 0;
@@ -1720,7 +1720,10 @@ function generatePlanMarcheCourse(profil, params) {
     warnings,
     profilOrigine: profil,
     paramsOrigine: params,
-    statuses: {}
+    statuses: {},
+    mode: 'marche-course',
+    palierMarcheCourse: palierId,
+    dateDebut: params.dateDebut
   };
 }
 
@@ -2028,7 +2031,17 @@ export function calculerACWR(activitesStrava) {
 // Section 33 — Règles d'adaptation du plan selon les résultats réels
 // ---------------------------------------------------------------------------
 
-const POIDS_STATUT = { ratee: 1, adaptee: 0.5, reussie: 0 };
+// Format réel des statuts stockés côté app (public/index.html, SOPTS) :
+// emojis, pas mots — "✅" réussie, "❌" ratée, "⚠️" adaptée, "😴" repos/skip.
+// BUG CORRIGÉ le 14/07/2026 : ces clés étaient auparavant des mots
+// (ratee/adaptee/reussie) qui ne correspondaient à AUCUN statut réel jamais
+// stocké par l'app — POIDS_STATUT[statut] retournait donc toujours
+// `undefined` (repli silencieux sur `?? 0` ligne ~2115), neutralisant
+// complètement le score de chaque semaine : une séance ratée valait 0 au
+// lieu de 1, donc analyserAdaptations() ne proposait jamais d'alléger une
+// semaine, quel que soit le nombre de séances ratées. Repéré en corrigeant
+// le même type d'erreur sur analyserProgressionMarcheCourse (§15).
+const POIDS_STATUT = { '❌': 1, '⚠️': 0.5, '✅': 0 };
 
 // ---------------------------------------------------------------------------
 // Progression marche-course (grand débutant) — distincte du mécanisme
@@ -2045,9 +2058,9 @@ export const GARDE_FOU_SEMAINES_MARCHE_COURSE = 12;
 
 /**
  * Détermine, à partir des statuts enregistrés, si le coureur est prêt à
- * passer au palier suivant. Compte les séances "réussie" au palier courant
+ * passer au palier suivant. Compte les séances "✅" au palier courant
  * (profil.palierMarcheCourse) parmi les semaines déjà vécues du plan ; une
- * séance "ratee" ou "adaptee" ne fait pas reculer le palier mais ne compte
+ * séance "❌" ou "⚠️" ne fait pas reculer le palier mais ne compte
  * pas non plus comme validation (cohérent avec "pas de saut brutal", et on
  * ne pénalise pas un grand débutant qui a eu une mauvaise semaine).
  */
@@ -2069,7 +2082,10 @@ export function analyserProgressionMarcheCourse(plan) {
       totalSeancesSuivies++;
       if (premiereSeanceSemaine === null) premiereSeanceSemaine = semaine.semaineNum;
       derniereSeanceSemaine = semaine.semaineNum;
-      if (statut === 'reussie') seancesValidees++;
+      // Format réel des statuts côté app (public/index.html, SOPTS) :
+      // emojis, pas mots — "✅" = réussie, "❌" = ratée, "⚠️" = adaptée,
+      // "😴" = repos/skip.
+      if (statut === '✅') seancesValidees++;
     }
   }
 
