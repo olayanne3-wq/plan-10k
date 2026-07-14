@@ -5,8 +5,8 @@
 > harmonisation visuelle app/wizard ; badge décharge onglet Semaines ; **v2.5 publiée** —
 > authentification Supabase, migration rétroactive, sync temps réel, wizard protégé,
 > nettoyage Réglages, variables d'env Vercel, file d'attente de sync ; **publication
-> Play Store en cours**, voir §11 ; **chantier Mode Forme (v2.6) démarré** — moteur
-> `plan-forme.js` codé et testé, câblage wizard/index.html restant, voir §12 ;
+> Play Store en cours**, voir §11 ; **Mode Forme (v2.6) câblé de bout en bout** — wizard,
+> dashboard, coach adapté, clôture permanente avec garde-fou anti-chevauchement, voir §12 ;
 > **bug TWA duplication de tâches résolu**, voir §13).
 > Pour l'historique des décisions et le "pourquoi", voir les autres docs de ce dossier
 > (bibliotheque-seances.md, convergence-v1-v2.md, etc.) et les mémoires de session.
@@ -89,7 +89,12 @@ plan-10k/
 │           │                       # placerSeanceTest/placerSeanceCourse. Codé et testé
 │           │                       # (14 tests), câblage wizard/index.html pas encore fait —
 │           │                       # voir §12.
-│           ├── gist-sync.js       # Sync multi-device via GitHub Gist
+│           ├── gist-sync.js       # Sync multi-device via GitHub Gist. Contient aussi le
+│           │                       # garde-fou anti-chevauchement entre plans (course ET
+│           │                       # forme, généralisé le 13 juillet 2026, cf. inventaire
+│           │                       # §12.4) — trouverPlanEnConflit(), dateFinPeriodeActive(),
+│           │                       # et le blocage permanent d'un plan Forme clôturé dans
+│           │                       # sauvegarderPlan().
 │           ├── pdf-export.js      # Export PDF du plan (jsPDF)
 │           ├── strava.js          # Intégration Strava côté client (tokens, volume) — réutilisé
 │           │                       # tel quel par le mode Forme (déjà générique, aucune
@@ -772,15 +777,15 @@ faire dans Play Console, jamais automatique.
   App Integrity dans Play Console) — différent du fingerprint local actuel,
   Google re-signe l'app avec sa propre clé de gestion
 
-## 12. Mode Forme (v2.6) — chantier en cours
+## 12. Mode Forme (v2.6) — câblé de bout en bout
 
 **Objectif** : un mode d'entraînement alternatif au plan course, pour le
 maintien en forme hors préparation d'une échéance précise (demandé par
 Laurent le 13 juillet 2026). Cadrage discuté et validé avant codage :
 
-- **Mode alternatif, sans date de fin** — remplace le plan course plutôt que
-  de s'y ajouter en complément ; pas de switch libre entre les deux au sein
-  d'un même plan.
+- **Mode alternatif, sans date de fin fixe** — remplace le plan course
+  plutôt que de s'y ajouter en complément ; pas de switch libre entre les
+  deux au sein d'un même plan.
 - **Plan structuré** (pas un simple journal de suivi), mais orienté
   développement général plutôt que préparation compétitive.
 - **Paramètres d'entrée** : niveau + volume hebdo + « accent » au choix
@@ -802,68 +807,182 @@ Laurent le 13 juillet 2026). Cadrage discuté et validé avant codage :
   course. Décision explicite pour que le mode Forme ne soit pas juste
   « un plan course sans date ».
 
-**Réalisé (13 juillet 2026)** :
-- `public/v2/engine/plan-forme.js` — module ES codé et testé. Réutilise
-  directement `placerSemaine`, `genererContenuEF`, `genererContenuLongue`,
-  `repartirVolumeSemaine`, `computeFcMaxTanaka`, `computeZonesFC` de
-  `plan-generator.js` ; n'importe jamais `computePhases`,
-  `ROTATION_SOUS_TYPE`, `placerSeanceTest`, `placerSeanceCourse` ni
-  `injecterApprocheCourse`. Fonctions principales :
-  - `generatePlanForme(profil, params)` — génère un bloc glissant de N
-    semaines (4 par défaut, `nbSemainesBloc` réglable). Retourne un plan
-    avec `mode: 'forme'`, `accent`, pas de `phases`/`dateCourse`.
-  - `genererBlocSuivant(planPrecedent, profilOrigine, paramsOrigine)` —
-    enchaîne le bloc suivant en repartant du plateau de volume atteint (pas
-    de la dernière semaine si celle-ci est une décharge), pour une
-    progression continue sans redémarrer de zéro ni reculer à chaque
-    enchaînement.
-  - `computeAlluresForme` — variante de `computeAllures` sans zone C
-    (allure course), les autres zones (recup/E/T/I/V) réutilisent
-    `PACE_RATIOS` tel quel.
-  - `computeVolumeFormeSemaine` — plateau glissant (volume départ + 15% max,
-    `MARGE_PROGRESSION_PLATEAU`), montée douce sur 3 semaines puis
-    stabilisation, décharge -25% tous les 4 semaines (même règle que le
-    moteur course).
-  - `genererContenuQualiteForme` + `ROTATION_SOUS_TYPE_FORME` — rotation par
-    accent (`vma`/`endurance`/`polyvalent`), sous-types propres au mode
-    Forme (`fartlek`, `pyramidale-forme`, `i-30-30-forme`, `cotes-forme`,
-    `seuil-forme`), jamais ceux du moteur course.
-- `public/engine-classic-scripts/plan-forme.classic.js` — copie non-module
-  correspondante (génération manuelle par retrait des `export`, même
-  principe que les autres `.classic.js`). Dépend des globales déjà définies
-  par `plan-generator.classic.js` — **doit être chargé après lui** dans
-  `index.html` (pas encore fait, cf. chantiers ouverts ci-dessous).
-- `public/v2/engine/test-plan-forme.mjs` — 14 tests (mode/accent corrects,
-  absence de zone C, absence de séance course/test, rotation par accent,
-  décharge tous les 4 semaines, plateau jamais dépassé, enchaînement de
-  blocs qui repart bien du plateau, garde-fous hérités de `placerSemaine`,
-  zone FC Tanaka/mesurée). Tous passent.
-- Bug trouvé et corrigé en testant manuellement avant de figer le module :
-  le texte fartlek affichait un double `/km` (`4:59/km et 4:18/km/km`) —
-  `formatPace()` inclut déjà l'unité, il ne fallait pas la rajouter dans le
-  gabarit du texte.
+### 12.1 Moteur — `plan-forme.js`
 
-**Chantiers ouverts (prochaine session)** :
-- **Câblage wizard** : l'étape de choix de mode (mockée le 13 juillet 2026,
-  écran « Objectif course » vs « Mode forme ») n'est pas codée dans
-  `v2/index.html`. La branche Forme doit sauter directement à
-  niveau/volume/jours/accent, sans distance/objectif/date de course.
-- **Câblage `index.html`** : affichage à adapter pour `plan.mode === 'forme'`
-  (masquer compte à rebours/phases/jour J), et gestion de l'enchaînement de
-  blocs via `genererBlocSuivant` quand le bloc courant est terminé (pas
-  encore décidé : déclenchement automatique en arrière-plan, ou action
-  explicite de l'utilisateur ?).
-- **Ordre de chargement** : ajouter `<script src="/engine-classic-scripts/
-  plan-forme.classic.js">` dans `index.html`, après le script tag de
-  `plan-generator.classic.js`.
-- **Import wizard** : ajouter `plan-forme.js` aux imports du
-  `<script type="module">` de `v2/index.html` (même pattern que
-  `PlanGenerator`/`Strava`/`GistSync` déjà fusionnés dans `window.Engine`).
-- Volume hebdo actuel et jours disponibles : à réutiliser tels quels depuis
-  le wizard existant (Strava déjà générique, cf. arborescence ci-dessus) —
-  pas de nouveau composant à créer, juste à câbler sur la branche Forme.
+`public/v2/engine/plan-forme.js` (+ copie classic
+`public/engine-classic-scripts/plan-forme.classic.js`, chargée après
+`plan-generator.classic.js`) — module ES codé et testé
+(`test-plan-forme.mjs`, 14 tests, tous passent). Réutilise directement
+`placerSemaine`, `genererContenuEF`, `genererContenuLongue`,
+`repartirVolumeSemaine`, `computeFcMaxTanaka`, `computeZonesFC` de
+`plan-generator.js` ; n'importe jamais `computePhases`,
+`ROTATION_SOUS_TYPE`, `placerSeanceTest`, `placerSeanceCourse` ni
+`injecterApprocheCourse`. Fonctions principales :
 
-## 13. Bug TWA — duplication de tâches à la navigation vers /v2 (résolu)
+- `generatePlanForme(profil, params)` — génère un bloc glissant de N
+  semaines (4 par défaut, `nbSemainesBloc` réglable). Retourne un plan avec
+  `mode: 'forme'`, `accent`, `dateCloture` (optionnelle, cf. §12.4), pas de
+  `phases`/`dateCourse`.
+- `genererBlocSuivant(planPrecedent, profilOrigine, paramsOrigine)` —
+  enchaîne le bloc suivant en repartant du plateau de volume atteint (pas de
+  la dernière semaine si celle-ci est une décharge), pour une progression
+  continue sans redémarrer de zéro ni reculer à chaque enchaînement.
+  `dateCloture` se propage automatiquement d'un bloc à l'autre via l'étalage
+  de `paramsOrigine`.
+- `computeAlluresForme` — variante de `computeAllures` sans zone C (allure
+  course), les autres zones (recup/E/T/I/V) réutilisent `PACE_RATIOS` tel
+  quel.
+- `computeVolumeFormeSemaine` — plateau glissant (volume départ + 15% max,
+  `MARGE_PROGRESSION_PLATEAU`), montée douce sur 3 semaines puis
+  stabilisation, décharge -25% tous les 4 semaines (même règle que le moteur
+  course).
+- `genererContenuQualiteForme` + `ROTATION_SOUS_TYPE_FORME` — rotation par
+  accent (`vma`/`endurance`/`polyvalent`), sous-types propres au mode Forme
+  (`fartlek`, `pyramidale-forme`, `i-30-30-forme`, `cotes-forme`,
+  `seuil-forme`), jamais ceux du moteur course.
+
+Bug trouvé et corrigé pendant le développement : le texte fartlek affichait
+un double `/km` (`4:59/km et 4:18/km/km`) — `formatPace()` inclut déjà
+l'unité, il ne fallait pas la rajouter dans le gabarit du texte.
+
+### 12.2 Wizard — `v2/index.html`
+
+Écran de choix de mode (« Objectif course » vs « Mode forme »), affiché
+avant le wizard course existant, indépendant du système `data-step`
+numérique pour ne rien décaler dans les références existantes
+(`totalSteps`/`current`). Flux Forme dédié en 4 étapes (niveau + référence,
+volume, jours, accent + date de clôture optionnelle), réutilise Strava, la
+logique de jours et `renderResults()`/`rafraichirPlanComplet()` du wizard
+course (rendues robustes aux champs absents `phases`/`dateCourse` via des
+gardes `ESTMODEFORME`/`?.`). Import de `plan-forme.js` ajouté au
+`<script type="module">` du wizard.
+
+### 12.3 Dashboard — `index.html`
+
+`ESTMODEFORME` (`window.__PLAN_BRUT__?.mode === 'forme'`) sert de
+discriminant global, déclaré tôt dans le fichier (avant tout usage) :
+
+- `countdown()`/`DATE_COURSE_REFERENCE` : `null`-safe en mode Forme, plus de
+  fausse date de repli.
+- `PHASES` : repli neutre (une seule « phase » sans label, couvrant tout le
+  bloc) en mode Forme, au lieu du faux repli historique 11 semaines qui
+  aurait affiché à tort « Construction/Spécifique/Affûtage ».
+- Badge « J– » masqué (header dashboard + header sticky), onglet « Course »
+  retiré de la nav (avec garde anti-crash si `view` y reste bloquée),
+  bannière post-course désactivée, bloc `heroPred` (objectif/estimation
+  chrono) masqué en mode Forme.
+- **Coach quotidien adapté** : prompt sans ligne « Estimation actuelle… de
+  l'objectif » en mode Forme ; intègre l'ACWR de façon *implicite* — le
+  ratio actuel (`calculerACWR(stravaActivities).dernierRatio`) est traduit
+  en consigne de ton interne (prudent / neutre / encourageant selon les
+  seuils `ACWR_SEUIL_RISQUE`/`ACWR_SEUIL_VIGILANCE`/
+  `ACWR_SEUIL_SOUS_CHARGE`), injectée dans le prompt avec instruction
+  explicite de ne jamais employer les termes techniques (« ACWR », « charge
+  aiguë/chronique »). S'applique en pratique à tous les modes, pas
+  seulement Forme, puisque l'ACWR est déjà indépendante de la notion de
+  course.
+
+**Deux bugs trouvés et corrigés en testant en production** :
+- Lors d'une édition du prompt du coach, tout le bloc de calcul des données
+  Strava de la séance du jour (`todayAvgPace`, `todayInTarget`,
+  `todayAvgIE`, `todayAvgCad`) avait été supprimé par erreur alors que ces
+  variables restaient utilisées plus loin — `ReferenceError` silencieuse
+  qui interrompait `fetchCoachMsg()` avant même l'appel réseau, donc aucun
+  message ne se générait jamais (aucune requête visible dans l'onglet
+  Réseau). Réintégré.
+- Le bloc coach (`coachEl`) n'était historiquement inséré que dans la carte
+  « séance du jour » (branche non-repos de `renderDashboard()`) — jamais
+  affiché les jours de repos, dans **aucun mode**, comportement pré-existant
+  révélé en pratique parce que le plan Forme de test tombait justement sur
+  un jour de repos. `coachEl` est désormais aussi inclus dans la carte
+  « REPOS », juste après le bilan de semaine et avant l'aperçu « Demain » —
+  s'applique aux deux modes.
+
+### 12.4 Clôture permanente & garde-fou anti-chevauchement
+
+**Problème identifié** : un plan Forme n'a pas de date de fin naturelle
+(contrairement à un plan course, borné par `dateCourse`). L'ancien garde-fou
+de non-chevauchement (`trouverPlanEnConflit`, `gist-sync.js`) exigeait
+`p.dateCourse` sur chaque plan comparé — un plan Forme (toujours sans
+`dateCourse`) était donc silencieusement exclu de toute vérification, dans
+les deux sens : deux plans (course et Forme, ou deux Forme) pouvaient
+coexister sur les mêmes dates sans aucun avertissement.
+
+**Analyse du risque réel** (avant de choisir un correctif) : pas de
+mélange/corruption de données — chaque plan a ses propres clés de stockage
+préfixées (`clePourPlan()`), et un seul plan est actif à la fois dans le
+dashboard (`window.__PLAN_BRUT__`). Le vrai risque est la **confusion** :
+deux plans actifs sur la même période, sans lien entre eux, chacun
+interprétant indépendamment les mêmes activités Strava réelles.
+
+**Principe retenu avec Laurent** : un seul plan actif à la fois, tous types
+confondus — pas de coexistence plan course / plan Forme sur les mêmes dates.
+Un plan Forme est considéré « en cours » **indéfiniment** tant qu'aucune
+`dateCloture` optionnelle n'est fixée dessus. Une fois `dateCloture` fixée
+et sauvegardée, elle devient **permanente et irréversible** : le plan
+devient intégralement figé (lecture seule — plus aucune modification de
+contenu, statuts, notes, ni synchro Strava), ce qui élimine tout besoin de
+revérifier les conflits à chaque sauvegarde ultérieure et rend le
+comportement d'un plan clôturé aussi prévisible qu'un plan course déjà
+couru.
+
+**Implémentation** (`gist-sync.js` + `gist-sync.classic.js` régénérée) :
+- `dateFinPeriodeActive(plan)` — abstrait la différence de règle entre types
+  : `dateCourse` pour un plan course, `dateCloture || null` pour un plan
+  Forme (`null` = actif indéfiniment dans le futur, jamais « pas de plan »).
+- `datesChevauchent(debutA, finA, debutB, finB)` — généralisée pour gérer
+  des périodes « ouvertes » (fin = `null`).
+- `trouverPlanEnConflit(plans, dateDebut, dateFin, idAExclure)` — fonctionne
+  pour n'importe quelle combinaison de types (course/course, course/forme,
+  forme/forme).
+- `sauvegarderPlan(plan)` : rejette d'emblée toute écriture sur un plan
+  Forme déjà clôturé (`planAvant.dateCloture` existe) avec un message
+  explicite. Sinon, vérifie le conflit uniquement à la **création** d'un
+  nouveau plan (`indexExistant === -1`) — une mise à jour de contenu sur un
+  plan Forme non clôturé (ex. rouvrir un vieux plan des mois plus tard pour
+  corriger une séance Strava historique) reste toujours libre, jamais
+  bloquée rétroactivement par l'apparition d'un plan plus récent sur la
+  même période calendaire. Point vérifié explicitement par Laurent avant de
+  choisir cette conception : la première approche envisagée (revérifier à
+  chaque sauvegarde si les dates changent) aurait cassé cet usage légitime.
+- `syncStrava()` (`index.html`) refuse de se déclencher sur un plan Forme
+  clôturé (garde en tout début de fonction, avant l'appel réseau).
+
+**Interface** :
+- Wizard (`v2/index.html`, étape accent) : champ « Date de clôture
+  (optionnel) », texte d'aide précisant le caractère définitif, confirmation
+  explicite (`confirm()`) au moment de générer le plan si une date a été
+  renseignée.
+- Paramètres (`index.html`, section « 🏁 Clôture du plan forme », visible
+  seulement si `ESTMODEFORME`) : si le plan n'est pas encore clôturé, un
+  champ date + bouton « Clôturer définitivement à cette date » avec
+  confirmation explicite (action irréversible, pas de bouton « Retirer »).
+  Si déjà clôturé, affichage lecture seule uniquement (🔒 date +
+  explication) — aucun champ ni bouton modifiable.
+
+**Tests** (exécutés manuellement en session, pas encore de fichier
+`test-*.mjs` dédié dans le repo — à créer si ce mécanisme évolue) : 11 cas
+sur `datesChevauchent`/`trouverPlanEnConflit` (chevauchements/non-
+chevauchements course/course, forme sans clôture qui bloque, forme clôturé
+qui débloque, mise à jour du même plan jamais en conflit avec lui-même) + 7
+cas sur `sauvegarderPlan` avec storage/fetch simulés (modification de
+contenu sur plan Forme clôturé rejetée, re-clôture avec mêmes valeurs
+toujours rejetée, première clôture autorisée, création de plan course après
+clôture autorisée, création pendant un plan Forme actif bloquée, édition de
+contenu sur plan Forme non clôturé toujours libre, plans course jamais
+concernés par la règle de figeage). Tous passent.
+
+### 12.5 Chantier encore ouvert
+
+- **Déclenchement de `genererBlocSuivant()`** : pas encore câblé côté
+  `index.html`. Reste à décider comment le bloc suivant est généré quand le
+  bloc courant touche à sa fin — déclenchement automatique en arrière-plan
+  (ex. à l'ouverture de l'app si la dernière semaine du bloc est dépassée),
+  ou action explicite proposée à l'utilisateur (ex. bannière « Générer le
+  prochain bloc » sur le dashboard, dans l'esprit de la bannière
+  d'adaptation dynamique déjà existante) ? À trancher en session dédiée.
+
+
 
 **Symptôme** (signalé le 13 juillet 2026, pendant la session mode Forme) :
 sur l'app Android installée (TWA), chaque navigation vers "configuration de
