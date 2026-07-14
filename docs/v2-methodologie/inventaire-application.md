@@ -1,7 +1,9 @@
 # Inventaire de l'application "Yoria"
 
 > Vue d'ensemble de référence — à relire en début de session pour retrouver le contexte
-> sans re-parcourir tout le repo. Mis à jour au 14 juillet 2026 (chantier **marche-course
+> sans re-parcourir tout le repo. Mis à jour au 14 juillet 2026 (**bug synchro Strava
+> corrigé** — mismatch de domaine Vercel après rebranding, callback domain Strava à
+> resynchroniser si le domaine change à nouveau, voir §16 ; chantier **marche-course
 > / niveau grand-débutant CLOS** — moteur, pont v1, wizard et dashboard faits et poussés,
 > reste des tests réels sur l'app déployée à faire, voir §15 ; **bug POIDS_STATUT corrigé
 > au passage** (l'adaptation dynamique était silencieusement cassée depuis un moment),
@@ -1770,3 +1772,51 @@ le correctif rien ne se déclenchait jamais).
   `MARCHE_COURSE` — pas cassé, juste imprécis (le vrai `kmEstime` du
   moteur est `null` pour ce type, faute d'allure établie). Pas
   prioritaire, mais à garder en tête si Laurent le remarque.
+
+## 16. Bug corrigé : synchro Strava cassée après rebranding (14/07/2026, session ultérieure)
+
+**Symptôme** : "❌ Erreur Strava" / "Authorization Error — access_token invalid"
+lors de la synchronisation, alors que Laurent venait de se reconnecter en
+bonne et due forme (flow OAuth complet : bouton "Connecter Strava" →
+autorisation sur strava.com → callback).
+
+**Cause** : `api/strava.js` construit le `redirect_uri` dynamiquement à
+partir de `req.headers.host` (§ ci-dessus, code inchangé depuis longtemps
+et volontairement dynamique pour ne pas coder un domaine en dur). Le
+renommage du repo `plan-10k` → `yoria` (§13/§14.5) a fait apparaître un
+**nouveau domaine Vercel auto-généré**, `yoria-running.vercel.app`, en plus
+de l'historique `plan-10k-alpha.vercel.app` — les deux coexistent
+(`vercel_get_project` confirme domains: yoria-running.vercel.app,
+plan-10k-alpha.vercel.app, plan-10k-olayanne.vercel.app,
+plan-10k-git-main-olayanne.vercel.app). Laurent accédait à l'app via ce
+nouveau domaine, dont le `redirect_uri` calculé
+(`https://yoria-running.vercel.app/api/strava/callback`) ne correspondait
+pas à l'**Authorization Callback Domain** configuré côté paramètres Strava
+(qui n'autorisait que `plan-10k-alpha.vercel.app`) — l'échange OAuth
+aboutissait donc à un token invalide côté Strava.
+
+**Diagnostic** : logs runtime Vercel (via le connecteur MCP Vercel,
+nouvellement connecté cette session) montrant `/api/strava/activities`
+répondant `200`/`304` (donc pas de crash serveur) — le vrai signal est venu
+du corps de la réponse relayée telle quelle par l'API (`{"message":
+"Authorization Error", "errors": [{"resource": "Athlete", "field":
+"access_token", "code": "invalid"}]}`), visible en inspectant la requête
+réseau côté navigateur (DevTools). Confirmé par l'absence totale de
+`/api/strava/auth` et `/api/strava/callback` dans les logs malgré un
+premier essai de reconnexion signalé par Laurent — indice que quelque
+chose empêchait le flow d'aboutir normalement, avant d'identifier la vraie
+cause (mismatch de domaine, pas un souci de cache token).
+
+**Corrigé** : Laurent a mis à jour l'Authorization Callback Domain côté
+paramètres Strava (strava.com/settings/api, app Client ID 260339) pour
+pointer vers `yoria-running.vercel.app`. Validé par un nouveau test
+complet (logs confirmant `/auth` 302 → `/callback` 302 [code reçu] →
+`/activities` 200 à 23:33 le 14/07/2026).
+
+**Point de vigilance pour l'avenir** : Strava n'accepte qu'un seul domaine
+dans ce champ — si Laurent bascule à nouveau entre domaines Vercel (ex.
+retour à `plan-10k-alpha.vercel.app`, ou un futur domaine personnalisé),
+la même erreur réapparaîtra et nécessitera de re-changer ce réglage côté
+Strava. Envisager à terme un domaine personnalisé fixe (ex. via Vercel
+Domains) plutôt que de dépendre des domaines `*.vercel.app` auto-générés,
+qui peuvent changer à chaque renommage de repo.
