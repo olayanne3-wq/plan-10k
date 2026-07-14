@@ -2182,6 +2182,7 @@
     dernierPlanGenere = plan;
     renderResults(plan);
     showingResults = true;
+    document.getElementById('choix-mode-contenu').style.display = 'none';
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.querySelector('.screen[data-step="10"]').classList.add('active');
     document.getElementById('nextBtn').textContent = 'Terminer';
