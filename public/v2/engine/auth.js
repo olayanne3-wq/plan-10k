@@ -1,5 +1,5 @@
 // ============================================================
-// Run by Léa — Module d'authentification Supabase
+// Yoria — Module d'authentification Supabase
 // Source de vérité : public/v2/engine/auth.js
 // Copie non-module dérivée : public/engine-classic-scripts/auth.classic.js
 // (mêmes conventions que plan-generator.js / v1-bridge.js / gist-sync.js /
@@ -43,7 +43,7 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
     <style>
     #ecran-auth {
       position: fixed; inset: 0; z-index: 9999;
-      background: #0f1117; color: #f1f5f9;
+      background: #07162F; color: #f1f5f9;
       display: flex; align-items: center; justify-content: center;
       padding: 20px; box-sizing: border-box;
     }
@@ -51,7 +51,7 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
     #ecran-auth .bandeau { text-align: center; margin-bottom: 28px; }
     #ecran-auth .bandeau h1 { font-size: 1.3rem; margin: 0; font-weight: 700; }
     #ecran-auth .bandeau .sous-titre {
-      color: #f97316; font-size: 0.75rem; letter-spacing: 0.08em;
+      color: #1E4ED8; font-size: 0.75rem; letter-spacing: 0.08em;
       text-transform: uppercase; margin-top: 4px;
     }
     #ecran-auth .onglets {
@@ -63,17 +63,17 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
       color: #f1f5f9; cursor: pointer; font-size: 0.85rem; border: none;
       transition: background 0.15s;
     }
-    #ecran-auth .onglet.actif { background: #f97316; color: #0f1117; font-weight: 600; }
+    #ecran-auth .onglet.actif { background: #1E4ED8; color: #07162F; font-weight: 600; }
     #ecran-auth label { display: block; font-size: 0.8rem; margin-bottom: 4px; color: #9ca3af; }
     #ecran-auth input {
       width: 100%; padding: 11px 12px; margin-bottom: 14px; border-radius: 8px;
       border: 1px solid #2e3347; background: #1a1d27; color: #f1f5f9;
       font-size: 0.95rem; box-sizing: border-box;
     }
-    #ecran-auth input:focus { outline: none; border-color: #f97316; }
+    #ecran-auth input:focus { outline: none; border-color: #1E4ED8; }
     #ecran-auth .btn-principal {
       width: 100%; padding: 12px; border-radius: 8px; border: none;
-      background: #f97316; color: #0f1117; font-weight: 700;
+      background: #1E4ED8; color: #07162F; font-weight: 700;
       font-size: 0.95rem; cursor: pointer; margin-top: 4px;
     }
     #ecran-auth .btn-principal:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -81,12 +81,12 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
     #ecran-auth .message.erreur { color: #f87171; }
     #ecran-auth .message.succes { color: #22c55e; }
     #ecran-auth .lien-secondaire { margin-top: 12px; font-size: 0.82rem; text-align: center; color: #9ca3af; }
-    #ecran-auth .lien-secondaire:hover { color: #f97316; }
+    #ecran-auth .lien-secondaire:hover { color: #1E4ED8; }
     </style>
     <div id="ecran-auth">
       <div class="carte">
         <div class="bandeau">
-          <h1>Run by Léa</h1>
+          <h1>Yoria</h1>
           <div class="sous-titre">Connexion</div>
         </div>
         <div class="onglets">
