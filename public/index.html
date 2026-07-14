@@ -260,7 +260,7 @@ const RACE_LOCATION = window.__PLAN_BRUT__?.paramsOrigine?.raceLocation || '';
 // pour ce même plan — deux affichages incohérents entre eux pour les mêmes
 // données, plus confus qu'utile.
 const LABEL_PHASE_V2 = { 'Construction': 'Construction', 'Specifique': 'Spécifique', 'Affutage': 'Affûtage' };
-const COULEUR_PHASE_V2 = { 'Construction': 'var(--accent)', 'Specifique': 'var(--accent)', 'Affutage': 'var(--warn)' };
+const COULEUR_PHASE_V2 = { 'Construction': 'var(--accent2)', 'Specifique': 'var(--accent)', 'Affutage': 'var(--warn)' };
 
 const PHASES = (() => {
   const phasesBrutes = window.__PLAN_BRUT__?.phases;
@@ -277,7 +277,7 @@ const PHASES = (() => {
     // vrais noms v2 (le plan historique de Laurent a bien 3 phases
     // Construction/Specifique/Affutage, cf. section 3 du doc de convergence)
     return [
-      { id:"Construction", label:"Construction", weeks:[1,2,3,4,5], color:"var(--accent)" },
+      { id:"Construction", label:"Construction", weeks:[1,2,3,4,5], color:"var(--accent2)" },
       { id:"Specifique",   label:"Spécifique",    weeks:[6,7,8,9],   color:"var(--accent)" },
       { id:"Affutage",     label:"Affûtage",      weeks:[10,11],     color:"var(--warn)" },
     ];
@@ -711,6 +711,13 @@ function globalPct() {
   return Math.round(done/total*100);
 }
 function phaseOf(weekNum) { return PHASES.find(p=>p.weeks.includes(weekNum))||{color:"var(--text2)",label:""}; }
+// Convertit une couleur var(--x) en rgba(var(--x-rgb), N) pour une opacité
+// personnalisée — évite le bug de suffixe hex collé directement sur une
+// variable CSS (var(--x)+"22" est invalide, cf. inventaire section 14.3).
+function colorAvecOpacite(varColor, opacite) {
+  const nom = varColor.replace("var(--", "").replace(")", "");
+  return "rgba(var(--" + nom + "-rgb)," + opacite + ")";
+}
 
 // Identifie si une semaine est une semaine de décharge — champ produit par
 // le moteur v2 (estDechargeSemaine, cf. v2/engine/plan-generator.js) et
@@ -2544,7 +2551,7 @@ function renderDashboard() {
 
   // Header cliquable
   let phaseOpen = false;
-  const phaseEl = el("div",{style:{background:"var(--bg)",border:"1px solid "+phase.color+"33",borderTop:"3px solid "+phase.color,borderRadius:"12px",padding:"12px 14px",marginBottom:"12px",cursor:"pointer"}},
+  const phaseEl = el("div",{style:{background:"var(--bg)",border:"1px solid "+colorAvecOpacite(phase.color,0.2),borderTop:"3px solid "+phase.color,borderRadius:"12px",padding:"12px 14px",marginBottom:"12px",cursor:"pointer"}},
     el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}},
       el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
         el("span",{style:{color:phase.color,fontSize:"15px",fontWeight:"700"}},phase.label),
