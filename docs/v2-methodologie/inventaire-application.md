@@ -6,8 +6,9 @@
 > authentification Supabase, migration rétroactive, sync temps réel, wizard protégé,
 > nettoyage Réglages, variables d'env Vercel, file d'attente de sync ; **publication
 > Play Store en cours**, voir §11 ; **Mode Forme (v2.6) câblé de bout en bout** — wizard,
-> dashboard, coach adapté, clôture permanente avec garde-fou anti-chevauchement, voir §12 ;
-> **bug TWA duplication de tâches résolu**, voir §13).
+> dashboard, coach adapté, clôture permanente avec garde-fou anti-chevauchement, fiabilité
+> du coach (prénom, moments de journée, météo dynamique), voir §12 ; **bug TWA duplication
+> de tâches résolu**, voir §13).
 > Pour l'historique des décisions et le "pourquoi", voir les autres docs de ce dossier
 > (bibliotheque-seances.md, convergence-v1-v2.md, etc.) et les mémoires de session.
 >
@@ -74,8 +75,19 @@ plan-10k/
 │   │                               # globales de plan-generator.classic.js (formatPace,
 │   │                               # paceFromTime, riegelPredict, PACE_RATIOS, placerSemaine,
 │   │                               # genererContenuEF/Longue, repartirVolumeSemaine,
-│   │                               # computeFcMaxTanaka, computeZonesFC) — DOIT être chargé
-│   │                               # après lui dans index.html, pas encore fait (§12).
+│   │                               # computeFcMaxTanaka, computeZonesFC) — chargé après lui
+│   │                               # dans index.html, câblé (§12.3).
+│   │                               # changelog.classic.js (13 juillet 2026) : contenu pur
+│   │                               # (tableau VERSIONS, historique des versions affiché dans
+│   │                               # Paramètres), extrait d'index.html pour l'alléger (~250
+│   │                               # lignes de texte sans rapport avec la logique de rendu
+│   │                               # environnante). Pas de dépendance au moteur — pose juste
+│   │                               # VERSIONS en portée globale, lu par renderSettings().
+│   │                               # N'A PAS de source de vérité en module ES séparé (pas de
+│   │                               # v2/engine/changelog.js) : c'est un contenu propre à
+│   │                               # index.html (v1), pas partagé avec le wizard v2 — donc pas
+│   │                               # de duplication à maintenir, ce fichier classic EST la
+│   │                               # source de vérité.
 │   └── v2/
 │       ├── index.html             # Wizard de création de plan (~120K)
 │       ├── manifest.json, sw.js   # PWA v2
@@ -857,6 +869,12 @@ course (rendues robustes aux champs absents `phases`/`dateCourse` via des
 gardes `ESTMODEFORME`/`?.`). Import de `plan-forme.js` ajouté au
 `<script type="module">` du wizard.
 
+`resPlansSauvegardes` (liste des plans déjà sauvegardés) déplacée depuis
+l'étape 1 du wizard course vers l'écran de choix de mode — c'est désormais
+le tout premier écran affiché, donc le seul endroit garanti visible avant
+tout choix de type de plan. Auparavant invisible tant que « Objectif course »
+n'était pas sélectionné.
+
 ### 12.3 Dashboard — `index.html`
 
 `ESTMODEFORME` (`window.__PLAN_BRUT__?.mode === 'forme'`) sert de
@@ -972,7 +990,79 @@ clôture autorisée, création pendant un plan Forme actif bloquée, édition de
 contenu sur plan Forme non clôturé toujours libre, plans course jamais
 concernés par la règle de figeage). Tous passent.
 
-### 12.5 Chantier encore ouvert
+### 12.5 Fiabilité du coach & météo dynamique (`index.html`)
+
+Trois problèmes trouvés en usage réel sur les deux prompts du coach
+(`fetchCoachMsg` et `fetchCoachRaceMsg`), tous corrigés :
+
+- **Confusion de prénom** : le coach s'adressait parfois à l'utilisateur en
+  l'appelant « Léa » (le prénom du personnage coach lui-même, pas celui du
+  coureur) — ex. « Bravo Léa ! » adressé à Laurent. Le prompt ne
+  transmettait jamais le vrai prénom de l'utilisateur. Corrigé : injection
+  de `profilCoureur.prenom` (déjà existant, Paramètres → Profil) dans les
+  deux prompts, avec instruction explicite « utilise son prénom, jamais
+  Léa » ; repli sur une instruction « n'utilise jamais Léa pour t'adresser
+  au coureur » si le prénom n'est pas renseigné.
+- **Moments de journée inventés** : le prompt contenait littéralement
+  « terminée ce soir » comme fait injecté, poussant l'IA à broder des
+  détails temporels qu'elle ne peut pas connaître (« demain matin »,
+  « avant de dormir », horaires de petit-déjeuner…) — l'app ne connaît que
+  la date d'une séance, jamais l'heure. Corrigé : retrait de la mention
+  factuelle « ce soir », ajout d'une consigne explicite interdisant toute
+  supposition d'heure/moment de journée dans les deux prompts.
+- **Météo en position fixe** : `weatherTemp` (météo actuelle, transmise au
+  coach) utilisait des coordonnées Toulon codées en dur
+  (`latitude=43.12&longitude=5.93`), sans lien avec l'endroit réel où
+  Laurent court. Corrigé : `coordonneesMeteoActuelles()` utilise désormais
+  la position GPS de la dernière activité Strava disponible avec GPS
+  (triée par date, ignore les activités sans `start_latlng` même plus
+  récentes), avec repli sur Toulon si aucune activité GPS n'existe ou si
+  `stravaActivities` est vide. Testé (6 cas : aucune activité, activités
+  sans GPS, mélange, tri par date, GPS mal formé) — tous passent.
+
+Deux bugs de régression trouvés et corrigés pendant le développement de ces
+correctifs (avant celui-ci) :
+- Suppression accidentelle du bloc de calcul des données Strava de la
+  séance du jour (`todayAvgPace`, `todayInTarget`, `todayAvgIE`,
+  `todayAvgCad`) lors d'une édition antérieure du prompt — `ReferenceError`
+  silencieuse qui empêchait `fetchCoachMsg()` de s'exécuter jusqu'au bout
+  (aucune requête réseau visible, aucun message généré). Diagnostiqué via
+  l'onglet Réseau des outils développeur (absence totale de requête vers
+  `/api/coach`) plutôt qu'en devinant.
+- Le bloc coach (`coachEl`) n'était historiquement inséré que dans la carte
+  « séance du jour », jamais dans la carte « REPOS » — comportement
+  pré-existant (pas une régression de cette session), révélé en pratique
+  parce qu'un plan de test tombait justement sur un jour de repos. Ajouté à
+  la carte REPOS, pour les deux modes.
+
+### 12.6 Extraction du changelog (`changelog.classic.js`)
+
+Le tableau `VERSIONS` (historique des versions affiché dans Paramètres,
+~250 lignes de contenu texte pur) vivait en dur au milieu de
+`renderSettings()` dans `index.html` (déjà ~5600 lignes) — sans rapport
+avec la logique de rendu environnante, et risqué à éditer (une entrée mal
+formée pouvait casser du JS ailleurs dans ce même fichier massif).
+
+Extrait tel quel vers `public/engine-classic-scripts/changelog.classic.js`
+(nouveau fichier), chargé en `<script src>` avec les autres scripts moteur,
+avant le script principal d'`index.html` qui lit `VERSIONS`. Choix du
+format JS plutôt que JSON : cohérent avec le pattern déjà en place pour
+tout le reste du moteur classic (chargement synchrone, pas d'attente
+réseau au démarrage, commentaires possibles pour documenter chaque entrée
+— un JSON ne le permettrait pas).
+
+Particularité par rapport aux autres fichiers `*.classic.js` : **pas de
+source de vérité en module ES séparé**. Les autres fichiers de ce dossier
+sont des copies dérivées d'un vrai module `v2/engine/*.js` (à régénérer
+manuellement à chaque évolution du moteur) ; `changelog.classic.js` n'a
+pas d'équivalent v2 — c'est un contenu propre à l'app v1 (`index.html`),
+jamais partagé avec le wizard v2, donc ce fichier classic *est*
+directement la source de vérité, à éditer sur place pour chaque nouvelle
+version.
+
+`index.html` allégé de ~200 lignes par cette extraction (~5620 → ~5450).
+
+### 12.7 Chantier encore ouvert
 
 - **Déclenchement de `genererBlocSuivant()`** : pas encore câblé côté
   `index.html`. Reste à décider comment le bloc suivant est généré quand le
