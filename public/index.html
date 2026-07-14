@@ -1856,7 +1856,7 @@ function renderDashboard() {
       el("div",{class:"muted",style:{fontSize:"14px",marginBottom:"12px",lineHeight:"1.5"}},
         "Plusieurs séances difficiles récemment — la semaine "+semaineNum+" pourrait être allégée pour mieux récupérer."),
       el("div",{style:{display:"flex",gap:"8px"}},
-        el("button",{style:{flex:"1",background:"var(--accent)",border:"none",borderRadius:"8px",padding:"9px",color:"#fff",fontSize:"14px",fontWeight:"700",cursor:"pointer"},
+        el("button",{style:{flex:"1",background:"var(--accent)",border:"none",borderRadius:"8px",padding:"9px",color:"#F8FAFC",fontSize:"14px",fontWeight:"700",cursor:"pointer"},
           feedback:true,
           onClick:()=>{
             appliquerAdaptations(window.__PLAN_BRUT__);
@@ -3913,7 +3913,7 @@ function renderCourse() {
             background:checked?"var(--accent)":"var(--border-soft)",
             border:checked?"1px solid var(--accent)":"1px solid var(--border)",
             display:"flex",alignItems:"center",justifyContent:"center"
-          }}, checked?el("span",{style:{color:"#fff",fontSize:"14px",fontWeight:"700"}},"✓"):null),
+          }}, checked?el("span",{style:{color:"#F8FAFC",fontSize:"14px",fontWeight:"700"}},"✓"):null),
           el("span",{style:{color:checked?"var(--text2)":"var(--text)",fontSize:"15px",textDecoration:checked?"line-through":"none"}},item.label)
         );
         row.addEventListener("click",()=>{
@@ -4157,7 +4157,7 @@ function renderCourse() {
       }
       const btn2=document.createElement("button");
       btn2.textContent=existingResult?"Modifier":"Enregistrer";
-      btn2.style.cssText="background:var(--accent);border:none;border-radius:8px;padding:8px 16px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;";
+      btn2.style.cssText="background:var(--accent);border:none;border-radius:8px;padding:8px 16px;color:#F8FAFC;font-size:14px;font-weight:700;cursor:pointer;";
       btn2.addEventListener("click",()=>{
         const parts=inp2.value.split(":");
         if(parts.length>=2){const secs=parseInt(parts[0])*3600+parseInt(parts[1])*60+(parseInt(parts[2])||0);if(!isNaN(secs)&&secs>0){save(clePourPlan("lk_race_result"),secs);render();}}
@@ -4888,7 +4888,7 @@ function renderSettings() {
 
   // ── Bouton global Enregistrer ─────────────────────────────────────────────
   const saveBtn = document.createElement("button");
-  saveBtn.style.cssText = "width:100%;background:linear-gradient(135deg,var(--accent),var(--warn));border:none;border-radius:12px;padding:14px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:24px;";
+  saveBtn.style.cssText = "width:100%;background:linear-gradient(135deg,var(--accent),var(--warn));border:none;border-radius:12px;padding:14px;color:#F8FAFC;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:24px;";
   saveBtn.textContent = "💾 Enregistrer les paramètres";
   saveBtn.addEventListener("click", avecRetourTactile(()=>{
     // Lire toutes les valeurs des inputs
