@@ -58,12 +58,12 @@
     flex:1; display:flex; align-items:center; justify-content:space-between;
     padding:8px 12px; border-radius:9px; font-size:13px; font-weight:600;
   }
-  .badge.qualite{ background:var(--signal-dim); color:var(--signal); }
-  .badge.vma{ background:rgba(var(--accent-rgb),0.13); color:var(--signal); }
-  .badge.seuil{ background:rgba(var(--accent2-rgb),0.13); color:var(--pace); }
-  .badge.spec{ background:rgba(var(--accent-rgb),0.13); color:var(--signal); }
-  .badge.ef{ background:var(--pace-soft); color:var(--pace); }
-  .badge.longue{ background:var(--longue-soft); color:var(--longue); }
+  .badge.qualite{ background:var(--signal); color:var(--ink); }
+  .badge.vma{ background:rgb(var(--warn-rgb)); color:var(--ink); }
+  .badge.seuil{ background:var(--signal); color:var(--ink); }
+  .badge.spec{ background:var(--signal); color:var(--ink); }
+  .badge.ef{ background:var(--pace); color:var(--ink); }
+  .badge.longue{ background:var(--pace); color:var(--ink); }
   .badge.repos{ background:transparent; color:rgba(var(--text-rgb),0.35); font-weight:500; }
   .badge .tag{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:10px; opacity:.8; }
   .day-detail{
@@ -1758,10 +1758,14 @@
         // Distingue VMA/SEUIL/SPEC par leur vraie couleur, cohérent avec
         // STYPES de l'app principale (index.html) — demandé par Laurent le
         // 8 juillet 2026 pour que la direction artistique du wizard
-        // corresponde à celle de l'app.
+        // corresponde à celle de l'app. Label affiché aussi remplacé par
+        // le vrai type de séance plutôt que le mot générique "Qualité"
+        // (demandé le 14 juillet 2026, cohérent avec les badges de
+        // l'app principale).
         const famille = a.estTest ? 'spec' : Engine.FAMILLE_SOUS_TYPE[a.sousType];
         badgeClass = famille === 'vma' ? 'vma' : famille === 'seuil' ? 'seuil' : famille === 'allure-course' ? 'spec' : 'qualite';
-        label = a.estTest ? '🎯 Test' : 'Qualité'; detail = a.contenu;
+        const labelFamille = famille === 'vma' ? 'VMA' : famille === 'seuil' ? 'Seuil' : famille === 'allure-course' ? 'Allure course' : 'Qualité';
+        label = a.estTest ? '🎯 Test' : labelFamille; detail = a.contenu;
         const r = a.restrictionsAllure;
         if (r && !a.estTest) label += ` <span class="tag">${r.repli5KDouleurChronique ? 'repli I' : (r.interdireV ? 'sans V' : '') + (r.interdireI ? ' sans I' : '')}</span>`;
       }
