@@ -299,6 +299,10 @@ const STYPES = {
   TEST:  { label:"Séance test",            color:"var(--warn)", colorSoft:"rgba(var(--warn-rgb),", short:"TEST"  },
   REPOS: { label:"Repos",                  color:"var(--text2)", colorSoft:"rgba(var(--text-rgb),", short:"REPOS" },
   RACE:  { label:"Course",                 color:"var(--warn)", colorSoft:"rgba(var(--warn-rgb),", short:"RACE"  },
+  // Marche-course (grand débutant, 14/07/2026) — même famille visuelle que
+  // EF (couleur accent2) : c'est un effort d'endurance douce, pas une
+  // séance d'intensité comme VMA/SEUIL.
+  MARCHE_COURSE: { label:"Marche-course", color:"var(--accent2)", colorSoft:"rgba(var(--accent2-rgb),", short:"M-C" },
 };
 
 // Options de statut de séance (✅/❌/⚠️/😴) — déplacées ici le 8 juillet
@@ -1836,6 +1840,108 @@ function renderDashboard() {
   const missed=ALL_SESSIONS.filter(s=>statuses[s.uid]==="❌").length;
   const adapted=ALL_SESSIONS.filter(s=>statuses[s.uid]==="⚠️").length;
 
+  // ── Proposition de progression de palier marche-course (grand débutant,
+  // 14/07/2026) ────────────────────────────────────────────────────────────
+  // Même pattern que l'adaptation dynamique ci-dessous : détection
+  // automatique, application seulement sur confirmation explicite. Pas de
+  // "Ignorer" ici (contrairement à l'adaptation) — rester au palier actuel
+  // est un choix normal et récurrent, pas un refus ponctuel à mémoriser.
+  const progressionMarcheCourseEl = (() => {
+    if (!window.__PLAN_BRUT__) return null;
+    window.__PLAN_BRUT__.statuses = statuses;
+    const progression = analyserProgressionMarcheCourse(window.__PLAN_BRUT__);
+    if (!progression) return null; // pas un plan grand-débutant
+
+    const banniereIgnoreeCettePalier = load(clePourPlan("lk_palier_propose_ignore"), null) === progression.palierId;
+
+    // Warning de stagnation (garde-fou 12 semaines) — affiché même si pas
+    // encore prêt pour le palier suivant, informatif seulement.
+    const warningStagnation = progression.warnings.length > 0
+      ? el("div",{style:{background:"rgba(var(--warn-rgb),0.07)",border:"1px solid rgba(var(--warn-rgb),0.2)",borderRadius:"12px",padding:"14px 16px",marginBottom:"16px"}},
+          el("div",{style:{display:"flex",alignItems:"center",gap:"10px"}},
+            el("span",{style:{fontSize:"20px"}},"💛"),
+            el("div",{class:"muted",style:{fontSize:"14px",lineHeight:"1.5"}}, progression.warnings[0].message)
+          )
+        )
+      : null;
+
+    // Dernier palier (course continue 30min) déjà atteint ET validé : pas de
+    // "palier suivant" possible côté marche-course, on propose la création
+    // d'un vrai plan debutant (structure longue/EF/qualité) plutôt qu'une
+    // conversion automatique en place (jugée risquée, cf. décision du
+    // 14/07/2026 — même logique prudente que la dé-duplication moteur/classic
+    // reportée pour la même raison). "Continuer ce palier" reste possible :
+    // rien n'oblige à basculer tout de suite.
+    if (progression.dernierPalier && progression.pretPourSuivant && !banniereIgnoreeCettePalier) {
+      return el("div",{style:{padding:"0"}},
+        warningStagnation,
+        el("div",{style:{background:"rgba(var(--accent2-rgb),0.07)",border:"1px solid rgba(var(--accent2-rgb),0.2)",borderRadius:"12px",padding:"14px 16px",marginBottom:"16px"}},
+          el("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"8px"}},
+            el("span",{style:{fontSize:"20px"}},"🏆"),
+            el("span",{style:{color:"var(--accent2)",fontSize:"15px",fontWeight:"700"}},"Tu cours en continu !")
+          ),
+          el("div",{class:"muted",style:{fontSize:"14px",marginBottom:"12px",lineHeight:"1.5"}},
+            progression.seancesValidees+" séances de course continue réussies — la marche-course a fait son travail. Tu peux passer à un vrai plan d'entraînement, avec sortie longue et séances qualité, quand tu es prêt·e."),
+          el("div",{style:{display:"flex",gap:"8px"}},
+            el("a",{href:"/v2",style:{flex:"1",display:"block",textAlign:"center",background:"var(--accent2)",border:"none",borderRadius:"8px",padding:"9px",color:"#F8FAFC",fontSize:"14px",fontWeight:"700",cursor:"pointer",textDecoration:"none"}
+            },"Configurer mon prochain plan"),
+            el("button",{style:{flex:"1",background:"none",boxShadow:"0 1px 3px var(--shadow1), 0 1px 2px var(--shadow2)",borderRadius:"8px",padding:"9px",color:"var(--text-muted)",fontSize:"14px",fontWeight:"600",cursor:"pointer"},
+              feedback:true,
+              onClick:()=>{
+                save(clePourPlan("lk_palier_propose_ignore"), progression.palierId);
+                render();
+              }
+            },"Pas encore")
+          )
+        )
+      );
+    }
+
+    if (!progression.pretPourSuivant || progression.dernierPalier || banniereIgnoreeCettePalier) {
+      return warningStagnation;
+    }
+
+    const palierActuel = PALIERS_MARCHE_COURSE[progression.palierId];
+    const palierSuivant = PALIERS_MARCHE_COURSE[progression.palierId + 1];
+
+    return el("div",{style:{padding:"0"}},
+      warningStagnation,
+      el("div",{style:{background:"rgba(var(--accent2-rgb),0.07)",border:"1px solid rgba(var(--accent2-rgb),0.2)",borderRadius:"12px",padding:"14px 16px",marginBottom:"16px"}},
+        el("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"8px"}},
+          el("span",{style:{fontSize:"20px"}},"🎉"),
+          el("span",{style:{color:"var(--accent2)",fontSize:"15px",fontWeight:"700"}},"Prêt·e pour la suite ?")
+        ),
+        el("div",{class:"muted",style:{fontSize:"14px",marginBottom:"12px",lineHeight:"1.5"}},
+          progression.seancesValidees+" séances réussies sur \""+palierActuel.label+"\" — tu peux passer à \""+palierSuivant.label+"\" quand tu veux, ou continuer encore un peu à ce rythme."),
+        el("div",{style:{display:"flex",gap:"8px"}},
+          el("button",{style:{flex:"1",background:"var(--accent2)",border:"none",borderRadius:"8px",padding:"9px",color:"#F8FAFC",fontSize:"14px",fontWeight:"700",cursor:"pointer"},
+            feedback:true,
+            onClick:()=>{
+              window.__PLAN_BRUT__.profilOrigine.palierMarcheCourse = progression.palierId + 1;
+              const nouveauPlan = generatePlan(window.__PLAN_BRUT__.profilOrigine, window.__PLAN_BRUT__.paramsOrigine);
+              nouveauPlan.statuses = window.__PLAN_BRUT__.statuses;
+              window.__PLAN_BRUT__ = nouveauPlan;
+              window.__PLAN_GENERE__ = traduirePlanVersFormatV1(window.__PLAN_BRUT__);
+              PLAN = window.__PLAN_GENERE__;
+              ALL_SESSIONS = recalculerAllSessions();
+              if (getGithubToken && getGithubToken() && sauvegarderPlan) {
+                sauvegarderPlan(window.__PLAN_BRUT__).catch(e => console.warn("Palier changé localement, sauvegarde échouée :", e.message));
+              }
+              render();
+            }
+          },"Palier suivant"),
+          el("button",{style:{flex:"1",background:"none",boxShadow:"0 1px 3px var(--shadow1), 0 1px 2px var(--shadow2)",borderRadius:"8px",padding:"9px",color:"var(--text-muted)",fontSize:"14px",fontWeight:"600",cursor:"pointer"},
+            feedback:true,
+            onClick:()=>{
+              save(clePourPlan("lk_palier_propose_ignore"), progression.palierId);
+              render();
+            }
+          },"Continuer ce palier")
+        )
+      )
+    );
+  })();
+
   // ── Proposition d'adaptation dynamique (étape 4, doc convergence) ────────
   // Décidé avec Laurent le 8 juillet 2026 : détection AUTOMATIQUE (comme le
   // statut lui-même), mais application seulement sur confirmation explicite
@@ -2598,7 +2704,7 @@ function renderDashboard() {
   // principal (décision d'emplacement tranchée le 6 juillet 2026).
   const selecteurPlanEl = renderSelecteurPlan();
 
-  return el("div",{style:{padding:"0 16px 100px"}},dashHeaderEl,selecteurPlanEl,adaptationEl,ESTMODEFORME?null:heroPred,todayEl||"",phaseEl,stravaSection);
+  return el("div",{style:{padding:"0 16px 100px"}},dashHeaderEl,selecteurPlanEl,progressionMarcheCourseEl,adaptationEl,ESTMODEFORME?null:heroPred,todayEl||"",phaseEl,stravaSection);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
