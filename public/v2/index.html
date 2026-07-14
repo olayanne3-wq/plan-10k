@@ -972,6 +972,11 @@
 
       <div class="options">
         <div class="opt" data-group="niveau" onclick="selectOpt(this)">
+          <div class="ico">🚶</div>
+          <div><div class="label">Je n'ai jamais couru</div><div class="desc">Je marche, ou je découvre — pas encore capable de courir en continu</div></div>
+          <div class="check"></div>
+        </div>
+        <div class="opt" data-group="niveau" onclick="selectOpt(this)">
           <div class="ico">🌱</div>
           <div><div class="label">Je débute</div><div class="desc">Moins de 6 mois de course régulière</div></div>
           <div class="check"></div>
@@ -1100,8 +1105,8 @@
     <!-- STEP 6: Date de course -->
     <div class="screen" data-step="6">
       <span class="eyebrow">Échéance</span>
-      <h1>C'est pour quand&nbsp;?</h1>
-      <p class="sub">La durée du plan se calcule automatiquement entre le début et le jour J.</p>
+      <h1 id="step6Title">C'est pour quand&nbsp;?</h1>
+      <p class="sub" id="step6Sub">La durée du plan se calcule automatiquement entre le début et le jour J.</p>
 
       <div class="date-label">Début du plan</div>
       <div class="date-field">
@@ -1109,20 +1114,22 @@
       </div>
       <div class="date-quick-row" id="startQuickRow"></div>
 
-      <div class="date-label" style="margin-top:16px;">Jour de la course</div>
+      <div class="date-label" style="margin-top:16px;" id="raceDateLabel">Jour de la course</div>
       <div class="date-field">
         <input type="date" id="raceDate">
       </div>
 
-      <div class="date-label" style="margin-top:16px;">Infos de la course (facultatif)</div>
-      <div class="date-field">
-        <input type="text" id="raceName" placeholder="Nom de la course">
-      </div>
-      <div class="date-field" style="margin-top:8px;">
-        <input type="text" id="raceLocation" placeholder="Lieu">
-      </div>
-      <div class="date-field" style="margin-top:8px;">
-        <input type="url" id="raceUrl" placeholder="Lien vers la page de la course">
+      <div id="raceInfosBlock">
+        <div class="date-label" style="margin-top:16px;">Infos de la course (facultatif)</div>
+        <div class="date-field">
+          <input type="text" id="raceName" placeholder="Nom de la course">
+        </div>
+        <div class="date-field" style="margin-top:8px;">
+          <input type="text" id="raceLocation" placeholder="Lieu">
+        </div>
+        <div class="date-field" style="margin-top:8px;">
+          <input type="url" id="raceUrl" placeholder="Lien vers la page de la course">
+        </div>
       </div>
 
       <div class="duration-card" id="durationCard">
@@ -1625,7 +1632,7 @@
     }
   }
 
-  const NIVEAU_MAP = { "Je débute": "debutant", "Intermédiaire": "intermediaire", "Confirmé": "confirme" };
+  const NIVEAU_MAP = { "Je n'ai jamais couru": "grand-debutant", "Je débute": "debutant", "Intermédiaire": "intermediaire", "Confirmé": "confirme" };
   const DISTANCE_MAP = { "5": "5K", "10": "10K", "21.1": "Semi", "42.2": "Marathon" };
 
   function readTimeFields(prefix, longFormat){
@@ -1636,6 +1643,7 @@
   }
 
   function collectParamsFromWizard(){
+    const grandDebutant = estGrandDebutant();
     const longFormat = distanceMeta[currentDist].unit === "h:min:sec";
     const niveauLabel = document.querySelector('.opt[data-group="niveau"].selected .label').textContent;
     const joursDisponibles = [...document.querySelectorAll('#daysGrid .day.selected')]
@@ -1654,17 +1662,25 @@
       anneeNaissance: parseInt(document.getElementById('birthYear').value) || undefined,
       fcMaxConnue: parseInt(document.getElementById('fcMaxConnue').value) || undefined,
       joursDisponiblesHabituels: joursDisponibles,
-      renforcementMusculaire: renfoOn
+      renforcementMusculaire: renfoOn,
+      // Palier de départ toujours 0 à la création d'un plan marche-course —
+      // la progression se fait ensuite depuis le dashboard, pas ici.
+      palierMarcheCourse: grandDebutant ? 0 : undefined
     };
 
     const params = {
-      distance: DISTANCE_MAP[currentDist],
-      refDistance: DISTANCE_MAP[currentDist],
-      tempsReference: readTimeFields('t', longFormat),
-      objectif: readTimeFields('o', longFormat),
+      // Steps 1/3/4/5 sautés pour grand-debutant (cf. estGrandDebutant) :
+      // ces champs n'ont jamais été renseignés par l'utilisateur, on
+      // fournit des constantes neutres uniquement pour satisfaire la
+      // signature de generatePlanMarcheCourse (params.distance/tempsReference/
+      // objectif ne sont pas utilisés par ce chemin de génération).
+      distance: grandDebutant ? '5K' : DISTANCE_MAP[currentDist],
+      refDistance: grandDebutant ? '5K' : DISTANCE_MAP[currentDist],
+      tempsReference: grandDebutant ? '30:00' : readTimeFields('t', longFormat),
+      objectif: grandDebutant ? '30:00' : readTimeFields('o', longFormat),
       dateDebut: document.getElementById('startDate').value,
       dateCourse: document.getElementById('raceDate').value,
-      volumeActuel: isNaN(volumeActuel) ? 30 : volumeActuel,
+      volumeActuel: grandDebutant ? 0 : (isNaN(volumeActuel) ? 30 : volumeActuel),
       contraintesPonctuelles: contraintesSelected,
       repriseDuree: contraintesSelected.includes('reprise') ? repriseDuree : undefined,
       // Infos de course, purement décoratives pour l'affichage — le moteur
@@ -1679,6 +1695,30 @@
   }
 
   function renderResults(plan){
+    // Marche-course (grand débutant, 14/07/2026) : pas d'allures, pas de
+    // zoneFC établie (aucune allure course fiable à ce stade), affichage
+    // dédié et sortie anticipée — même logique que le court-circuit
+    // Mode Forme ci-dessous, mais encore plus minimal.
+    if (plan.mode === 'marche-course') {
+      document.getElementById('resultsAmpleur').textContent =
+        `Marche-course — palier de départ : "${Engine.PALIERS_MARCHE_COURSE[plan.palierMarcheCourse]?.label ?? ''}" — ${plan.warnings.length} avertissement(s).`;
+      document.getElementById('resultsWarnCount').textContent = `${plan.warnings.length} alerte(s)`;
+      document.getElementById('resDuree').textContent = `${plan.semaines.length} semaines`;
+      document.getElementById('resPhases').textContent = 'Marche-course — pas de phases';
+      document.getElementById('resPlafond').textContent = '—';
+      document.getElementById('resFcMax').textContent = 'Non applicable en marche-course';
+      document.getElementById('resAllures').innerHTML =
+        '<div class="bib-row"><span class="k">Allures</span><span class="v" style="opacity:.7;">Pas encore établies — arrivent une fois la course continue acquise</span></div>';
+
+      rafraichirPlanComplet();
+
+      const warnDivMC = document.getElementById('resWarnings');
+      warnDivMC.innerHTML = plan.warnings.map(w =>
+        `<div class="flag" style="margin-top:10px;"><span class="ico">⚠️</span><span>${w.message}</span></div>`
+      ).join('') || '<div class="flag" style="margin-top:10px;"><span class="ico">✅</span><span>Aucun avertissement.</span></div>';
+      return;
+    }
+
     // Mode Forme (13 juillet 2026) : pas de phases/dureeSemaines/ampleurObjectif
     // (notions propres au plan course, cf. plan-forme.js) — repli textuel
     // plutôt qu'un plantage sur plan.phases.map(...) undefined.
@@ -2413,12 +2453,36 @@
     document.getElementById('stepNum').textContent = 'ÉTAPE ' + n;
     document.getElementById('backBtn').style.visibility = n === 1 ? 'hidden' : 'visible';
     document.getElementById('nextBtn').textContent = n === totalSteps ? 'Générer le plan' : 'Continuer';
+    if (n === 6) {
+      // Marche-course : pas de "jour de course" à proprement parler, juste
+      // une échéance de fin de bloc — libellés adaptés, infos course
+      // (nom/lieu/lien) masquées (non pertinentes pour ce profil).
+      const gd = estGrandDebutant();
+      document.getElementById('step6Title').innerHTML = gd
+        ? "Jusqu'à quand&nbsp;?"
+        : "C'est pour quand&nbsp;?";
+      document.getElementById('step6Sub').textContent = gd
+        ? "La durée du plan se calcule automatiquement entre le début et cette date — tu pourras l'ajuster plus tard selon ta progression."
+        : "La durée du plan se calcule automatiquement entre le début et le jour J.";
+      document.getElementById('raceDateLabel').textContent = gd ? 'Fin du bloc' : 'Jour de la course';
+      document.getElementById('raceInfosBlock').style.display = gd ? 'none' : '';
+    }
     renderTrack();
     // Persiste l'étape courante pour la restaurer après un rechargement de
     // page (ex: retour OAuth Strava qui force un reload complet, cf.
     // capterRetourStravaOAuth). sessionStorage plutôt que localStorage :
     // ne doit pas survivre au-delà de cette session de navigation.
     sessionStorage.setItem('v2_wizard_step', n);
+  }
+
+  // Marche-course (grand débutant, 14/07/2026) : steps 3 (volume actuel),
+  // 4 (chrono de référence) et 5 (objectif chrono) n'ont pas de sens pour
+  // ce profil — sautés dans les deux sens plutôt que masqués avec des
+  // valeurs par défaut invisibles (cf. décision avec Laurent : plus honnête
+  // sur ce que le plan représente réellement).
+  function estGrandDebutant(){
+    const sel = document.querySelector('.opt[data-group="niveau"].selected .label');
+    return sel && sel.textContent === "Je n'ai jamais couru";
   }
 
   async function nextStep(){
@@ -2476,7 +2540,11 @@
       location.href = '/';
       return;
     }
-    if(current < totalSteps){ current++; showStep(current); }
+    if(current < totalSteps){
+      current++;
+      if (estGrandDebutant() && current === 3) current = 6;
+      showStep(current);
+    }
     else { generateAndShowResults(); }
   }
   function prevStep(){
@@ -2485,7 +2553,11 @@
       showStep(current); // current est resté à totalSteps (9) : retour au récap
       return;
     }
-    if(current > 1){ current--; showStep(current); }
+    if(current > 1){
+      current--;
+      if (estGrandDebutant() && current === 5) current = 2;
+      showStep(current);
+    }
   }
 
   function computeDuration(){
