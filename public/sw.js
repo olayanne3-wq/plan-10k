@@ -1,4 +1,4 @@
-const CACHE = "plan10k-v21";
+const CACHE = "yoria-v1";
 const ASSETS = ["/", "/index.html", "/manifest.json"];
 
 self.addEventListener("install", e => {
