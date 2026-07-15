@@ -5,6 +5,33 @@
 // ============================================================
 
 (function () {
+  // Fonctions dupliquées depuis gist-sync.classic.js (dateFinPeriodeActive,
+  // datesChevauchent, trouverPlanEnConflit) — v2.8, 15/07/2026. Duplication
+  // plutôt qu'un appel croisé entre les deux IIFE classic (gist-sync.classic.js
+  // n'expose aucune de ses fonctions via window.LkXxx, contrairement au
+  // pattern habituel des autres modules classic — état existant, pas
+  // touché ici pour ne rien risquer de casser côté Gist). Garder ces trois
+  // fonctions synchronisées avec gist-sync.js/gist-sync.classic.js si leur
+  // logique évolue.
+  function dateFinPeriodeActive(plan) {
+    if (plan.mode === 'forme') return plan.dateCloture || null;
+    return plan.dateCourse || null;
+  }
+
+  function datesChevauchent(debutA, finA, debutB, finB) {
+    if (finB !== null && finB !== undefined && debutA > finB) return false;
+    if (finA !== null && finA !== undefined && debutB > finA) return false;
+    return true;
+  }
+
+  function trouverPlanEnConflit(plans, dateDebut, dateFin, idAExclure) {
+    return plans.find(function (p) {
+      if (p.id === idAExclure || !p.dateDebut) return false;
+      const finExistant = dateFinPeriodeActive(p);
+      return datesChevauchent(dateDebut, dateFin === undefined ? null : dateFin, p.dateDebut, finExistant);
+    }) || null;
+  }
+
   // v2_gist_id ajouté le 14 juillet 2026 : oubliée depuis la création de
   // cette liste, c'est l'id du Gist contenant les VRAIS plans v2 (multi-
   // plans, format wizard) — distinct de lk_gist_id (résidu de l'ancien
@@ -380,6 +407,18 @@
       }
       if (lecture.data) return;
 
+      if (planBrut && planBrut.dateDebut) {
+        const plansExistants = await chargerPlansSupabase(userId);
+        const dateFinDuNouveauPlan = planBrut.mode === 'forme' ? (planBrut.dateCloture || null) : planBrut.dateCourse;
+        const conflit = trouverPlanEnConflit(plansExistants, planBrut.dateDebut, dateFinDuNouveauPlan, planId);
+        if (conflit) {
+          const nomConflit = conflit.nom || (conflit.mode === 'forme' ? 'Plan forme' : ((conflit.distance || '?') + ' — ' + (conflit.objectif || '?')));
+          const finConflit = conflit.mode === 'forme' ? (conflit.dateCloture || 'sans date de fin') : conflit.dateCourse;
+          const finNouveau = dateFinDuNouveauPlan || 'sans date de fin';
+          throw new Error('Ce plan (' + planBrut.dateDebut + ' → ' + finNouveau + ') chevauche un plan déjà actif : "' + nomConflit + '" (' + conflit.dateDebut + ' → ' + finConflit + '). Un seul plan peut être actif à la fois — clôture ou supprime le plan existant, ou choisis d\'autres dates.');
+        }
+      }
+
       const nom = (planBrut && planBrut.nom) ||
         (((planBrut && planBrut.distance) || '') + ' — ' + ((planBrut && planBrut.objectif) || '')).trim() ||
         'Plan';
@@ -393,6 +432,7 @@
         console.warn('Création de la ligne plans échouée :', insertion.error.message);
       }
     } catch (err) {
+      if (err.message && err.message.indexOf('chevauche un plan déjà actif') !== -1) throw err;
       console.warn('assurerPlanExiste a échoué :', err.message);
     }
   }
