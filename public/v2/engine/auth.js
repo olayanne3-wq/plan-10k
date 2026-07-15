@@ -118,6 +118,7 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
           <div class="message" id="auth-message"></div>
         </form>
         <div class="lien-secondaire" id="lien-mdp-oublie" style="cursor:pointer; text-decoration:underline;">Mot de passe oublié ?</div>
+        <div class="lien-secondaire" id="lien-suppr-compte" style="cursor:pointer; text-decoration:underline; color:var(--warn);">Supprimer mon compte</div>
       </div>
     </div>
   `;
@@ -131,6 +132,7 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
     const messageEl = hote.querySelector('#auth-message');
     const onglets = hote.querySelectorAll('#ecran-auth .onglet');
     const lienMdpOublie = hote.querySelector('#lien-mdp-oublie');
+    const lienSupprCompte = hote.querySelector('#lien-suppr-compte');
 
     let mode = 'connexion';
     let dejaResolu = false;
@@ -142,6 +144,7 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
         submitBtn.textContent = mode === 'connexion' ? 'Se connecter' : 'Créer mon compte';
         passwordInput.autocomplete = mode === 'connexion' ? 'current-password' : 'new-password';
         lienMdpOublie.style.display = mode === 'connexion' ? 'block' : 'none';
+        lienSupprCompte.style.display = mode === 'connexion' ? 'block' : 'none';
         messageEl.textContent = '';
       });
     });
@@ -173,6 +176,47 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
         afficherMessage('Erreur : ' + err.message, 'erreur');
       } finally {
         lienMdpOublie.style.pointerEvents = 'auto';
+      }
+    });
+
+    // "Supprimer mon compte" — ajouté le 14/07/2026, pour retester le flow
+    // d'inscription/onboarding sans accumuler de comptes de test. Exige
+    // d'être connecté (nécessite le vrai access_token pour l'API serveur,
+    // cf. api/delete-account.js) : on demande donc email + mot de passe
+    // AVANT de supprimer, via une vraie connexion, pas juste une saisie
+    // libre — ça sert aussi de double confirmation implicite (il faut
+    // connaître le mot de passe pour supprimer le compte).
+    lienSupprCompte.addEventListener('click', async () => {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      if (!email || !password) {
+        afficherMessage('Entre ton email et ton mot de passe ci-dessus, puis clique à nouveau sur ce lien.', 'erreur');
+        return;
+      }
+      if (!confirm('Supprimer définitivement ton compte Yoria et toutes tes données (plans, profil, historique) ? Cette action est irréversible.')) {
+        return;
+      }
+
+      lienSupprCompte.style.pointerEvents = 'none';
+      afficherMessage('Suppression en cours…', 'succes');
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+
+        const res = await fetch('/api/delete-account', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${data.session.access_token}` }
+        });
+        const resultat = await res.json();
+        if (!res.ok) throw new Error(resultat.error || 'Échec de la suppression.');
+
+        await supabase.auth.signOut();
+        localStorage.clear();
+        afficherMessage('Compte supprimé. Rechargement…', 'succes');
+        setTimeout(() => window.location.reload(), 1200);
+      } catch (err) {
+        afficherMessage('Erreur : ' + err.message, 'erreur');
+        lienSupprCompte.style.pointerEvents = 'auto';
       }
     });
 
@@ -251,6 +295,7 @@ export async function monterEcranAuth(conteneurId = 'ecran-auth-hote') {
       `;
       hote.querySelector('#ecran-auth .onglets').style.display = 'none';
       lienMdpOublie.style.display = 'none';
+      lienSupprCompte.style.display = 'none';
       hote.querySelector('.sous-titre').textContent = 'Nouveau mot de passe';
 
       form.addEventListener('submit', async (e) => {
