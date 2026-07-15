@@ -755,10 +755,51 @@
        soit vers le flux Forme dédié (#wizard-forme-contenu), plus
        court, ci-dessous.
   ============================================================ -->
+  <!-- ============================================================
+       Écran d'accueil du wizard — v2.8, ajouté le 15/07/2026, demandé
+       par Laurent : séparer clairement "consulter un plan existant" de
+       "créer un nouveau plan", plutôt que la liste des plans existants
+       en petit au-dessus du choix de mode (peu visible, souvent manquée).
+       Affiché en premier si des plans existent déjà ; sinon on saute
+       directement à choix-mode-contenu (rien à consulter).
+  ============================================================ -->
+  <div id="accueil-wizard-contenu" style="display:none;">
+    <div class="content" style="padding-top:8px;">
+      <span class="eyebrow">Tes plans</span>
+      <h1>Que veux-tu faire&nbsp;?</h1>
+      <div class="options">
+        <div class="opt" onclick="ouvrirConsultationPlans()">
+          <div class="ico">📋</div>
+          <div><div class="label">Consulter un plan existant</div><div class="desc" id="accueilNbPlansDesc">Voir mes plans déjà créés</div></div>
+          <div class="check"></div>
+        </div>
+        <div class="opt" onclick="ouvrirChoixModeDepuisAccueil()">
+          <div class="ico">✨</div>
+          <div><div class="label">Créer un nouveau plan</div><div class="desc">Objectif course ou mode forme</div></div>
+          <div class="check"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sous-écran de consultation — liste des plans existants seule,
+       affichée uniquement si "Consulter un plan existant" est choisi
+       depuis l'accueil. Réutilise resPlansSauvegardes/afficherPlansSauvegardes
+       tels quels (contenu généré identique), juste sorti de son ancien
+       emplacement au-dessus de choix-mode-contenu. -->
+  <div id="consultation-plans-contenu" style="display:none;">
+    <div class="content" style="padding-top:8px;">
+      <span class="eyebrow">Tes plans</span>
+      <h1>Plans existants</h1>
+      <div id="resPlansSauvegardesConsultation"></div>
+    </div>
+    <div class="footer">
+      <button class="btn btn-back" onclick="retourAccueilWizard()">← Retour</button>
+    </div>
+  </div>
+
   <div id="choix-mode-contenu">
     <div class="content" style="padding-top:8px;">
-      <div id="resPlansSauvegardes"></div>
-
       <span class="eyebrow">Objectif</span>
       <h1>Quel est ton objectif&nbsp;?</h1>
       <p class="sub">Choisis le type de plan qui te correspond.</p>
@@ -2015,7 +2056,7 @@
   // que de supposer que le <script type="module"> a fini avant ce point,
   // avec un garde-fou (window.Engine déjà présent) au cas où l'événement
   // serait déjà passé avant la pose de ce listener.
-  function initialiserApresChargementEngine() {
+  async function initialiserApresChargementEngine() {
     const existant = getGithubToken();
     const champ = document.getElementById('githubTokenInput');
     if (existant && champ) champ.value = existant;
@@ -2040,6 +2081,31 @@
     if (document.getElementById('wizard-grand-debutant-contenu')?.style.display === 'block') {
       rafraichirBlocStravaGrandDebutant();
     }
+
+    // v2.8 (15/07/2026) : si l'écran d'accueil (Consulter/Créer) est
+    // affiché, on vérifie maintenant (window.__UTILISATEUR__ connu) s'il y
+    // a des plans à consulter — sinon on saute directement à
+    // choix-mode-contenu (rien à consulter pour un tout nouveau compte).
+    // Ne s'applique pas si un autre écran a déjà pris la main entre-temps
+    // (grand-débutant, retour Strava…).
+    if (document.getElementById('accueil-wizard-contenu')?.style.display === 'block') {
+      let plans = [];
+      try {
+        if (window.__UTILISATEUR__?.id && window.LkSync) {
+          plans = await window.LkSync.chargerPlansSupabase(window.__UTILISATEUR__.id);
+        }
+      } catch (e) { /* pas grave, traité comme "aucun plan" */ }
+      if (plans.length === 0) {
+        try { plans = await chargerPlans(); } catch (e) { /* pas de Gist configuré */ }
+      }
+      if (plans.length === 0) {
+        document.getElementById('accueil-wizard-contenu').style.display = 'none';
+        document.getElementById('choix-mode-contenu').style.display = 'block';
+      } else {
+        const desc = document.getElementById('accueilNbPlansDesc');
+        if (desc) desc.textContent = `${plans.length} plan${plans.length > 1 ? 's' : ''} déjà créé${plans.length > 1 ? 's' : ''}`;
+      }
+    }
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -2051,7 +2117,10 @@
   });
 
   async function afficherPlansSauvegardes() {
-    const conteneur = document.getElementById('resPlansSauvegardes');
+    // v2.8 (15/07/2026) : déplacé du haut de choix-mode-contenu vers son
+    // propre écran de consultation dédié (accueil-wizard-contenu →
+    // consultation-plans-contenu), cf. ouvrirConsultationPlans().
+    const conteneur = document.getElementById('resPlansSauvegardesConsultation');
     if (!conteneur) return;
     // BUG corrigé le 15/07/2026 : cette fonction utilisait encore
     // chargerPlans() (Gist) seul, jamais mise à jour lors du basculement
@@ -2890,6 +2959,23 @@
   // ===========================================================================
   let modeChoisi = null;
 
+  // ── Navigation écran d'accueil — v2.8, ajouté le 15/07/2026 ────────────
+  function ouvrirConsultationPlans() {
+    document.getElementById('accueil-wizard-contenu').style.display = 'none';
+    document.getElementById('consultation-plans-contenu').style.display = 'block';
+    afficherPlansSauvegardes();
+  }
+
+  function ouvrirChoixModeDepuisAccueil() {
+    document.getElementById('accueil-wizard-contenu').style.display = 'none';
+    document.getElementById('choix-mode-contenu').style.display = 'block';
+  }
+
+  function retourAccueilWizard() {
+    document.getElementById('consultation-plans-contenu').style.display = 'none';
+    document.getElementById('accueil-wizard-contenu').style.display = 'block';
+  }
+
   function choisirMode(mode) {
     modeChoisi = mode;
     document.getElementById('choixModeCourse').classList.toggle('selected', mode === 'course');
@@ -3224,7 +3310,16 @@
     document.getElementById('nextBtn').textContent = 'Terminer';
   }
 
-  document.getElementById('choix-mode-contenu').style.display = 'block';
+  // v2.8 (15/07/2026) : accueil-wizard-contenu (Consulter/Créer) affiché
+  // par défaut plutôt que choix-mode-contenu directement — demandé par
+  // Laurent pour séparer clairement les deux intentions. On ne peut pas
+  // encore savoir ici si des plans existent (window.__UTILISATEUR__ pas
+  // connu à ce stade, synchrone, avant engineReady) ; si aucun plan n'est
+  // trouvé une fois cette info disponible, on saute directement à
+  // choix-mode-contenu (cf. initialiserApresChargementEngine plus haut) —
+  // rien à consulter, autant éviter l'écran intermédiaire pour un tout
+  // nouveau compte.
+  document.getElementById('accueil-wizard-contenu').style.display = 'block';
 
   // Redirection directe depuis l'onboarding (v2.8, §17.9) — cf. index.html,
   // juste après monterEcranOnboarding(). Court-circuite complètement
@@ -3268,6 +3363,7 @@
       window.history.replaceState({}, document.title, nouvelleUrl);
     }
     document.getElementById('choix-mode-contenu').style.display = 'none';
+    document.getElementById('accueil-wizard-contenu').style.display = 'none';
     document.getElementById('wizard-grand-debutant-contenu').style.display = 'block';
     renderDaysGrandDebutant();
   })();
