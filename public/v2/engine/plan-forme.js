@@ -26,7 +26,9 @@ import {
   genererContenuLongue,
   repartirVolumeSemaine,
   computeFcMaxTanaka,
-  computeZonesFC
+  computeZonesFC,
+  genererContenuMarcheCourse,
+  PALIERS_MARCHE_COURSE
 } from './plan-generator.js';
 
 // ---------------------------------------------------------------------------
@@ -180,6 +182,58 @@ export function computeVolumeFormeSemaine({ volumeDepart, semaineNum }) {
 }
 
 // ---------------------------------------------------------------------------
+// Grand débutant — v2.8 (§17.1, correction du 14/07/2026 par rapport à la
+// première version du chantier marche-course, où ce niveau vivait dans
+// plan-generator.js/generatePlan). Le Mode Forme est la bonne maison pour ce
+// profil : pas de date de fin, cycle glissant — cohérent avec l'esprit
+// "pas de pression d'échéance" pour quelqu'un qui commence tout juste à
+// courir. Réutilise PALIERS_MARCHE_COURSE/genererContenuMarcheCourse
+// (plan-generator.js) tels quels, dans le contexte bloc glissant plutôt que
+// date de fin fixe. Toutes les séances du bloc sont identiques (même palier),
+// pas de distinction longue/EF/qualité (cf. placerSemaine, cas
+// grand-debutant déjà géré côté plan-generator.js).
+// ---------------------------------------------------------------------------
+
+function generatePlanFormeMarcheCourse(profil, params) {
+  const nbSemaines = params.nbSemainesBloc ?? TAILLE_BLOC_SEMAINES;
+  const palierId = profil.palierMarcheCourse ?? 0;
+  const semaines = [];
+  const warnings = [];
+
+  for (let semaineNum = 1; semaineNum <= nbSemaines; semaineNum++) {
+    const { assignment, warnings: warningsPlacement } = placerSemaine({
+      joursDisponibles: profil.joursDisponiblesHabituels,
+      niveau: 'grand-debutant',
+      renforcementActif: false
+    });
+    for (const seance of Object.values(assignment)) {
+      if (seance.type === 'marche-course') {
+        const { contenu, kmEstime, palierLabel } = genererContenuMarcheCourse({ palierId });
+        seance.contenu = contenu;
+        seance.kmEstime = kmEstime;
+        seance.palierLabel = palierLabel;
+      }
+    }
+    warningsPlacement.forEach(w => warnings.push({ ...w, message: `S${semaineNum} : ${w.message}` }));
+    semaines.push({ semaineNum, phase: 'MarcheCourse', estDechargeSemaine: false, assignment, warnings: warningsPlacement });
+  }
+
+  return {
+    mode: 'forme',
+    sousMode: 'marche-course', // distingue ce cas du Mode Forme classique côté app (index.html)
+    accent: null,
+    dateDebut: params.dateDebut,
+    dateCloture: params.dateCloture || undefined,
+    tailleBlocSemaines: nbSemaines,
+    allures: null, // pas d'allure établie à ce stade (cf. plan-generator.js, generatePlanMarcheCourse)
+    zoneFC: null,
+    palierMarcheCourse: palierId,
+    semaines,
+    warnings
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Orchestrateur — génère un bloc glissant de N semaines (défaut 4). Conforme
 // à un schéma de plan minimal compatible avec l'affichage existant
 // (semaines[].assignment, phase absente ou 'Forme' générique), avec
@@ -189,6 +243,10 @@ export function computeVolumeFormeSemaine({ volumeDepart, semaineNum }) {
 const TAILLE_BLOC_SEMAINES = 4;
 
 export function generatePlanForme(profil, params) {
+  if (profil.niveau === 'grand-debutant') {
+    return generatePlanFormeMarcheCourse(profil, params);
+  }
+
   const refTimeSeconds = parseTimeToSeconds(params.tempsReference);
   const refDistanceKm = { '5K': 5, '10K': 10, 'Semi': 21.1, 'Marathon': 42.2 }[params.refDistance ?? '10K'];
 
