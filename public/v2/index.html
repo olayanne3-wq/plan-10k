@@ -2178,7 +2178,7 @@
         const nbFaites = Object.keys(p.statuses || {}).length;
         const titre = p.nom || `${p.distance} — ${p.objectif}`;
         return `<div class="bib-row">
-          <span class="k" style="cursor:pointer;" onclick="chargerPlanExistant('${p.id}')">${titre}</span>
+          <span style="cursor:pointer; font-size:16px; font-weight:600; color:var(--paper);" onclick="chargerPlanExistant('${p.id}')">${titre}</span>
           <span style="display:flex; align-items:center; gap:10px;">
             <span class="v" style="text-align:right;">${date}${nbFaites ? ` · ${nbFaites} séance(s)` : ''}</span>
             <span style="cursor:pointer;" onclick="renommerPlanUI('${p.id}')" title="Renommer">✏️</span>
@@ -3194,6 +3194,7 @@
     sessionStorage.removeItem('v2_onboarding_grand_debutant'); // flow terminé, cf. rediriger_si_onboarding_grand_debutant
     sessionStorage.removeItem('v2_gd_jours_selectionnes');
     plan.id = (window.crypto?.randomUUID) ? crypto.randomUUID() : ('plan-grand-debutant-' + Date.now());
+    plan.nom = nommerPlanForme(plan);
     plan.statuses = plan.statuses || {};
     plan.profilOrigine = profil;
     plan.paramsOrigine = params;
@@ -3286,6 +3287,24 @@
 
   let dernierPlanFormeGenere = null;
 
+  // Nommage automatique des plans Mode Forme (v2.8, 15/07/2026, demandé par
+  // Laurent) — sans ça, un plan Forme retombe toujours sur le fallback
+  // générique "Plan" (cf. sync-storage.js, assurerPlanExiste : distance/
+  // objectif sont undefined pour ce mode). Inclut la date de clôture si
+  // elle existe, pour distinguer plusieurs plans Forme successifs dans la
+  // liste ("Mode forme — depuis le 20 juil. 2026" vs "Mode forme — 20 juil.
+  // au 15 sept. 2026"). Réutilisée à la fois à la création (genererPlanFormeUI)
+  // et lors d'une clôture a posteriori (Réglages), pour que le nom reste
+  // synchronisé avec la vraie période du plan dans les deux cas.
+  function nommerPlanForme(plan) {
+    if (!plan?.dateDebut) return 'Mode forme';
+    const fmt = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+    const label = plan.sousMode === 'marche-course' ? 'Marche-course' : 'Mode forme';
+    return plan.dateCloture
+      ? `${label} — ${fmt(plan.dateDebut)} au ${fmt(plan.dateCloture)}`
+      : `${label} — depuis le ${fmt(plan.dateDebut)}`;
+  }
+
   function genererPlanFormeUI(){
     const { profil, params } = collectParamsFromWizardForme();
 
@@ -3309,6 +3328,7 @@
       return;
     }
     plan.id = (window.crypto?.randomUUID) ? crypto.randomUUID() : ('plan-forme-' + Date.now());
+    plan.nom = nommerPlanForme(plan);
     plan.statuses = plan.statuses || {};
     plan.profilOrigine = profil;
     plan.paramsOrigine = params;
