@@ -485,6 +485,44 @@ export async function chargerPlansSupabase(userId) {
 }
 
 // ------------------------------------------------------------
+// Clôture un plan Forme déjà existant côté Supabase — v2.8, 15/07/2026.
+// assurerPlanExiste() ne fait jamais de mise à jour (juste "créer si
+// absent"), donc insuffisant pour fixer dateCloture sur un plan déjà en
+// base. Utilisé notamment par la bannière de transition grand-débutant
+// ("🏆 Tu cours en continu !", index.html) : sans cette fonction, le clic
+// sur "Configurer mon prochain plan" ne clôturait jamais le plan
+// grand-débutant en cours, qui restait donc "actif indéfiniment" —
+// bloquant la création du nouveau plan par le garde-fou anti-chevauchement
+// (assurerPlanExiste, réactivé le même jour) qu'on est justement censé
+// pouvoir franchir à ce moment précis.
+// ------------------------------------------------------------
+export async function cloturerPlanSupabase(planId, dateCloture) {
+  await supabaseReady;
+  if (!estUuidValide(planId)) return;
+  try {
+    const { data: existant, error: erreurLecture } = await supabase
+      .from('plans')
+      .select('plan_brut')
+      .eq('id', planId)
+      .maybeSingle();
+    if (erreurLecture || !existant) {
+      console.warn('Clôture du plan échouée (lecture) :', erreurLecture?.message || 'plan introuvable');
+      return;
+    }
+    const planBrutMisAJour = { ...existant.plan_brut, dateCloture };
+    const { error: erreurUpdate } = await supabase
+      .from('plans')
+      .update({ plan_brut: planBrutMisAJour })
+      .eq('id', planId);
+    if (erreurUpdate) {
+      console.warn('Clôture du plan échouée (update) :', erreurUpdate.message);
+    }
+  } catch (err) {
+    console.warn('cloturerPlanSupabase a échoué :', err.message);
+  }
+}
+
+// ------------------------------------------------------------
 // Garantit qu'une ligne existe dans la table `plans` pour ce planId,
 // AVANT toute tentative d'écriture vers `plan_donnees` (qui a une
 // contrainte de clé étrangère vers plans.id — cf. schéma SQL). Sans
