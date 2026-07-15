@@ -3218,6 +3218,20 @@
   // v2_onboarding_grand_debutant) — survit au reload, nettoyé une fois le
   // plan généré.
   function renderDaysGrandDebutant() {
+    // BUG CORRIGÉ (15/07/2026, signalé par Laurent — après connexion Strava
+    // depuis cet écran hors du flux d'onboarding initial, ex. via
+    // validerChoixMode(), le reload forcé par capterRetourStravaOAuth()
+    // renvoyait vers l'accueil du wizard au lieu de rester sur cet écran).
+    // v2_onboarding_grand_debutant n'était posé QUE par
+    // rediriger_si_onboarding_grand_debutant(), donc seulement pour le tout
+    // premier passage juste après inscription — tout autre chemin d'entrée
+    // vers cet écran (retour ultérieur via le choix de mode) n'avait aucun
+    // marqueur survivant au reload, perdant l'écran ET la sélection de
+    // jours. Corrigé : ce marqueur est maintenant posé ici, à chaque
+    // affichage réel de l'écran (cette fonction est appelée par tous les
+    // chemins d'entrée), pas seulement depuis l'onboarding.
+    sessionStorage.setItem('v2_onboarding_grand_debutant', 'true');
+
     const days = ['L','M','M','J','V','S','D'];
     let selectionSauvee;
     try { selectionSauvee = JSON.parse(sessionStorage.getItem('v2_gd_jours_selectionnes')); } catch { selectionSauvee = null; }
