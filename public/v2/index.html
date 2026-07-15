@@ -2177,11 +2177,19 @@
         const date = p.dateDebut ? new Date(p.dateDebut+"T00:00:00").toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
         const nbFaites = Object.keys(p.statuses || {}).length;
         const titre = p.nom || `${p.distance} — ${p.objectif}`;
+        // Renommage manuel retiré pour les plans Mode Forme (v2.8,
+        // 15/07/2026, demandé par Laurent) — leur nom est toujours
+        // auto-généré à partir des vraies dates (cf. nommerPlanForme) et
+        // resynchronisé automatiquement à chaque clôture ; un renommage
+        // manuel désynchroniserait durablement le nom affiché de la
+        // réalité du plan. Les plans course gardent le bouton (leur nom
+        // n'est jamais mis à jour automatiquement).
+        const boutonRenommer = p.mode === 'forme' ? '' : `<span style="cursor:pointer;" onclick="renommerPlanUI('${p.id}')" title="Renommer">✏️</span>`;
         return `<div class="bib-row">
           <span style="cursor:pointer; font-size:16px; font-weight:600; color:var(--paper);" onclick="chargerPlanExistant('${p.id}')">${titre}</span>
           <span style="display:flex; align-items:center; gap:10px;">
             <span class="v" style="text-align:right;">${date}${nbFaites ? ` · ${nbFaites} séance(s)` : ''}</span>
-            <span style="cursor:pointer;" onclick="renommerPlanUI('${p.id}')" title="Renommer">✏️</span>
+            ${boutonRenommer}
             <span style="cursor:pointer;" onclick="supprimerPlanUI('${p.id}')" title="Supprimer">🗑️</span>
           </span>
         </div>`;
