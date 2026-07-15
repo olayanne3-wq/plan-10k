@@ -394,6 +394,22 @@
     }
   }
 
+  async function mettreAJourPlanSupabase(planId, planBrutComplet) {
+    await window.LkAuth.supabaseReady;
+    const supabase = window.LkAuth.supabase;
+    if (!estUuidValide(planId)) return;
+    try {
+      const payload = { plan_brut: planBrutComplet };
+      if (planBrutComplet && planBrutComplet.nom) payload.nom = planBrutComplet.nom;
+      const res = await supabase.from('plans').update(payload).eq('id', planId);
+      if (res.error) {
+        console.warn('Mise à jour du plan échouée :', res.error.message);
+      }
+    } catch (err) {
+      console.warn('mettreAJourPlanSupabase a échoué :', err.message);
+    }
+  }
+
   async function cloturerPlanSupabase(planId, dateCloture) {
     await window.LkAuth.supabaseReady;
     const supabase = window.LkAuth.supabase;
@@ -505,6 +521,7 @@
     migrerDonneesExistantes: migrerDonneesExistantes,
     assurerPlanExiste: assurerPlanExiste,
     cloturerPlanSupabase: cloturerPlanSupabase,
+    mettreAJourPlanSupabase: mettreAJourPlanSupabase,
     chargerPlansSupabase: chargerPlansSupabase,
     rejouerFileSync: rejouerFileSync,
     activerRealtime: activerRealtime
