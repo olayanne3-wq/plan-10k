@@ -1,18 +1,20 @@
 # Inventaire de l'application "Yoria"
 
 > Vue d'ensemble de référence — à relire en début de session pour retrouver le contexte
-> sans re-parcourir tout le repo. Mis à jour au 14 juillet 2026 (**périmètre v2.8 recueilli,
-> PAS ENCORE COMMENCÉ** — refonte du grand-débutant vers le Mode Forme, paliers de durée
-> continue, séances marche-course sur Strava, blocage séances futures, wizard sans données
-> de profil, navigation par flèches, suggestion de changement de niveau ; voir §17 pour le
-> détail complet des 8 points actés avec Laurent ; **bug synchro Strava corrigé** —
-> mismatch de domaine Vercel après rebranding, callback domain Strava à resynchroniser si
-> le domaine change à nouveau, voir §16 ; chantier **marche-course / niveau grand-débutant
-> CLOS pour sa version actuelle** — moteur, pont v1, wizard et dashboard faits et poussés
-> (mais périmètre remis en cause par v2.8, voir §17.1), reste des tests réels sur l'app
-> déployée à faire, voir §15 ; **bug POIDS_STATUT corrigé au passage** (l'adaptation
-> dynamique était silencieusement cassée depuis un moment), voir §15.5 ; bug v2_gist_id
-> résolu, voir §14 ; chantier ACWR toujours en cours ;
+> sans re-parcourir tout le repo. Mis à jour au 15 juillet 2026 (**v2.8 implémentée en
+> grande partie** — grand-débutant rattaché au Mode Forme, écran dédié + onboarding,
+> écran d'accueil Consulter/Créer, nommage automatique des plans Forme, suppression de
+> compte ; **bug majeur corrigé** : Supabase était silencieusement absent du chemin de
+> sauvegarde principal (aucun plan ne se sauvegardait sans token GitHub, garde-fou
+> anti-chevauchement contourné) — voir §17 pour le détail complet, reste à faire en
+> §17.16 (paliers de durée continue, blocage séances futures, flèches de navigation,
+> suggestion de changement de niveau) ; **bug synchro Strava corrigé** — mismatch de
+> domaine Vercel après rebranding, callback domain Strava à resynchroniser si le domaine
+> change à nouveau, voir §16 ; chantier **marche-course / niveau grand-débutant** —
+> moteur, pont v1, wizard et dashboard initiaux, puis refondus par v2.8 (§17.1) ; **bug
+> POIDS_STATUT corrigé au passage** (l'adaptation dynamique était silencieusement cassée
+> depuis un moment), voir §15.5 ; bug v2_gist_id résolu, voir §14 ; chantier ACWR
+> toujours en cours ;
 > harmonisation visuelle app/wizard ; badge décharge onglet Semaines ; **v2.5 publiée** —
 > authentification Supabase, migration rétroactive, sync temps réel, wizard protégé,
 > nettoyage Réglages, variables d'env Vercel, file d'attente de sync ; **publication
@@ -1826,134 +1828,239 @@ Strava. Envisager à terme un domaine personnalisé fixe (ex. via Vercel
 Domains) plutôt que de dépendre des domaines `*.vercel.app` auto-générés,
 qui peuvent changer à chaque renommage de repo.
 
-## 17. Périmètre v2.8 (recueil du 14/07/2026, PAS ENCORE COMMENCÉ)
+## 17. v2.8 — Grand débutant, plans multiples & fiabilité Supabase (15/07/2026)
 
-Discussion avec Laurent en fin de session, en réaction directe au chantier
-marche-course (§15) qui vient d'être livré — plusieurs de ces points
-remettent en cause des choix faits dans ce chantier (notamment le
-rattachement du grand-débutant au plan course plutôt qu'au Mode Forme).
-Volontairement non codé cette session : recueilli et discuté, pas encore
-implémenté. Laurent a nommé cet ensemble "v2.8".
+Chantier démarré en fin de session du 14/07 (recueil de 8 points avec
+Laurent, alors non codé) et implémenté le 15/07/2026. Périmètre initial
+en §17 (désormais historique, voir sous-sections ci-dessous pour l'état
+réel implémenté) : refonte du grand-débutant, paliers de durée, séances
+marche-course sur Strava, blocage séances futures, wizard sans données de
+profil, navigation par flèches, suggestion de changement de niveau.
 
-### 17.1 Grand débutant → rattaché au Mode Forme, pas un niveau du plan course
+**Fait dans cette session** (17.1, 17.7 partiellement, 17.9 nouveau,
+plus plusieurs bugs de fiabilité découverts en testant) : voir §17.1 à
+§17.11 ci-dessous. **Pas encore fait** : 17.2 (déjà réglé par 17.1),
+17.4 (blocage séances futures), 17.5 (paliers de durée continue — encore
+sur l'ancien système ratio course/marche), 17.6 (flèches de navigation),
+17.8 (suggestion de changement de niveau).
 
-Revient sur le choix du §15 (niveau `grand-debutant` dans
-`plan-generator.js`, aux côtés de debutant/intermediaire/confirme). Le
-Mode Forme (`plan-forme.js`, §12) a déjà la bonne philosophie pour ce
-public : pas de date de course, cycle glissant, pas de pression
-d'échéance — plus cohérent qu'un wizard "plan course" avec des steps
-sautés artificiellement (§15.3). Implique de défaire une partie du
-rattachement fait en §15 et de le refaire côté `plan-forme.js`.
+### 17.1 Grand débutant rattaché au Mode Forme — FAIT
 
-### 17.2 Pas de phases (Construction/Spécifique/Affûtage) pour le grand débutant
+Revient sur le choix initial du chantier marche-course (v2.0, alors dans
+`plan-generator.js`). `generatePlanFormeMarcheCourse` (nouveau, dans
+`plan-forme.js`) génère le plan grand-débutant en bloc glissant de 4
+semaines (`TAILLE_BLOC_SEMAINES`, cohérent avec le Mode Forme classique
+— pas une durée fixe à l'avance). `generatePlanMarcheCourse` et son
+court-circuit dans `generatePlan()` (plan-generator.js) ont été retirés
+— redondants. Restent dans `plan-generator.js`, réutilisés par
+`plan-forme.js` : `nbQualiteFor`, `placerSemaine` (cas grand-debutant),
+`PALIERS_MARCHE_COURSE`, `genererContenuMarcheCourse`,
+`palierMarcheCourseFor`, `analyserProgressionMarcheCourse` (adaptée pour
+lire `plan.mode === 'forme' && plan.sousMode === 'marche-course'` au lieu
+de l'ancien `plan.profilOrigine`).
 
-Déjà vrai par construction une fois rattaché au Mode Forme (qui n'a pas
-ces phases) — ce point se règle automatiquement via 17.1, pas de
-traitement séparé nécessaire.
+### 17.7 (partiel) Niveau retiré du wizard, profil unifié — FAIT
 
-### 17.3 Séances marche-course programmables sur la montre via Strava
+- `profilCoureur.niveau` ajouté (4 valeurs : `grand-debutant`,
+  `debutant`, `intermediaire`, `confirme`) — sélecteur dédié dans
+  Réglages (grille 2×2), plus dans le wizard.
+- Écran d'onboarding (`monterEcranOnboarding`, auth.js) affiché une
+  seule fois après connexion si `profilCoureur.niveau` est vide — année
+  de naissance, FC max, niveau (avec "Je n'ai jamais couru" en option).
+  Sync Supabase explicite (le mécanisme `save()` habituel n'est pas
+  encore défini à ce stade du chargement).
+- Champs année de naissance / FC max retirés des deux wizards (course et
+  forme) — lus depuis `lk_profil_coureur` au lieu de champs de saisie.
+- **"Grand débutant" est une valeur du niveau (profil), pas un choix du
+  wizard forme** — correction en cours de session : d'abord envisagé
+  comme option dans le wizard Mode Forme, finalement placé dans le
+  sélecteur de Réglages comme les 3 autres niveaux, pour cohérence.
 
-Comme pour les séances qualité existantes (mécanisme déjà en place
-depuis le 8 juillet — détection des laps Strava par alternance
-positionnelle effort/récupération, cf. chantier "v2.0 streams" clos) :
-le coureur programme échauffement/intervalles/RAC directement sur sa
-montre, part courir, l'app récupère l'activité Strava correspondante et
-l'affiche — plutôt qu'un texte descriptif sans lien avec ce qui s'est
-réellement passé. Objectif annoncé par Laurent : motivant, et prépare
-le coureur au even réflexe qu'il gardera sur les vraies séances qualité
-plus tard. Réutilise un mécanisme existant, ne part pas de zéro.
+### 17.9 Écran dédié grand débutant, onboarding → wizard direct — FAIT (nouveau, pas dans le recueil initial)
 
-### 17.4 Blocage de validation des séances futures (tous modes)
+- Nouvel écran `wizard-grand-debutant-contenu` (`v2/index.html`) :
+  volontairement minimal — jours disponibles + invitation Strava
+  (optionnelle) + bouton "Générer mon plan". Pas de volume actuel, pas
+  de temps de référence, pas d'accent : aucun de ces champs n'a de sens
+  pour ce profil.
+  - `renderDaysGrandDebutant` persiste la sélection de jours en
+    sessionStorage (survit au reload forcé par le retour Strava).
+  - `rafraichirBlocStravaGrandDebutant` affiche l'état connecté/non
+    connecté, rappelée après capture du token (bug corrigé, voir §17.10).
+- Redirection automatique depuis l'onboarding
+  (`index.html?...` → `/v2?onboarding=grand-debutant`) si le niveau
+  choisi est grand-débutant — court-circuite l'écran de choix
+  course/forme, un grand débutant ne peut de toute façon créer qu'un
+  plan Forme (`bloquerCourseSiGrandDebutant`, grise "Objectif course").
+  Le flag survit au reload OAuth Strava via sessionStorage
+  (`v2_onboarding_grand_debutant`), nettoyé une fois le plan généré.
+- **Un seul plan actif à la fois pour un grand débutant** (décision de
+  Laurent, 15/07/2026) : la carte "Créer un nouveau plan" est grisée
+  tant qu'un plan grand-débutant est déjà actif — aucun nouveau plan
+  (ni un autre grand-débutant, ni forme, ni course) tant que celui-ci
+  n'est pas clôturé. Vérifié dans `initialiserApresChargementEngine`.
+- **Transition à 30min de course continue** : bannière "🏆 Tu cours en
+  continu !" (déjà présente depuis le chantier initial) — le clic sur
+  "Configurer mon prochain plan" clôture maintenant le plan (fixe
+  `dateCloture` à aujourd'hui via `cloturerPlanSupabase`) AVANT de
+  rediriger vers `/v2`, sinon le garde-fou anti-chevauchement (§17.11)
+  bloquait la création du plan suivant.
 
-Point général, pas spécifique au marche-course : aujourd'hui rien
-n'empêche de valider (✅/❌/⚠️) une séance dont la date n'est pas encore
-arrivée. Décision de Laurent : blocage complet (bouton désactivé/
-invisible), pas un simple avertissement. Touche le cycle de statut au
-clic (`SOPTS`, cf. §15.5) sur tous les modes (course, forme, et le futur
-marche-course une fois migré en 17.1).
+### 17.10 Bugs corrigés en testant le flow grand-débutant (Strava, reload)
 
-### 17.5 Refonte des objectifs du grand débutant : paliers de durée continue
+Plusieurs bugs découverts en testant le retour OAuth Strava depuis
+l'écran dédié — tous liés au `window.location.reload()` forcé par
+`capterRetourStravaOAuth()` (contournement d'un bug de rendu
+Android/PWA) qui interrompt l'exécution en cours :
 
-Revient sur `PALIERS_MARCHE_COURSE` (§15.1, ratio course/marche) : les
-objectifs proposés au coureur deviennent des **paliers de durée de
-course continue croissants, de 5 à 30 minutes** (pas un ratio abstrait
-course/marche affiché comme objectif). Décisions actées avec Laurent :
-- **Validation manuelle par le coureur**, pas automatique (contrairement
-  au seuil de 2 séances codé en §15.1 via `palierMarcheCourseFor`) — le
-  coureur décide lui-même quand il se sent prêt à passer au palier
-  suivant, pas de détection algorithmique du seuil.
-- Les séances adaptatives (le contenu généré) doivent évoluer en
-  fonction du palier de durée validé.
-- Le coach (messages contextuels, cf. Mode Forme §12) doit avoir un ton
-  spécifiquement encourageant pour ce profil.
-- **Clôture à 30 minutes** : une fois ce palier validé, le coureur
-  n'est plus considéré "grand débutant" — le plan se clôture et l'app
-  lui propose explicitement de lancer un nouveau plan, soit en mode
-  course soit en Mode Forme, niveau debutant. Pas de suite automatique
-  en marche-course (contrairement à la mécanique actuelle du §15.4 qui
-  ne fait que proposer, sans clôturer).
+- Le nettoyage d'URL du flag `?onboarding=grand-debutant`
+  (`history.replaceState`) effaçait TOUTE l'URL, y compris les tokens
+  Strava présents dans la même URL au retour du callback — corrigé pour
+  ne retirer que ce paramètre précis (`URLSearchParams.delete`), jamais
+  toute l'URL.
+- `rafraichirBlocStravaGrandDebutant()` n'était appelée qu'au tout
+  premier affichage de l'écran, jamais après le reload du retour Strava
+  — le bouton "Connecter Strava" restait affiché malgré une connexion
+  réussie côté serveur. Corrigé : rappelée explicitement dans
+  `initialiserApresChargementEngine` une fois le token capté.
+- Sélection de jours réinitialisée à chaque reload (valeurs par
+  défaut) — persistée en sessionStorage.
 
-### 17.6 Wizard : navigation par flèches en haut, plus de bouton "Continuer"
+### 17.11 Bug majeur : Supabase silencieusement absent du chemin de sauvegarde principal — FAIT (corrigé)
 
-Les flèches de navigation (précédent/suivant) se placent au niveau de
-l'indicateur d'étape en haut de l'écran (zone "ÉTAPE N", cf. §15.3) et
-**remplacent** le bouton "Continuer" en bas — pas une coexistence des
-deux. Simplifie l'écran, touche tous les steps du wizard (pas
-spécifique au grand débutant).
+Découvert en testant la génération d'un plan grand-débutant sans token
+GitHub configuré (Laurent l'a volontairement retiré, décision
+antérieure à cette session) :
 
-### 17.7 Données de profil retirées du wizard → Réglages / Profil uniquement
+- `nextStep()` (wizard, bouton "Terminer") ne tentait la sauvegarde
+  QUE si un token GitHub (Gist) était présent — sans lui, **aucun plan
+  n'était plus jamais sauvegardé du tout**, tous wizards confondus (pas
+  spécifique au grand-débutant), malgré Supabase déjà en place depuis
+  le chantier v2.5 (13/07). Inversé : `assurerPlanExiste` (Supabase)
+  devient le mécanisme PRINCIPAL et bloquant ; Gist devient secondaire
+  et best-effort (tenté seulement si un token existe encore).
+- `chargerPlans()` (Gist) sans token retourne toujours `[]` — le
+  dashboard (`index.html`) et `afficherPlansSauvegardes` (wizard)
+  utilisaient encore ce seul chemin pour lister "mes plans". Aucune
+  fonction Supabase équivalente n'existait (`assurerPlanExiste` ne fait
+  que créer/vérifier UN plan, jamais lister). Nouvelle fonction
+  `chargerPlansSupabase(userId)` (sync-storage.js + classic), utilisée
+  en priorité partout où `chargerPlans()` l'était.
+- **Garde-fou anti-chevauchement silencieusement contourné** : la
+  logique existante (`trouverPlanEnConflit`, `datesChevauchent`,
+  `dateFinPeriodeActive` — gist-sync.js) n'était appelée que dans
+  `sauvegarderPlan()` (Gist), jamais dans `assurerPlanExiste()`
+  (Supabase). Depuis le basculement vers Supabase comme mécanisme
+  principal, plus aucun contrôle de chevauchement n'avait lieu, pour
+  tous les modes. Réactivé : `assurerPlanExiste` importe et applique
+  `trouverPlanEnConflit` avant toute insertion, relance une erreur
+  explicite en cas de conflit (remonte jusqu'à l'utilisateur via
+  `nextStep()`).
+- `assurerPlanExiste` ne fait jamais de mise à jour (juste "créer si
+  absent") — insuffisant pour clôturer ou renommer un plan déjà
+  existant. Nouvelle fonction `mettreAJourPlanSupabase(planId,
+  planBrutComplet)` (remplace intégralement `plan_brut`, met aussi à
+  jour la colonne `nom` dénormalisée) ; `cloturerPlanSupabase` conservée
+  pour le cas simple (clôture seule, sans renommage — utilisée par la
+  bannière grand-débutant).
 
-Les champs de profil (année de naissance, FC max, et **le niveau du
-coureur** — décision confirmée par Laurent, pas seulement les données
-physiques) ne doivent plus être saisissables/modifiables depuis le
-wizard course/forme. Ils vivent uniquement dans Réglages → Profil
-(la structure `profilCoureur` / `lk_profil_coureur` existe déjà depuis
-la v2.3, cf. inventaire section correspondante — il s'agit d'aller plus
-loin que le pré-remplissage actuel du wizard, en retirant carrément ces
-champs de cet écran).
+### 17.12 Écran d'accueil du wizard : Consulter / Créer — FAIT (nouveau, pas dans le recueil initial)
 
-Implication sur le parcours de création de compte (v2.5, auth
-Supabase) : comme ces données ne seront plus jamais demandées dans le
-wizard, il faut un autre moment de collecte, sinon un nouveau compte
-n'aura ni FC max ni niveau tant qu'il n'ira pas volontairement dans
-Réglages. Décision de Laurent : **ajouter une étape de profil dédiée
-juste après la création de compte**, avant le tout premier wizard
-course/forme — pas de collecte optionnelle a posteriori (bandeau
-incitatif), une vraie étape d'onboarding.
+Demandé par Laurent après avoir testé le nouvel écran de liste de
+plans : séparer clairement "consulter" de "créer", plutôt que la liste
+en petit au-dessus du choix de mode.
 
-### 17.8 Suggestion automatique de changement de niveau
+- Nouvel écran `accueil-wizard-contenu` (deux cartes : "Consulter un
+  plan existant" / "Créer un nouveau plan"), affiché en premier. Si
+  aucun plan n'existe (nouveau compte), saute automatiquement à
+  `choix-mode-contenu` — rien à consulter.
+- Nouvel écran `consultation-plans-contenu` : liste des plans
+  (`resPlansSauvegardesConsultation`), reprend `afficherPlansSauvegardes`
+  tel quel, juste déplacé de son ancien emplacement.
+- Bug trouvé et corrigé le jour même : `choix-mode-contenu` n'avait pas
+  `display:none` par défaut (c'était l'écran affiché en premier avant
+  ce changement) — les deux écrans restaient visibles superposés tant
+  que ce style par défaut manquait.
+- Titre des plans dans la liste agrandi (16px, style dédié) — l'ancien
+  style `.bib-row .k` (13px) était trop discret pour un usage de titre
+  principal, conçu à l'origine pour un contexte différent.
 
-Nouvelle idée, ouverte pendant la discussion (pas demandée initialement
-par Laurent, proposée par Claude puis affinée avec lui) :
+### 17.13 Nommage automatique des plans Mode Forme — FAIT (nouveau, pas dans le recueil initial)
 
-- **Dans les deux sens** (monter ET descendre) — décision de Laurent
-  malgré la proposition initiale de Claude d'envisager uniquement la
-  hausse ; l'argument retenu est qu'un coureur en difficulté constante
-  sur un niveau trop ambitieux mérite le même accompagnement qu'un
-  coureur prêt à monter, cohérent avec l'esprit "ne pas décourager"
-  déjà présent ailleurs (progression douce v2.2, garde-fou marche-course
-  §15.1).
-- **Déclenchement après plusieurs PLANS TERMINÉS**, pas en cours de
-  plan — décision explicite de Laurent (Claude avait d'abord proposé
-  "tendance sur plusieurs semaines" à l'intérieur d'un même plan, jugé
-  trop bruité par les variations naturelles d'un cycle course : fatigue
-  de fin de cycle, affûtage, forme du moment). Le moment naturel pour se
-  poser la question est donc à la fin d'un plan / au début du suivant.
-- **Critères envisagés, encore à concevoir en détail** — Laurent a
-  proposé kilométrage et assiduité en plus des pistes initiales de
-  Claude (taux de réussite/échec sur séances qualité/longue, allures
-  réelles vs attendues) :
-  - Difficulté perçue : ratio de séances ✅/❌/⚠️ sur plusieurs plans
-  - Performance réelle : allures tenues vs attendues pour le niveau
-  - Volume : km réels (Strava) vs volume théorique du niveau déclaré
-  - Assiduité : taux de séances faites vs sautées/non renseignées
-  - **Décision de principe actée** : "ça devrait être un tout" (Laurent)
-    — un seul jugement d'ensemble combinant les 4 axes, pas plusieurs
-    signaux indépendants pouvant chacun déclencher une suggestion (même
-    logique que "une seule bannière d'adaptation" déjà retenue pour
-    l'ACWR, §33). La mécanique exacte de combinaison (score composite ?
-    règle à faisceau d'indices ?) reste à concevoir — probablement avec
-    la même rigueur que l'ACWR : validation manuelle sur les vraies
-    données Strava de Laurent avant tout codage.
-- Question encore ouverte, non tranchée : coupler ou non ce mécanisme
-  avec l'ACWR une fois ce chantier-ci terminé.
+Demandé par Laurent après avoir vu des plans Forme nommés "Plan"
+(repli générique, `distance`/`objectif` étant `undefined` pour ce
+mode) :
+
+- `nommerPlanForme(plan)` (v2/index.html) : `"Mode forme — depuis le
+  20 juil. 2026"` ou `"Marche-course — depuis le 20 juil. 2026"`
+  (grand-débutant) ; avec date de clôture si elle existe :
+  `"... — 20 juil. au 15 sept. 2026"`. Appliquée à la création
+  (`genererPlanFormeUI`, `genererPlanGrandDebutantUI`).
+- Renommage automatique a posteriori lors d'une clôture manuelle
+  (Réglages, `index.html`) : si le nom actuel correspond au pattern
+  auto-généré (`/^(Mode forme|Marche-course) —/`), il est recalculé
+  avec la nouvelle date de clôture — persisté via
+  `mettreAJourPlanSupabase`. Ne touche jamais un nom personnalisé par
+  Laurent (pattern non reconnu → pas de renommage automatique).
+- **Renommage manuel retiré pour tous les plans Mode Forme** (décision
+  de Laurent, 15/07/2026) : le bouton ✏️ n'apparaît plus dans la liste
+  que pour les plans course — un nom Mode Forme reste TOUJOURS
+  synchronisé avec les vraies dates, jamais éditable à la main (éviterait
+  une désynchronisation durable entre le nom affiché et la réalité du
+  plan).
+
+### 17.14 Suppression de compte — FAIT (nouveau, pas dans le recueil initial)
+
+Demandé par Laurent pour pouvoir retester le flow d'inscription/
+onboarding sans accumuler de comptes de test.
+
+- `api/delete-account.js` : route serverless, appelle l'Admin API
+  Supabase (`SUPABASE_SERVICE_ROLE_KEY`, nouvelle variable
+  d'environnement Vercel — clé "service_role", jamais exposée côté
+  client). Vérifie le token d'accès fourni (jamais un userId confié par
+  le client) avant de supprimer.
+- Lien "Supprimer mon compte" dans l'écran de connexion (mode connexion
+  uniquement) — redemande email + mot de passe avant suppression
+  (double confirmation implicite), `confirm()` JS en plus.
+- Bug de routage trouvé et corrigé le jour même : `vercel.json`
+  n'avait pas d'entrée pour `/api/delete-account` — 404 ("The page
+  could not be found"), la requête n'atteignait jamais le serveur.
+- Testé et validé : compte + toutes ses données (profiles/plans/
+  integrations) bien supprimés côté Supabase, confirmé par Laurent
+  directement dans le dashboard Supabase.
+
+### 17.15 Bug corrigé indépendamment : synchro Strava cassée après rebranding
+
+Repéré et corrigé en tout début de session, avant le chantier v2.8
+lui-même — mismatch entre le nouveau domaine Vercel auto-généré
+(`yoria-running.vercel.app`, apparu après le renommage du repo
+plan-10k → yoria) et l'Authorization Callback Domain configuré côté
+Strava (qui n'autorisait que l'ancien `plan-10k-alpha.vercel.app`).
+Corrigé par Laurent directement dans les paramètres Strava. Point de
+vigilance conservé : si le domaine change encore, la même erreur
+réapparaîtra.
+
+### 17.16 Reste à faire (v2.8, prochaine session)
+
+- **17.4** Blocage de validation des séances futures (tous modes) —
+  pas commencé.
+- **17.5** Refonte des objectifs marche-course en paliers de durée
+  continue (5→30min), validation manuelle par le coureur — le moteur
+  utilise encore l'ancien système de ratio course/marche
+  (`PALIERS_MARCHE_COURSE`) avec validation par seuil de séances
+  automatique (`palierMarcheCourseFor`), pas la logique décidée en fin
+  de session précédente (validation manuelle, coach encourageant).
+- **17.6** Navigation par flèches en haut du wizard (remplace le
+  bouton "Continuer" en bas) — pas commencé.
+- **17.8** Suggestion automatique de changement de niveau (après
+  plusieurs plans terminés, sur un jugement combinant difficulté/
+  performance/volume/assiduité) — pas commencé, conception à affiner.
+- **Tests réels supplémentaires** sur l'app déployée — le flow complet
+  grand-débutant (onboarding → wizard → Strava → génération →
+  consultation → progression de palier → clôture → transition) a été
+  testé et corrigé en plusieurs itérations cette session, mais la
+  progression de palier elle-même (bouton "Palier suivant") n'a pas
+  encore été testée en conditions réelles.
+- Fichier de test formel pour `plan-forme.js`/marche-course — les tests
+  actuels restent des scripts manuels non committés (`test-forme-mc.mjs`,
+  etc., supprimés après usage).
