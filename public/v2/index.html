@@ -1712,11 +1712,22 @@
   }
 
   function renderResults(plan){
-    // Marche-course (grand débutant, 14/07/2026) : pas d'allures, pas de
-    // zoneFC établie (aucune allure course fiable à ce stade), affichage
-    // dédié et sortie anticipée — même logique que le court-circuit
-    // Mode Forme ci-dessous, mais encore plus minimal.
-    if (plan.mode === 'marche-course') {
+    // Marche-course (grand débutant) : pas d'allures, pas de zoneFC établie
+    // (aucune allure course fiable à ce stade), affichage dédié et sortie
+    // anticipée — même logique que le court-circuit Mode Forme ci-dessous,
+    // mais encore plus minimal.
+    //
+    // BUG corrigé le 15/07/2026 : cette condition testait plan.mode ===
+    // 'marche-course', qui ne correspond plus au format réel depuis que
+    // generatePlanFormeMarcheCourse (plan-forme.js, v2.8 §17.1) expose
+    // mode:'forme' + sousMode:'marche-course' — jamais mode:'marche-course'
+    // seul (c'était l'ancien format, retiré de plan-generator.js le même
+    // jour). Résultat : cette branche ne se déclenchait jamais, le plan
+    // tombait dans le chemin Mode Forme classique plus bas, qui plante sur
+    // Object.entries(plan.allures) quand plan.allures est null — d'où le
+    // bouton "Générer" qui semblait ne rien faire (erreur JS silencieuse,
+    // aucun catch autour de renderResults()).
+    if (plan.mode === 'forme' && plan.sousMode === 'marche-course') {
       document.getElementById('resultsAmpleur').textContent =
         `Marche-course — palier de départ : "${Engine.PALIERS_MARCHE_COURSE[plan.palierMarcheCourse]?.label ?? ''}" — ${plan.warnings.length} avertissement(s).`;
       document.getElementById('resultsWarnCount').textContent = `${plan.warnings.length} alerte(s)`;
@@ -2971,9 +2982,19 @@
   }
 
   // ── Écran dédié grand débutant — v2.8 (§17.9) ──────────────────────────
+  //
+  // BUG corrigé le 15/07/2026 : la sélection de jours repartait toujours
+  // aux valeurs par défaut (Lun/Mer/Ven) après le retour Strava, puisque
+  // celui-ci force un window.location.reload() (cf. capterRetourStravaOAuth)
+  // et que renderDaysGrandDebutant() reconstruit la grille from scratch à
+  // chaque appel. Persisté en sessionStorage (même logique que
+  // v2_onboarding_grand_debutant) — survit au reload, nettoyé une fois le
+  // plan généré.
   function renderDaysGrandDebutant() {
     const days = ['L','M','M','J','V','S','D'];
-    const selectedDefault = [1,3,5];
+    let selectionSauvee;
+    try { selectionSauvee = JSON.parse(sessionStorage.getItem('v2_gd_jours_selectionnes')); } catch { selectionSauvee = null; }
+    const selectedDefault = Array.isArray(selectionSauvee) ? selectionSauvee : [1,3,5];
     const grid = document.getElementById('daysGridGrandDebutant');
     grid.innerHTML = '';
     days.forEach((d,i)=>{
@@ -2981,7 +3002,12 @@
       el.className = 'day' + (selectedDefault.includes(i) ? ' selected' : '');
       el.dataset.dayIndex = i;
       el.innerHTML = `<span class="d">${d}</span><span>●</span>`;
-      el.onclick = () => { el.classList.toggle('selected'); updateDayCountGrandDebutant(); };
+      el.onclick = () => {
+        el.classList.toggle('selected');
+        updateDayCountGrandDebutant();
+        const jours = [...document.querySelectorAll('#daysGridGrandDebutant .day.selected')].map(e => parseInt(e.dataset.dayIndex));
+        sessionStorage.setItem('v2_gd_jours_selectionnes', JSON.stringify(jours));
+      };
       grid.appendChild(el);
     });
     updateDayCountGrandDebutant();
@@ -3028,6 +3054,7 @@
       return;
     }
     sessionStorage.removeItem('v2_onboarding_grand_debutant'); // flow terminé, cf. rediriger_si_onboarding_grand_debutant
+    sessionStorage.removeItem('v2_gd_jours_selectionnes');
     plan.id = (window.crypto?.randomUUID) ? crypto.randomUUID() : ('plan-grand-debutant-' + Date.now());
     plan.statuses = plan.statuses || {};
     plan.profilOrigine = profil;
