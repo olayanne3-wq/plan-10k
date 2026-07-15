@@ -305,7 +305,6 @@
             <label>Ton niveau</label>
             <div id="onb-niveaux"></div>
             <button class="btn-principal" id="onb-valider" disabled>Valider</button>
-            <button class="lien-secondaire" id="onb-passer">Passer pour l'instant</button>
           </div>
         </div>
       `;
@@ -330,19 +329,25 @@
       rafraichirNiveaux();
       if (niveauChoisi) validerBtn.disabled = false;
 
-      function terminer(avecNiveau) {
+      // Le choix du niveau est obligatoire (v2.9, 15/07/2026) — un profil
+      // avec niveau:null redéclenchait cet écran à l'infini à chaque
+      // connexion, le bouton "Passer pour l'instant" permettait justement
+      // d'arriver à cet état. Retiré : le bouton Valider reste désactivé
+      // tant qu'aucune option de niveau n'est cliquée (cf.
+      // rafraichirNiveaux plus haut), donc terminer() n'est plus jamais
+      // appelée sans un niveauChoisi valide.
+      function terminer() {
         hote.querySelector('#ecran-onboarding').style.display = 'none';
         const annee = parseInt(hote.querySelector('#onb-annee').value) || profilExistant.anneeNaissance || null;
         const fcmax = parseInt(hote.querySelector('#onb-fcmax').value) || profilExistant.fcMax || 181;
         resolve({
           anneeNaissance: annee,
           fcMax: fcmax,
-          niveau: avecNiveau ? niveauChoisi : (profilExistant.niveau || null)
+          niveau: niveauChoisi
         });
       }
 
-      validerBtn.addEventListener('click', function () { terminer(true); });
-      hote.querySelector('#onb-passer').addEventListener('click', function () { terminer(false); });
+      validerBtn.addEventListener('click', terminer);
     });
   }
 
