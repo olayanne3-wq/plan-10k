@@ -241,10 +241,22 @@ input[type=text], input[type=number], input[type=password] {
     }
 
     if (!planBrut) {
-      // Repli : aucun plan trouvé dans le Gist (première utilisation, pas
-      // de token configuré, ou erreur réseau) — génère un plan par défaut
-      // avec les paramètres historiques de Laurent, pour ne jamais laisser
-      // un écran vide.
+      // Repli : aucun plan trouvé (Supabase ET Gist vides — compte neuf,
+      // tous les plans supprimés, ou pas encore de token configuré). Un
+      // plan minimal est quand même généré pour que PLAN/ALL_SESSIONS et
+      // les nombreuses lectures directes de window.__PLAN_BRUT__.* dans ce
+      // fichier (paramsOrigine, semaines, etc.) restent toutes valides sans
+      // vérification de nullité partout — mais il est marqué
+      // estPlanRepli:true, lu par renderDashboard() pour afficher un vrai
+      // état "Aucun plan en cours" plutôt que ce contenu factice.
+      //
+      // BUG CORRIGÉ (15/07/2026, signalé par Laurent) : avant ce correctif,
+      // ce plan par défaut (paramètres historiques de Laurent, "10 km
+      // Gem'Aubagne") s'affichait tel quel comme un vrai plan actif dès que
+      // la liste de plans était vide — trompeur, en particulier après une
+      // purge de compte légitime (cf. correctif sécurité déconnexion) où
+      // "aucun plan" est un état parfaitement normal à afficher clairement,
+      // pas à masquer derrière un plan qui n'a jamais existé pour ce compte.
       planBrut = generatePlan(
         { niveau: 'intermediaire', joursDisponiblesHabituels: [1,2,3,4,5,6], renforcementMusculaire: true, fcMaxConnue: 181 },
         { distance: '10K', refDistance: '10K', tempsReference: '50:21', objectif: '48:30', dateDebut: '2026-06-22', dateCourse: '2026-09-06', volumeActuel: 30, contraintesPonctuelles: [], raceName: "10 km Gem'Aubagne", raceLocation: 'Aubagne', raceUrl: 'https://new.sportsnconnect.com/client/events/4qa4QCJ1DtZYPSzSCbjJJK-5-and-10-km-gemaubagne' }
@@ -262,6 +274,7 @@ input[type=text], input[type=number], input[type=password] {
       // que ce plan de repli garde toujours la même clé d'une session à
       // l'autre) évite ce retour silencieux vers l'ancienne clé globale.
       planBrut.id = 'plan-repli-defaut';
+      planBrut.estPlanRepli = true;
     }
 
     window.__PLAN_BRUT__ = planBrut;
@@ -1912,6 +1925,37 @@ function renderSelecteurPlan() {
 }
 
 function renderDashboard() {
+  // État vide réel — aucun plan trouvé pour ce compte (Supabase et Gist
+  // tous deux vides), cf. window.__PLAN_PRET__ plus haut dans ce fichier.
+  // BUG CORRIGÉ (15/07/2026, signalé par Laurent) : avant ce correctif, le
+  // plan de repli factice (paramètres historiques de Laurent, jamais
+  // rattaché à aucun compte réel) s'affichait tel quel comme si c'était un
+  // vrai plan actif — trompeur, en particulier juste après une purge de
+  // compte légitime (correctif sécurité déconnexion) où "aucun plan" est
+  // l'état normal et attendu à afficher clairement.
+  if (window.__PLAN_BRUT__?.estPlanRepli) {
+    const hdrVide = el("div",{style:{display:"flex",alignItems:"center",gap:"8px",padding:"12px 0 10px",marginBottom:"12px",borderBottom:"1px solid var(--border)"}},
+      runByLeaIcon(24,6),
+      el("div",{style:{color:"var(--text)",fontSize:"16px",fontWeight:"800"}},"Yoria")
+    );
+    const contenuVide = el("div",{style:{textAlign:"center",padding:"48px 16px"}},
+      el("div",{style:{fontSize:"40px",marginBottom:"12px"}},"🗓️"),
+      el("div",{style:{color:"var(--text)",fontSize:"17px",fontWeight:"700",marginBottom:"6px"}},"Aucun plan en cours"),
+      el("div",{class:"muted",style:{fontSize:"14px",marginBottom:"20px",lineHeight:"1.5"}},"Crée un plan d'entraînement pour commencer — objectif course ou mode forme."),
+      el("a",{href:"/v2",style:{
+        display:"inline-block",textAlign:"center",
+        background:"var(--accent)",border:"none",borderRadius:"8px",
+        padding:"11px 22px",color:"var(--bg)",fontSize:"15px",fontWeight:"700",
+        textDecoration:"none",cursor:"pointer"
+      }},"🏁 Créer un plan")
+    );
+    const wrapperVide = document.createElement("div");
+    wrapperVide.style.cssText = "padding:0 16px 100px;";
+    wrapperVide.appendChild(hdrVide);
+    wrapperVide.appendChild(contenuVide);
+    return wrapperVide;
+  }
+
   const cw=currentWeek(), cd=countdown(), gp=globalPct();
   const done=ALL_SESSIONS.filter(s=>statuses[s.uid]==="✅").length;
   const missed=ALL_SESSIONS.filter(s=>statuses[s.uid]==="❌").length;
@@ -5779,20 +5823,30 @@ function render() {
   const app=document.getElementById("app");
   app.innerHTML="";
 
+  // Garde-fou global — aucun plan réel pour ce compte (estPlanRepli) :
+  // toute vue qui afficherait le contenu du plan factice (semaines, stats,
+  // course...) retombe sur le dashboard, qui affiche le vrai état "Aucun
+  // plan en cours" (cf. renderDashboard). Paramètres reste toujours
+  // accessible (ex. pour se déconnecter) même sans plan. Ajouté le
+  // 15/07/2026 avec le correctif du plan de repli factice. Calculé tôt
+  // (avant header/titre/nav) pour que tout l'affichage reste cohérent avec
+  // la vue réellement rendue, pas seulement le contenu principal.
+  const vueEffective = (window.__PLAN_BRUT__?.estPlanRepli && view !== "settings") ? "dashboard" : view;
+
   // Header uniquement pour les vues secondaires (pas le dashboard)
-  const backBtn=view==="weekDetail"
+  const backBtn=vueEffective==="weekDetail"
     ?el("button",{style:{background:"none",border:"none",color:"var(--accent)",fontSize:"22px",cursor:"pointer",padding:"0",lineHeight:"1",marginRight:"4px"},onClick:()=>setView("weeks")},"‹")
-    :view==="help"
+    :vueEffective==="help"
     ?el("button",{style:{background:"none",border:"none",color:"var(--accent)",fontSize:"22px",cursor:"pointer",padding:"0",lineHeight:"1",marginRight:"4px"},onClick:()=>setView("dashboard")},"‹")
     :null;
 
   const titles={weeks:"Semaines",weekDetail:"Semaine "+selectedWeek,stats:"Stats",settings:"Paramètres",course:"Course",help:"Aide"};
-  const hdr = view==="dashboard" ? null : el("div",{style:{position:"sticky",top:"0",zIndex:"10",background:"rgba(var(--bg-rgb),0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid var(--border)",padding:"12px 16px 10px",display:"flex",alignItems:"center",gap:"8px"}},
+  const hdr = vueEffective==="dashboard" ? null : el("div",{style:{position:"sticky",top:"0",zIndex:"10",background:"rgba(var(--bg-rgb),0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid var(--border)",padding:"12px 16px 10px",display:"flex",alignItems:"center",gap:"8px"}},
     backBtn||"",
     runByLeaIcon(24, 6),
     el("div",{style:{flex:"1"}},
-      el("div",{style:{color:"var(--text)",fontSize:"17px",fontWeight:"700",lineHeight:"1"}},titles[view]||""),
-      view==="weekDetail"?el("div",{class:"muted",style:{fontSize:"13px",marginTop:"1px"}},phaseOf(selectedWeek).label):null
+      el("div",{style:{color:"var(--text)",fontSize:"17px",fontWeight:"700",lineHeight:"1"}},titles[vueEffective]||""),
+      vueEffective==="weekDetail"?el("div",{class:"muted",style:{fontSize:"13px",marginTop:"1px"}},phaseOf(selectedWeek).label):null
     ),
     ESTMODEFORME ? null : el("div",{style:{background:"var(--border-soft)",borderRadius:"8px",padding:"4px 10px",color:"var(--accent)",fontSize:"15px",fontWeight:"700"}},"J–"+countdown())
   );
@@ -5801,13 +5855,13 @@ function render() {
   currentPred = predict10K();
 
   let content;
-  if (view==="dashboard") content=renderDashboard();
-  else if (view==="weeks") content=renderWeeks();
-  else if (view==="weekDetail") content=renderWeekDetail(selectedWeek);
-  else if (view==="stats") content=renderStats();
-  else if (view==="course" && !ESTMODEFORME) content=renderCourse();
-  else if (view==="course" && ESTMODEFORME) content=renderDashboard(); // repli : onglet Course n'existe pas en mode Forme
-  else if (view==="help") content=renderHelp();
+  if (vueEffective==="dashboard") content=renderDashboard();
+  else if (vueEffective==="weeks") content=renderWeeks();
+  else if (vueEffective==="weekDetail") content=renderWeekDetail(selectedWeek);
+  else if (vueEffective==="stats") content=renderStats();
+  else if (vueEffective==="course" && !ESTMODEFORME) content=renderCourse();
+  else if (vueEffective==="course" && ESTMODEFORME) content=renderDashboard(); // repli : onglet Course n'existe pas en mode Forme
+  else if (vueEffective==="help") content=renderHelp();
   else content=renderSettings();
 
   const NAV=[
@@ -5817,7 +5871,7 @@ function render() {
     ...(ESTMODEFORME ? [] : [{id:"course",   icon:"🏁",label:"Course"}]),
     {id:"settings", icon:"⚙️",label:"Paramètres"},
   ];
-  const activeNav=["dashboard","stats","settings","course","help"].includes(view)?view:"weeks";
+  const activeNav=["dashboard","stats","settings","course","help"].includes(vueEffective)?vueEffective:"weeks";
   const nav=el("div",{style:{position:"fixed",bottom:"0",left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:"430px",background:"rgba(var(--bg-rgb),0.97)",backdropFilter:"blur(16px)",borderTop:"1px solid var(--border)",display:"flex",zIndex:"20"}},
     ...NAV.map(n=>{
       const hasBadge = n.id==="dashboard" && (() => {
