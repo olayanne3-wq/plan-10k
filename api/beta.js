@@ -1,7 +1,4 @@
-const ALLOWED_PLATFORMS = new Set([
-  "android",
-  "iphone",
-]);
+const ALLOWED_PLATFORMS = new Set(["android", "iphone"]);
 
 const ALLOWED_LEVELS = new Set([
   "debutant",
@@ -19,7 +16,7 @@ const ALLOWED_DISTANCES = new Set([
   "debutant",
 ]);
 
-function normalizeText(value, maximumLength = 250) {
+function cleanText(value, maxLength = 250) {
   if (typeof value !== "string") {
     return "";
   }
@@ -27,19 +24,15 @@ function normalizeText(value, maximumLength = 250) {
   return value
     .trim()
     .replace(/\s+/g, " ")
-    .slice(0, maximumLength);
-}
-
-function normalizeEmail(value) {
-  return normalizeText(value, 254).toLowerCase();
+    .slice(0, maxLength);
 }
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function sendJson(response, status, payload) {
-  response.status(status).json(payload);
+function sendJson(response, status, data) {
+  return response.status(status).json(data);
 }
 
 export default async function handler(request, response) {
@@ -55,100 +48,64 @@ export default async function handler(request, response) {
   }
 
   const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceRoleKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
-    console.error(
-      "Configuration Supabase serveur absente.",
-    );
+    console.error("Variables Supabase manquantes.");
 
     return sendJson(response, 500, {
       success: false,
-      message:
-        "Le service est temporairement indisponible.",
+      message: "Le service est temporairement indisponible.",
     });
   }
 
-  const body = request.body ?? {};
+  const body = request.body || {};
 
-  // Champ invisible destiné aux robots.
-  if (normalizeText(body.website, 200)) {
+  // Champ invisible anti-robot.
+  if (cleanText(body.website, 200)) {
     return sendJson(response, 200, {
       success: true,
       message: "Candidature enregistrée.",
     });
   }
 
-  const firstName = normalizeText(
-    body.firstName,
-    80,
-  );
+  const firstName = cleanText(body.firstName, 80);
+  const email = cleanText(body.email, 254).toLowerCase();
+  const platform = cleanText(body.platform, 20);
+  const runningLevel = cleanText(body.runningLevel, 30);
+  const favoriteDistance = cleanText(body.favoriteDistance, 40);
+  const message = cleanText(body.message, 1500);
 
-  const email = normalizeEmail(body.email);
+  const runsPerWeek = Number(body.runsPerWeek);
+  const usesStrava = body.usesStrava === true;
+  const acceptsFeedback = body.acceptsFeedback === true;
+  const consent = body.consent === true;
 
-  const platform = normalizeText(
-    body.platform,
-    20,
-  );
-
-  const runningLevel = normalizeText(
-    body.runningLevel,
-    30,
-  );
-
-  const favoriteDistance = normalizeText(
-    body.favoriteDistance,
-    40,
-  );
-
-  const message = normalizeText(
-    body.message,
-    1500,
-  );
-
-  const runsPerWeek = Number(
-    body.runsPerWeek,
-  );
-
-  const usesStrava =
-    body.usesStrava === true;
-
-  const acceptsFeedback =
-    body.acceptsFeedback === true;
-
-  const consent =
-    body.consent === true;
-
-  if (!firstName || firstName.length < 2) {
+  if (firstName.length < 2) {
     return sendJson(response, 400, {
       success: false,
-      message:
-        "Le prénom est obligatoire.",
+      message: "Le prénom est obligatoire.",
     });
   }
 
   if (!isValidEmail(email)) {
     return sendJson(response, 400, {
       success: false,
-      message:
-        "L’adresse e-mail n’est pas valide.",
+      message: "L’adresse e-mail n’est pas valide.",
     });
   }
 
   if (!ALLOWED_PLATFORMS.has(platform)) {
     return sendJson(response, 400, {
       success: false,
-      message:
-        "La plateforme sélectionnée n’est pas valide.",
+      message: "Le téléphone sélectionné n’est pas valide.",
     });
   }
 
   if (!ALLOWED_LEVELS.has(runningLevel)) {
     return sendJson(response, 400, {
       success: false,
-      message:
-        "Le niveau sélectionné n’est pas valide.",
+      message: "Le niveau sélectionné n’est pas valide.",
     });
   }
 
@@ -159,28 +116,21 @@ export default async function handler(request, response) {
   ) {
     return sendJson(response, 400, {
       success: false,
-      message:
-        "Le nombre de sorties n’est pas valide.",
+      message: "Le nombre de sorties n’est pas valide.",
     });
   }
 
-  if (
-    !ALLOWED_DISTANCES.has(
-      favoriteDistance,
-    )
-  ) {
+  if (!ALLOWED_DISTANCES.has(favoriteDistance)) {
     return sendJson(response, 400, {
       success: false,
-      message:
-        "La distance sélectionnée n’est pas valide.",
+      message: "La distance sélectionnée n’est pas valide.",
     });
   }
 
   if (!consent) {
     return sendJson(response, 400, {
       success: false,
-      message:
-        "Le consentement est obligatoire.",
+      message: "Le consentement est obligatoire.",
     });
   }
 
@@ -195,75 +145,61 @@ export default async function handler(request, response) {
     accepts_feedback: acceptsFeedback,
     message: message || null,
     status: "pending",
-    consented_at:
-      new Date().toISOString(),
+    consented_at: new Date().toISOString(),
   };
 
   try {
-    const insertResponse = await fetch(
+    const supabaseResponse = await fetch(
       `${supabaseUrl}/rest/v1/beta_testers`,
       {
         method: "POST",
         headers: {
           apikey: serviceRoleKey,
-          Authorization:
-            `Bearer ${serviceRoleKey}`,
-          "Content-Type":
-            "application/json",
+          Authorization: `Bearer ${serviceRoleKey}`,
+          "Content-Type": "application/json",
           Prefer: "return=minimal",
         },
         body: JSON.stringify(candidate),
       },
     );
 
-    if (insertResponse.ok) {
+    if (supabaseResponse.ok) {
       return sendJson(response, 201, {
         success: true,
-        message:
-          "Merci ! Votre candidature a bien été enregistrée.",
+        message: "Merci ! Votre candidature a bien été enregistrée.",
       });
     }
 
-    const errorText =
-      await insertResponse.text();
+    const errorText = await supabaseResponse.text();
 
     if (
-      insertResponse.status === 409 ||
-      errorText.includes(
-        "beta_testers_email_unique",
-      ) ||
+      supabaseResponse.status === 409 ||
+      errorText.includes("beta_testers_email_unique") ||
       errorText.includes("duplicate key")
     ) {
       return sendJson(response, 409, {
         success: false,
-        code:
-          "EMAIL_ALREADY_REGISTERED",
-        message:
-          "Cette adresse e-mail est déjà inscrite à la bêta.",
+        code: "EMAIL_ALREADY_REGISTERED",
+        message: "Cette adresse e-mail est déjà inscrite à la bêta.",
       });
     }
 
     console.error(
-      "Erreur Supabase beta_testers :",
-      insertResponse.status,
+      "Erreur Supabase :",
+      supabaseResponse.status,
       errorText,
     );
 
     return sendJson(response, 500, {
       success: false,
-      message:
-        "La candidature n’a pas pu être enregistrée.",
+      message: "La candidature n’a pas pu être enregistrée.",
     });
   } catch (error) {
-    console.error(
-      "Erreur API beta :",
-      error,
-    );
+    console.error("Erreur API bêta :", error);
 
     return sendJson(response, 500, {
       success: false,
-      message:
-        "Une erreur technique est survenue.",
+      message: "Une erreur technique est survenue.",
     });
   }
 }
