@@ -156,6 +156,7 @@ input[type=text], input[type=number], input[type=password] {
      régénérer depuis les fichiers sources si le moteur évolue (cf.
      docs/v2-methodologie/convergence-v1-v2.md, section 5). -->
 <script src="/engine-classic-scripts/plan-generator.classic.js"></script>
+<script src="/engine-classic-scripts/plan-forme.classic.js"></script>
 <script src="/engine-classic-scripts/v1-bridge.classic.js"></script>
 <script src="/engine-classic-scripts/gist-sync.classic.js"></script>
 <script src="/engine-classic-scripts/weather.classic.js"></script>
@@ -2012,19 +2013,7 @@ function renderDashboard() {
         el("div",{style:{display:"flex",gap:"8px"}},
           el("button",{style:{flex:"1",background:"var(--accent2)",border:"none",borderRadius:"8px",padding:"9px",color:"#F8FAFC",fontSize:"14px",fontWeight:"700",cursor:"pointer"},
             feedback:true,
-            onClick:()=>{
-              window.__PLAN_BRUT__.profilOrigine.palierMarcheCourse = progression.palierId + 1;
-              const nouveauPlan = generatePlan(window.__PLAN_BRUT__.profilOrigine, window.__PLAN_BRUT__.paramsOrigine);
-              nouveauPlan.statuses = window.__PLAN_BRUT__.statuses;
-              window.__PLAN_BRUT__ = nouveauPlan;
-              window.__PLAN_GENERE__ = traduirePlanVersFormatV1(window.__PLAN_BRUT__);
-              PLAN = window.__PLAN_GENERE__;
-              ALL_SESSIONS = recalculerAllSessions();
-              if (getGithubToken && getGithubToken() && sauvegarderPlan) {
-                sauvegarderPlan(window.__PLAN_BRUT__).catch(e => console.warn("Palier changé localement, sauvegarde échouée :", e.message));
-              }
-              render();
-            }
+            onClick:async ()=>{ await changerPalierGrandDebutant(progression.palierId + 1); }
           },"Palier suivant"),
           el("button",{style:{flex:"1",background:"none",boxShadow:"0 1px 3px var(--shadow1), 0 1px 2px var(--shadow2)",borderRadius:"8px",padding:"9px",color:"var(--text-muted)",fontSize:"14px",fontWeight:"600",cursor:"pointer"},
             feedback:true,
@@ -2035,6 +2024,48 @@ function renderDashboard() {
           },"Continuer ce palier")
         )
       )
+    );
+  })();
+
+  // Carte permanente "prochain palier" (17.5, 15/07/2026, demande de
+  // Laurent) — même esprit que heroPred (objectif/estimation du mode
+  // course) mais pour le grand-débutant : toujours visible tant qu'un plan
+  // marche-course est actif, pas seulement quand une bannière de transition
+  // se déclenche. Affiche le palier courant et le suivant, avec un accès
+  // direct au changement de palier si déjà débloqué (progression.pretPourSuivant),
+  // sans attendre que la bannière progressionMarcheCourseEl apparaisse.
+  const prochainPalierEl = (() => {
+    if (!window.__PLAN_BRUT__ || window.__PLAN_BRUT__.sousMode !== 'marche-course') return null;
+    const progression = analyserProgressionMarcheCourse(window.__PLAN_BRUT__);
+    if (!progression) return null;
+
+    const palierActuel = PALIERS_MARCHE_COURSE[progression.palierId];
+    const palierSuivant = progression.dernierPalier ? null : PALIERS_MARCHE_COURSE[progression.palierId + 1];
+
+    return el("div",{style:{background:"linear-gradient(135deg,var(--bg) 0%,var(--border-soft) 100%)",borderRadius:"16px",padding:"16px",marginBottom:"12px",border:"1px solid rgba(var(--accent2-rgb),0.2)",marginTop:"8px"}},
+      el("div",{style:{marginBottom:"14px"}},
+        el("div",{style:{color:"var(--accent2)",fontSize:"15px",fontWeight:"700",marginBottom:"2px"}},"🏃 Progression marche-course"),
+        el("div",{class:"muted",style:{fontSize:"13px"}},progression.totalSeancesSuivies+" séance"+(progression.totalSeancesSuivies>1?"s":"")+" suivie"+(progression.totalSeancesSuivies>1?"s":"")+" sur ce plan")
+      ),
+      el("div",{style:{display:"grid",gridTemplateColumns:palierSuivant?"1fr 1px 1fr":"1fr",gap:"12px",marginBottom:"4px"}},
+        el("div",{style:{textAlign:"center"}},
+          el("div",{class:"label",style:{marginBottom:"4px"}},"Palier actuel"),
+          el("div",{style:{color:"var(--text)",fontSize:"22px",fontWeight:"900",letterSpacing:"-0.5px",lineHeight:"1.2"}},palierActuel.label),
+          el("div",{class:"muted",style:{fontSize:"13px",marginTop:"2px"}},progression.seancesValidees+" validée"+(progression.seancesValidees>1?"s":"")+" à ce palier")
+        ),
+        palierSuivant ? el("div",{style:{background:"var(--border)"}}) : null,
+        palierSuivant ? el("div",{style:{textAlign:"center"}},
+          el("div",{class:"label",style:{marginBottom:"4px"}},"Palier suivant"),
+          el("div",{style:{color:progression.pretPourSuivant?"var(--accent2)":"var(--text-muted)",fontSize:"22px",fontWeight:"900",letterSpacing:"-0.5px",lineHeight:"1.2"}},palierSuivant.label),
+          progression.pretPourSuivant
+            ? el("div",{style:{fontSize:"13px",marginTop:"2px",color:"var(--accent2)",fontWeight:"700"}},"🎉 Débloqué")
+            : el("div",{class:"muted",style:{fontSize:"13px",marginTop:"2px"}},"Encore un peu de patience")
+        ) : el("div",{class:"muted",style:{fontSize:"13px",textAlign:"center"}},"Dernier palier — tu y es !")
+      ),
+      progression.pretPourSuivant && palierSuivant ? el("button",{style:{width:"100%",marginTop:"12px",background:"var(--accent2)",border:"none",borderRadius:"8px",padding:"9px",color:"#F8FAFC",fontSize:"14px",fontWeight:"700",cursor:"pointer"},
+        feedback:true,
+        onClick:async ()=>{ await changerPalierGrandDebutant(progression.palierId + 1); }
+      },"Passer à \""+palierSuivant.label+"\"") : null
     );
   })();
 
@@ -2800,7 +2831,7 @@ function renderDashboard() {
   // principal (décision d'emplacement tranchée le 6 juillet 2026).
   const selecteurPlanEl = renderSelecteurPlan();
 
-  return el("div",{style:{padding:"0 16px 100px"}},dashHeaderEl,selecteurPlanEl,progressionMarcheCourseEl,adaptationEl,ESTMODEFORME?null:heroPred,todayEl||"",phaseEl,stravaSection);
+  return el("div",{style:{padding:"0 16px 100px"}},dashHeaderEl,selecteurPlanEl,progressionMarcheCourseEl,adaptationEl,prochainPalierEl,ESTMODEFORME?null:heroPred,todayEl||"",phaseEl,stravaSection);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2947,6 +2978,76 @@ function renderBoutonStructureAProgrammer(structure) {
   progWrapper.appendChild(progBtn);
   progWrapper.appendChild(progBlock);
   return progWrapper;
+}
+
+// Change le palier marche-course d'un plan grand-débutant depuis le
+// dashboard (bannière "Prêt·e pour la suite ?" ou section palier permanente,
+// 17.4/17.5, 15/07/2026). Corrige un bug latent : l'ancien code lisait
+// window.__PLAN_BRUT__.profilOrigine/paramsOrigine, qui n'existent PAS pour
+// un plan grand-débutant (généré par generatePlanFormeMarcheCourse dans
+// plan-forme.js, lequel ne stocke ni profil ni params d'origine sur le plan
+// résultant — cf. §17.1/§17.9 de l'inventaire) — le bouton "Palier suivant"
+// plantait donc systématiquement en pratique. Reconstruit profil/params à
+// partir des données réellement disponibles : jours d'entraînement déduits
+// des séances déjà placées dans le plan courant (assignment), reste du
+// profil lu depuis lk_profil_coureur.
+async function changerPalierGrandDebutant(nouveauPalierId) {
+  const planCourant = window.__PLAN_BRUT__;
+  if (!planCourant || planCourant.sousMode !== 'marche-course') return;
+
+  const premiereSemaine = planCourant.semaines?.[0];
+  const joursDisponibles = premiereSemaine
+    ? Object.keys(premiereSemaine.assignment).map(Number)
+    : [1, 3, 5]; // repli raisonnable si jamais aucune semaine n'existe (ne devrait pas arriver)
+
+  let profilStocke;
+  try { profilStocke = JSON.parse(localStorage.getItem('lk_profil_coureur')); } catch { profilStocke = null; }
+
+  const profil = {
+    niveau: 'grand-debutant',
+    anneeNaissance: profilStocke?.anneeNaissance || undefined,
+    fcMaxConnue: profilStocke?.fcMax || undefined,
+    joursDisponiblesHabituels: joursDisponibles,
+    renforcementMusculaire: false,
+    palierMarcheCourse: nouveauPalierId
+  };
+  const params = {
+    dateDebut: planCourant.dateDebut,
+    dateCloture: planCourant.dateCloture,
+    nbSemainesBloc: planCourant.tailleBlocSemaines
+  };
+
+  let nouveauPlan;
+  try {
+    nouveauPlan = generatePlanForme(profil, params);
+  } catch (e) {
+    alert("Erreur lors du changement de palier : " + e.message);
+    console.error(e);
+    return;
+  }
+  nouveauPlan.id = planCourant.id;
+  nouveauPlan.nom = planCourant.nom;
+  nouveauPlan.statuses = planCourant.statuses;
+
+  window.__PLAN_BRUT__ = nouveauPlan;
+  window.__PLAN_GENERE__ = traduirePlanVersFormatV1(window.__PLAN_BRUT__);
+  PLAN = window.__PLAN_GENERE__;
+  ALL_SESSIONS = recalculerAllSessions();
+
+  // Même pattern de sauvegarde que la clôture de plan (Réglages) : Supabase
+  // en priorité (mécanisme principal depuis §17.11), Gist en best-effort.
+  try {
+    if (window.__UTILISATEUR__?.id && window.LkSync?.mettreAJourPlanSupabase && window.__PLAN_BRUT__.id) {
+      await window.LkSync.mettreAJourPlanSupabase(window.__PLAN_BRUT__.id, window.__PLAN_BRUT__);
+    }
+    if (getGithubToken && getGithubToken()) {
+      try { await sauvegarderPlan(window.__PLAN_BRUT__); }
+      catch (eGist) { console.warn('Sauvegarde Gist échouée (Supabase OK, non bloquant) :', eGist.message); }
+    }
+  } catch (e) {
+    console.warn('Palier changé localement, sauvegarde Supabase échouée :', e.message);
+  }
+  render();
 }
 
 // Rangée de boutons de statut (✅/❌/⚠️/😴), réutilisable — extraite le
