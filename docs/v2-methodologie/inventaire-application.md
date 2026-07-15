@@ -1,7 +1,17 @@
 # Inventaire de l'application "Yoria"
 
 > Vue d'ensemble de référence — à relire en début de session pour retrouver le contexte
-> sans re-parcourir tout le repo. Mis à jour au 15 juillet 2026 (**v2.8 implémentée en
+> sans re-parcourir tout le repo. Mis à jour au 15 juillet 2026 (**bug Strava résolu** —
+> access_token invalidé après reconnexion Supabase, non détecté par ensureFreshToken()
+> qui ne vérifie que l'expiration locale ; **bug sélection du plan actif corrigé** —
+> l'app prenait le plan le plus récemment créé plutôt que la course la plus proche
+> quand plusieurs plans sont actifs en parallèle ; **bug onboarding en boucle résolu** —
+> niveau:null traité comme "jamais renseigné", redéclenchait l'écran à l'infini ; le
+> bouton "Passer pour l'instant" de l'onboarding a été retiré, le choix du niveau est
+> désormais obligatoire ; voir §18 pour le détail complet ; **site "beta" ajouté au
+> repo** (public/beta/, api/beta.js, routes dédiées) par Laurent, indépendant de l'app
+> principale, à ne jamais toucher lors des mises à jour de Yoria — voir §18.1 ; **v2.8
+> implémentée en
 > grande partie** — grand-débutant rattaché au Mode Forme, écran dédié + onboarding,
 > écran d'accueil Consulter/Créer, nommage automatique des plans Forme, suppression de
 > compte ; **bug majeur corrigé** : Supabase était silencieusement absent du chemin de
@@ -2064,3 +2074,149 @@ réapparaîtra.
 - Fichier de test formel pour `plan-forme.js`/marche-course — les tests
   actuels restent des scripts manuels non committés (`test-forme-mc.mjs`,
   etc., supprimés après usage).
+
+## 18. Site "beta" indépendant, bugs Strava/sélection de plan/onboarding (15/07/2026)
+
+### 18.1 Site "beta" ajouté au repo par Laurent
+
+Laurent a créé et modifie volontairement un second site statique, **`public/beta/`**
+(`index.html`, `script.js`, `styles.css`, `assets/`), avec son propre endpoint
+`api/beta.js` et ses propres routes dans `vercel.json` (`/beta`, `/beta/`,
+`/api/beta`). Sur la même branche `main`, mais un contexte complètement indépendant
+de l'app principale (Yoria) — pas de dossier partagé avec `public/v2/` ni
+`public/engine-classic-scripts/`.
+
+**Consigne permanente** : ne jamais supprimer, modifier, ni toucher à ces
+fichiers/routes lors des mises à jour de l'app principale, sauf demande explicite de
+Laurent. Vérifié que le routing `vercel.json` ne crée aucun conflit avec l'app
+principale (`/beta` et `/api/beta` déclarés explicitement avant le catch-all `/(.*)`).
+
+### 18.2 Bug résolu : synchro Strava cassée après reconnexion Supabase
+
+**Symptôme** : "❌ Erreur Strava" au clic sur le bouton de synchronisation, alors
+qu'une séance récente (VMA du jour) était bien présente et valide côté Strava (confirmé
+via l'API Strava directement, activité avec 4 PR détectés).
+
+**Fausses pistes explorées avant la vraie cause** (utile pour ne pas les re-tester) :
+- Cache HTTP / réponse 304 sur `/api/strava/activities` — un `Cache-Control: no-store`
+  a été ajouté par précaution (bonne pratique générale, cf. code), mais n'était pas la
+  cause principale de ce symptôme précis.
+- Policies RLS Supabase sur `plans`/`plan_donnees` — plusieurs 409/403 observés en
+  parallèle dans la console au même moment, mais vérifiés être des warnings sans effet
+  bloquant (policies confirmées correctes en SQL : `auth.uid() = user_id` partout,
+  types de colonnes corrects, UUID identiques entre session et base).
+
+**Vraie cause** : la réponse réelle de Strava, visible dans l'onglet Réseau du
+navigateur, était `{"message":"Authorization Error","errors":[{"resource":"Athlete",
+"field":"access_token","code":"invalid"}]}` — l'`access_token` Strava stocké était
+invalide, alors que `ensureFreshToken()` (`index.html`) ne vérifie que l'expiration
+locale du token (`Date.now()/1000 < stravaExpires-60`), jamais sa validité réelle
+côté Strava. Un token invalidé pour une autre raison (probable : désynchronisation du
+`refresh_token` stocké suite à une déconnexion/reconnexion Supabase, qui réécrit les
+intégrations en base) n'est donc jamais détecté par ce contrôle.
+
+**Correctif appliqué** : reconnexion Strava directe (Paramètres → Strava,
+déconnecter/reconnecter) — résout le symptôme en obtenant un couple token/refresh
+entièrement neuf. Correctif de code complémentaire poussé : `Cache-Control: no-store,
+max-age=0` ajouté sur les deux réponses de `/api/strava/activities` (`api/strava.js`)
+— utile en soi pour éviter tout comportement de cache sur cette route dynamique, mais
+n'était pas la cause de ce bug précis.
+
+**Piste future si ça se reproduit** : détecter explicitement le cas `access_token
+invalid` retourné par Strava dans `syncStrava()` et soit déclencher automatiquement un
+`ensureFreshToken()` forcé (ignorant l'expiration locale), soit inviter directement à
+la reconnexion Strava, plutôt que d'afficher seulement "❌ Erreur Strava" sans piste
+d'action pour l'utilisateur.
+
+### 18.3 Bug résolu : sélection du plan actif au démarrage
+
+**Contexte découvert en diagnostiquant 18.4** (onboarding en boucle) : Laurent a
+actuellement deux plans course actifs en parallèle, sur des dates qui ne se
+chevauchent pas — GEM'AUBAGNE et "400 ans de la Marine". Légitime : le garde-fou
+anti-chevauchement (`trouverPlanEnConflit`, cf. §17.11) fonctionne correctement pour
+ce cas, les deux périodes ne se recoupant pas.
+
+**Bug** : `window.__PLAN_PRET__` (`public/index.html`) choisissait, en l'absence de
+`v2_preview_plan_id` explicite en `localStorage`, systématiquement
+`plansDisponibles[0]` — le premier élément retourné par `chargerPlansSupabase()`,
+trié par `created_at DESC` (le plus récemment **créé**, pas le plus pertinent). Avec
+deux plans course actifs, l'app chargeait donc parfois le mauvais plan (celui créé en
+dernier), sans lien avec la date de course réelle la plus proche.
+
+**Correctif appliqué** (`public/index.html`, bloc `window.__PLAN_PRET__`) : en
+l'absence de `v2_preview_plan_id`, l'app filtre désormais les plans de type course
+(`mode !== 'forme'`) dont `dateCourse` est dans le futur (`>= aujourd'hui`), les trie
+par date de course croissante, et prend le premier — c'est-à-dire **la course la plus
+proche dans le temps**. Un plan Mode Forme n'est retenu en repli que s'il n'existe
+aucun plan course à venir. Décision validée avec Laurent (deux plans course légitimes
+en parallèle doivent afficher celui dont l'échéance est la plus proche, pas le plus
+récemment créé).
+
+### 18.4 Bug résolu : onboarding en boucle à chaque lancement
+
+**Symptôme** : l'app affichait l'écran d'onboarding (année de naissance / niveau) à
+chaque lancement au lieu du dashboard, malgré une session Supabase valide et des
+données de profil complètes en base.
+
+**Longue chaîne de diagnostic, plusieurs fausses pistes explorées et écartées avant
+la vraie cause** (résumé, cf. §18.2/§18.3 pour le détail des sous-diagnostics
+associés) :
+- Cache HTTP Strava — écarté (cf. §18.2).
+- Policies RLS Supabase — vérifiées correctes en SQL direct (`pg_policy`), écarté.
+- Mismatch de `user_id` entre session et base — écarté après vérification directe
+  (`getSession()`, comparaison UUID caractère pour caractère, type de colonne `uuid`
+  confirmé côté `information_schema`).
+- Sélection du mauvais plan par défaut — un vrai bug distinct, corrigé (§18.3), mais
+  qui n'était pas non plus la cause de CE symptôme précis (la redirection persistait
+  après ce correctif).
+
+**Vraie cause** : le `profilCoureur` de Laurent avait `niveau: null` en base
+(vérifié directement via `localStorage.getItem('lk_profil_coureur')` après
+préchargement Supabase réussi) — probablement suite à un passage antérieur par le
+bouton "Passer pour l'instant" de l'écran d'onboarding. Le test dans
+`auth.classic.js`/`auth.js` :
+```js
+if (!profilBrut || !profilBrut.niveau) { /* affiche l'onboarding */ }
+```
+traite `null` exactement comme "jamais renseigné" (`!null === true`), donc
+redéclenche l'onboarding à chaque connexion tant qu'aucun niveau n'est explicitement
+choisi — un profil par ailleurs complet (poids, taille, records, prénom, etc.) était
+piégé dans cette boucle uniquement à cause de ce champ.
+
+**Correctif immédiat** : Laurent a choisi un vrai niveau dans l'onboarding (au lieu
+de "Passer"), ce qui a résolu la boucle pour son compte.
+
+**Correctif structurel appliqué** (demande explicite de Laurent : rendre le choix du
+niveau obligatoire) — dans `public/engine-classic-scripts/auth.classic.js` ET
+`public/v2/engine/auth.js` (les deux fichiers, synchronisés) :
+- Bouton "Passer pour l'instant" retiré du HTML de `monterEcranOnboarding()`.
+- Fonction `terminer(avecNiveau)` simplifiée en `terminer()` sans paramètre —
+  `niveau: niveauChoisi` directement, sans plus jamais de repli possible vers `null`
+  (le bouton Valider reste désactivé tant qu'aucune option de niveau n'a été
+  cliquée, donc `terminer()` n'est structurellement plus jamais appelable sans un
+  niveau valide).
+- Un seul listener conservé : `validerBtn.addEventListener('click', terminer)`.
+
+**Conséquence** : plus aucun compte, existant ou nouveau, ne peut désormais se
+retrouver avec `niveau: null` en sortant de l'onboarding — élimine la classe de bug
+à la racine plutôt que de traiter seulement le symptôme.
+
+**Piste d'amélioration future, non implémentée** (si Laurent la redemande) :
+distinguer explicitement "niveau jamais demandé" de "l'utilisateur a un jour
+volontairement passé cette étape" (avec une valeur sentinelle dédiée, par exemple),
+utile seulement si le bouton "Passer" devait un jour être réintroduit pour une autre
+raison — non pertinent tant que le choix reste obligatoire.
+
+### 18.5 Méthode de diagnostic à retenir pour la suite
+
+Cette session a nécessité d'éliminer méthodiquement plusieurs hypothèses plausibles
+mais fausses (cache HTTP, RLS, mismatch d'identité, mauvais plan chargé) avant
+d'atteindre la vraie cause d'un symptôme ("redirection vers le profil"), qui s'est
+révélée être un bug totalement différent et sans lien apparent avec Strava (le
+problème initialement signalé). Les deux bugs (Strava et onboarding) sont
+apparus mélangés dans les mêmes échanges de diagnostic à cause d'une coïncidence de
+timing (les deux se sont manifestés après la même reconnexion Supabase), mais sont
+in fine indépendants l'un de l'autre. Retenu : quand un symptôme résiste à un
+correctif ciblé, vérifier les faits un par un directement en console (session réelle,
+requêtes réelles, valeurs réelles en base) plutôt que d'empiler des hypothèses
+successives sans les confirmer individuellement.
