@@ -3174,12 +3174,30 @@
   // à l'URL une fois nettoyée) — persisté dès l'affichage de l'écran, lu ici
   // en plus du paramètre d'URL, retiré seulement une fois le plan généré
   // (cf. genererPlanGrandDebutantUI) pour ne pas re-déclencher indéfiniment.
+  //
+  // BUG #2 corrigé le 15/07/2026 (même diagnostic, un cran plus profond) :
+  // ce bloc s'exécute en synchrone dès le chargement du script, AVANT que
+  // capterRetourStravaOAuth() (asynchrone, attend engineReady) ait pu lire
+  // les tokens Strava dans l'URL. Le history.replaceState() ci-dessous
+  // écrasait alors l'URL — tokens Strava compris — avant que
+  // capterRetourStravaOAuth() ne les voie jamais : la connexion semblait
+  // échouer silencieusement (aucune erreur, juste un token jamais stocké).
+  // Corrigé : on ne réécrit plus toute l'URL, on retire UNIQUEMENT le
+  // paramètre onboarding via URLSearchParams.delete(), en laissant intacts
+  // tous les autres paramètres (access_token, refresh_token, expires_at —
+  // exactement ceux que extraireTokensDepuisUrl() doit encore pouvoir lire
+  // ensuite).
   (function rediriger_si_onboarding_grand_debutant() {
-    const vientDeOnboardingUrl = new URLSearchParams(window.location.search).get('onboarding') === 'grand-debutant';
+    const params = new URLSearchParams(window.location.search);
+    const vientDeOnboardingUrl = params.get('onboarding') === 'grand-debutant';
     const vientDeOnboardingSession = sessionStorage.getItem('v2_onboarding_grand_debutant') === 'true';
     if (!vientDeOnboardingUrl && !vientDeOnboardingSession) return;
     sessionStorage.setItem('v2_onboarding_grand_debutant', 'true');
-    window.history.replaceState({}, document.title, window.location.pathname); // nettoie l'URL
+    if (vientDeOnboardingUrl) {
+      params.delete('onboarding');
+      const nouvelleUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+      window.history.replaceState({}, document.title, nouvelleUrl);
+    }
     document.getElementById('choix-mode-contenu').style.display = 'none';
     document.getElementById('wizard-grand-debutant-contenu').style.display = 'block';
     renderDaysGrandDebutant();
