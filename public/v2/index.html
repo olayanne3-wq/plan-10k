@@ -779,7 +779,7 @@
        fin via "Terminer") — demandé par Laurent le 8 juillet 2026, qui
        n'avait aucun moyen de revenir à l'app en cours de route dans le
        wizard, seulement à la toute fin du processus. -->
-  <button id="btnRetourApp" style="display:block;width:calc(100% - 32px);margin:0 16px 12px;padding:8px;text-align:center;background:rgba(var(--text-rgb),0.07);border:1px solid rgba(var(--text-rgb),0.2);border-radius:8px;color:var(--paper-dim);font-size:13px;font-weight:600;cursor:pointer;">← Retour à l'app</button>
+  <button id="btnRetourApp" style="display:block;width:calc(100% - 32px);margin:0 16px 12px;padding:10px;text-align:center;background:rgba(var(--text-rgb),0.09);border:1px solid rgba(var(--text-rgb),0.25);border-radius:8px;color:var(--paper);font-size:14px;font-weight:700;cursor:pointer;">← Retour à l'app</button>
 
   <!-- ============================================================
        Choix de mode (Objectif course / Mode forme) — ajouté le 13
@@ -2646,7 +2646,9 @@
     document.querySelector(`.screen[data-step="${n}"]`).classList.add('active');
     document.getElementById('stepNum').textContent = 'ÉTAPE ' + n;
     const backBtn = document.getElementById('backBtn');
-    backBtn.classList.toggle('hidden', n === 1);
+    // Reste visible même à l'étape 1 : ramène à l'écran "choix de mode"
+    // plutôt que de disparaître sans action possible (15/07/2026).
+    backBtn.classList.remove('hidden');
     const nextBtn = document.getElementById('nextBtn');
     nextBtn.innerHTML = n === totalSteps ? '✓' : '→';
     nextBtn.setAttribute('aria-label', n === totalSteps ? 'Générer le plan' : 'Étape suivante');
@@ -2767,6 +2769,13 @@
       current--;
       if (estGrandDebutant() && current === 5) current = 2;
       showStep(current);
+    } else {
+      // Retour à l'écran de choix de mode depuis la toute première étape —
+      // même comportement que prevStepForme (Mode Forme), ajouté le
+      // 15/07/2026 suite au retour de Laurent (flèche bloquée à l'étape 1
+      // sans action, jugé peu logique une fois le bouton bas retiré, 17.6).
+      document.getElementById('wizard-course-contenu').style.display = 'none';
+      document.getElementById('choix-mode-contenu').style.display = 'block';
     }
   }
 
@@ -3097,7 +3106,9 @@
     document.querySelector(`#wizard-forme-contenu .screen[data-step-forme="${n}"]`).classList.add('active');
     document.getElementById('stepNumForme').textContent = 'ÉTAPE ' + n;
     const backBtnForme = document.getElementById('backBtnForme');
-    backBtnForme.classList.toggle('hidden', n === 1);
+    // Reste visible même à l'étape 1 : ramène à l'écran "choix de mode"
+    // plutôt que de disparaître sans action possible (15/07/2026).
+    backBtnForme.classList.remove('hidden');
     const nextBtnForme = document.getElementById('nextBtnForme');
     nextBtnForme.innerHTML = n === totalStepsForme ? '✓' : '→';
     nextBtnForme.setAttribute('aria-label', n === totalStepsForme ? 'Générer le plan' : 'Étape suivante');
