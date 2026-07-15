@@ -2541,24 +2541,36 @@
       // Corrigé : un échec de sauvegarde BLOQUE maintenant la redirection,
       // avec un message d'erreur visible (même mécanisme que le vrai
       // bouton "Sauvegarder").
-      if (dernierPlanGenere && getGithubToken()) {
-        // Indicateur visuel pendant la sauvegarde (appel réseau, latence
-        // perceptible signalée par Laurent le 8 juillet 2026) — le bouton
-        // change temporairement de texte pour rassurer que le clic a bien
-        // été pris en compte, plutôt qu'une attente silencieuse.
+      //
+      // BUG #2 corrigé le 15/07/2026 : ce bloc ne tentait la sauvegarde QUE
+      // si un token GitHub (Gist) était présent — depuis que Laurent l'a
+      // volontairement retiré, AUCUN plan (tous wizards confondus, pas
+      // spécifique au grand-débutant) n'était plus jamais sauvegardé du
+      // tout, silencieusement, malgré Supabase déjà en place depuis le
+      // 13/07/2026 (chantier v2.5). Inversé : assurerPlanExiste()
+      // (Supabase) est maintenant le mécanisme PRINCIPAL et bloquant (un
+      // échec empêche la redirection, même logique de garde-fou que
+      // ci-dessus) ; le Gist devient secondaire et best-effort (tenté
+      // seulement si un token existe encore, jamais bloquant) — inverse
+      // exact de l'ancienne priorité.
+      if (dernierPlanGenere?.id) {
         const btnTerminer = document.getElementById('nextBtn');
         const texteOriginal = btnTerminer?.textContent;
         if (btnTerminer) btnTerminer.textContent = 'Sauvegarde…';
         try {
-          await sauvegarderPlan(dernierPlanGenere);
+          if (window.__UTILISATEUR__?.id) {
+            await window.LkSync.assurerPlanExiste(window.__UTILISATEUR__.id, dernierPlanGenere.id, dernierPlanGenere);
+          }
+          // Gist : best-effort, jamais bloquant — seulement si un token
+          // est encore configuré (compatibilité ascendante).
+          if (getGithubToken()) {
+            try {
+              await sauvegarderPlan(dernierPlanGenere);
+            } catch (eGist) {
+              console.warn('Sauvegarde Gist échouée (Supabase OK, non bloquant) :', eGist.message);
+            }
+          }
         } catch (e) {
-          // Bug trouvé le 8 juillet 2026 : le message d'erreur s'écrivait
-          // bien dans sauvegardeMsg, mais ce bloc (blocSauvegarde) reste
-          // masqué (display:none) tant que l'utilisateur n'a pas cliqué sur
-          // "☁️ Sauvegarder" — jamais le cas en cliquant directement sur
-          // "Terminer". Le message existait dans le DOM sans être visible
-          // à l'écran. Corrigé : le bloc est maintenant explicitement
-          // déplié en même temps que le message est écrit.
           const blocSauvegarde = document.getElementById('blocSauvegarde');
           if (blocSauvegarde) blocSauvegarde.style.display = 'block';
           const msgEl = document.getElementById('sauvegardeMsg');
