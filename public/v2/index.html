@@ -2017,6 +2017,18 @@
     const rechargementEnCours = capterRetourStravaOAuth();
     if (rechargementEnCours) return;
     chargerVolumeStrava();
+    // BUG corrigé le 15/07/2026 : rafraichirBlocStravaGrandDebutant() n'était
+    // appelée qu'au tout premier affichage de l'écran (dans
+    // renderDaysGrandDebutant), jamais après le reload du retour Strava —
+    // celui-ci intervient AVANT que ce bloc (asynchrone, dépend
+    // d'engineReady) n'ait fini de capter/stocker le nouveau token. Résultat :
+    // le bouton "Connecter Strava" restait affiché malgré une connexion
+    // Strava réussie côté serveur. Sans effet si l'élément n'existe pas
+    // (écran non affiché) — vérifié par l'optional chaining implicite du
+    // early return dans la fonction elle-même.
+    if (document.getElementById('wizard-grand-debutant-contenu')?.style.display === 'block') {
+      rafraichirBlocStravaGrandDebutant();
+    }
   }
 
   document.addEventListener('DOMContentLoaded', () => {
