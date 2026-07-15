@@ -795,39 +795,27 @@
 
     <div class="content">
 
-      <!-- FORME STEP 1: Niveau -->
+      <!-- FORME STEP 1: Référence de temps -->
       <div class="screen active" data-step-forme="1">
         <span class="eyebrow">Point de départ</span>
-        <h1>Où en es-tu aujourd'hui&nbsp;?</h1>
-        <p class="sub">Ça nous aide à calibrer le point de départ du plan — pas de mauvaise réponse.</p>
-        <div class="options">
-          <div class="opt" data-group="niveau-forme" onclick="selectOptForme(this)">
-            <div class="ico">🌱</div>
-            <div><div class="label">Je débute</div><div class="desc">Moins de 6 mois de course régulière</div></div>
-            <div class="check"></div>
-          </div>
-          <div class="opt selected" data-group="niveau-forme" onclick="selectOptForme(this)">
-            <div class="ico">🏃</div>
-            <div><div class="label">Intermédiaire</div><div class="desc">Je cours depuis un moment, j'ai déjà couru un 10K</div></div>
-            <div class="check"></div>
-          </div>
-          <div class="opt" data-group="niveau-forme" onclick="selectOptForme(this)">
-            <div class="ico">⚡</div>
-            <div><div class="label">Confirmé</div><div class="desc">Plusieurs courses, je connais mes allures</div></div>
-            <div class="check"></div>
-          </div>
-        </div>
-        <!-- Champs profil (année naissance, FC max) retirés le 14/07/2026
-             (v2.8, §17.7) — mêmes raisons que côté plan course, voir plus
-             haut. -->
+        <h1 id="formeStep1Title">Où en es-tu aujourd'hui&nbsp;?</h1>
+        <p class="sub" id="formeStep1Sub">Ça nous aide à calibrer le point de départ du plan — pas de mauvaise réponse.</p>
+        <!-- Sélecteur de niveau retiré le 14/07/2026 (v2.8, §17.7/§17.9) —
+             lu depuis le profil (Réglages), plus un choix du wizard. Si le
+             profil est 'grand-debutant', le champ temps de référence
+             ci-dessous est masqué par showStepForme() : pas d'objectif ni
+             d'estimation de temps pour ce niveau (§17.9, pas encore câblé
+             ici — objectifs à paliers de durée continue à venir). -->
 
-        <div class="block-label" style="margin-top:22px;">Une référence de temps, pour calibrer tes allures</div>
-        <p class="sub" style="margin-top:0; margin-bottom:8px;">N'importe quelle distance récente (5K, 10K, semi...), même approximative.</p>
-        <div class="time-input" style="padding:16px 10px;">
-          <input type="text" maxlength="2" value="50" id="tMinForme" style="font-size:28px;">
-          <span class="sep">:</span>
-          <input type="text" maxlength="2" value="21" id="tSecForme" style="font-size:28px;">
-          <span class="unit">min:sec</span>
+        <div id="formeRefTempsBloc">
+          <div class="block-label" style="margin-top:22px;">Une référence de temps, pour calibrer tes allures</div>
+          <p class="sub" style="margin-top:0; margin-bottom:8px;">N'importe quelle distance récente (5K, 10K, semi...), même approximative.</p>
+          <div class="time-input" style="padding:16px 10px;">
+            <input type="text" maxlength="2" value="50" id="tMinForme" style="font-size:28px;">
+            <span class="sep">:</span>
+            <input type="text" maxlength="2" value="21" id="tSecForme" style="font-size:28px;">
+            <span class="unit">min:sec</span>
+          </div>
         </div>
       </div>
 
@@ -2865,6 +2853,23 @@
     document.getElementById('stepNumForme').textContent = 'ÉTAPE ' + n;
     document.getElementById('backBtnForme').style.visibility = n === 1 ? 'hidden' : 'visible';
     document.getElementById('nextBtnForme').textContent = n === totalStepsForme ? 'Générer le plan' : 'Continuer';
+    if (n === 1) {
+      // Grand débutant (v2.8, §17.9) : pas d'objectif/estimation de temps —
+      // le champ de référence n'a pas de sens tant qu'aucune course continue
+      // n'est établie. Masqué plutôt que pré-rempli avec une valeur
+      // arbitraire (cf. décision §17.7 : ne pas simuler des données qui
+      // n'existent pas pour ce profil).
+      let profilStocke;
+      try { profilStocke = JSON.parse(localStorage.getItem('lk_profil_coureur')); } catch { profilStocke = null; }
+      const estGrandDebutantForme = profilStocke?.niveau === 'grand-debutant';
+      document.getElementById('formeRefTempsBloc').style.display = estGrandDebutantForme ? 'none' : '';
+      document.getElementById('formeStep1Title').textContent = estGrandDebutantForme
+        ? "C'est parti !"
+        : "Où en es-tu aujourd'hui\u00a0?";
+      document.getElementById('formeStep1Sub').textContent = estGrandDebutantForme
+        ? "Pas besoin de référence de temps pour commencer — on avance à ton rythme."
+        : "Ça nous aide à calibrer le point de départ du plan — pas de mauvaise réponse.";
+    }
     renderTrackForme();
   }
 
@@ -2955,7 +2960,6 @@
   const NIVEAU_MAP_FORME = { "Je débute": "debutant", "Intermédiaire": "intermediaire", "Confirmé": "confirme" };
 
   function collectParamsFromWizardForme(){
-    const niveauLabel = document.querySelector('.opt[data-group="niveau-forme"].selected .label').textContent;
     const joursDisponibles = [...document.querySelectorAll('#daysGridForme .day.selected')]
       .map(el => parseInt(el.dataset.dayIndex));
 
@@ -2967,12 +2971,15 @@
     try { profilStockeForme = JSON.parse(localStorage.getItem('lk_profil_coureur')); } catch { profilStockeForme = null; }
 
     const profil = {
-      niveau: NIVEAU_MAP_FORME[niveauLabel] ?? 'intermediaire',
-      // Retirés du wizard le 14/07/2026 (v2.8, §17.7).
+      // Niveau lu depuis le profil global (v2.8, §17.7/§17.9) — plus depuis
+      // un step du wizard. Peut valoir 'grand-debutant', géré séparément
+      // par genererPlanFormeUI (pas de tempsReference/accent dans ce cas).
+      niveau: profilStockeForme?.niveau ?? 'intermediaire',
       anneeNaissance: profilStockeForme?.anneeNaissance || undefined,
       fcMaxConnue: profilStockeForme?.fcMax || undefined,
       joursDisponiblesHabituels: joursDisponibles,
-      renforcementMusculaire: renfoOnForme
+      renforcementMusculaire: renfoOnForme,
+      palierMarcheCourse: profilStockeForme?.niveau === 'grand-debutant' ? 0 : undefined
     };
 
     const tMin = document.getElementById('tMinForme').value || '0';
