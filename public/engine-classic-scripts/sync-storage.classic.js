@@ -394,6 +394,26 @@
     }
   }
 
+  async function cloturerPlanSupabase(planId, dateCloture) {
+    await window.LkAuth.supabaseReady;
+    const supabase = window.LkAuth.supabase;
+    if (!estUuidValide(planId)) return;
+    try {
+      const lecture = await supabase.from('plans').select('plan_brut').eq('id', planId).maybeSingle();
+      if (lecture.error || !lecture.data) {
+        console.warn('Clôture du plan échouée (lecture) :', (lecture.error && lecture.error.message) || 'plan introuvable');
+        return;
+      }
+      const planBrutMisAJour = Object.assign({}, lecture.data.plan_brut, { dateCloture: dateCloture });
+      const update = await supabase.from('plans').update({ plan_brut: planBrutMisAJour }).eq('id', planId);
+      if (update.error) {
+        console.warn('Clôture du plan échouée (update) :', update.error.message);
+      }
+    } catch (err) {
+      console.warn('cloturerPlanSupabase a échoué :', err.message);
+    }
+  }
+
   async function assurerPlanExiste(userId, planId, planBrut) {
     if (!estUuidValide(planId)) return;
     await window.LkAuth.supabaseReady;
@@ -484,6 +504,7 @@
     synchroniserVersSupabase: synchroniserVersSupabase,
     migrerDonneesExistantes: migrerDonneesExistantes,
     assurerPlanExiste: assurerPlanExiste,
+    cloturerPlanSupabase: cloturerPlanSupabase,
     chargerPlansSupabase: chargerPlansSupabase,
     rejouerFileSync: rejouerFileSync,
     activerRealtime: activerRealtime
