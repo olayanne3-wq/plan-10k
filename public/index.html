@@ -217,7 +217,26 @@ input[type=text], input[type=number], input[type=password] {
 
     if (plansDisponibles.length > 0) {
       planBrut = idPlanChoisi ? plansDisponibles.find(p => p.id === idPlanChoisi) : null;
-      if (!planBrut) planBrut = plansDisponibles[0]; // repli sur le premier plan disponible
+      if (!planBrut) {
+        // Repli : plusieurs plans actifs possibles (ex: deux courses dont
+        // les dates ne se chevauchent pas) — on ne peut plus se fier à
+        // l'ordre de création (chargerPlansSupabase() trie par created_at
+        // DESC), qui ne correspond pas forcément au plan le plus pertinent
+        // du moment. On choisit la course dont la date est la plus proche
+        // dans le futur (aujourd'hui inclus) ; un plan Forme (pas de
+        // dateCourse, cycle glissant) n'a pas cette notion et n'est retenu
+        // ici que s'il n'y a aucun plan course à venir. Bug découvert le
+        // 15 juillet 2026 : avec deux plans course légitimes en parallèle
+        // (dates non chevauchantes), l'app chargeait systématiquement le
+        // plus récemment créé au lieu du plus pertinent, provoquant une
+        // redirection vers le profil quand ce plan n'était pas celui
+        // attendu par Laurent.
+        const aujourdhui = new Date().toISOString().slice(0, 10);
+        const plansCourseAVenir = plansDisponibles
+          .filter(p => p.mode !== 'forme' && p.dateCourse && p.dateCourse >= aujourdhui)
+          .sort((a, b) => a.dateCourse < b.dateCourse ? -1 : 1);
+        planBrut = plansCourseAVenir[0] || plansDisponibles[0];
+      }
     }
 
     if (!planBrut) {
