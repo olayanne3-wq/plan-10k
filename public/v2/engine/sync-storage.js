@@ -442,6 +442,48 @@ export function synchroniserVersSupabase(userId, planId, cle, valeur) {
 }
 
 // ------------------------------------------------------------
+// Liste tous les plans d'un utilisateur depuis Supabase — ajouté le
+// 15/07/2026. Jusqu'ici, seul chargerPlans() (gist-sync.js, Gist GitHub)
+// permettait de lister "tous mes plans" pour le sélecteur/repli du
+// dashboard ; assurerPlanExiste() ne fait qu'insérer UNE ligne pour un
+// plan déjà choisi, jamais de listing. Conséquence concrète découverte le
+// 15/07/2026 en testant le wizard grand-débutant : sans token GitHub
+// configuré (Laurent l'a volontairement retiré), chargerPlans() retourne
+// toujours [] (gist-sync.js, ligne ~49), donc AUCUN plan tout juste
+// généré ne pouvait jamais être retrouvé côté dashboard, quel que soit le
+// wizard utilisé (course, forme, grand-débutant) — pas un bug propre au
+// grand-débutant, un trou structurel du chantier v2.5 migration.
+//
+// plan_brut (jsonb, colonne existante depuis assurerPlanExiste) contient
+// déjà le plan complet tel que généré par le moteur — pas besoin de le
+// reconstruire depuis plan_donnees, contrairement aux statuts/notes qui
+// eux restent dans cette table séparée.
+// ------------------------------------------------------------
+export async function chargerPlansSupabase(userId) {
+  await supabaseReady;
+  if (!userId) return [];
+  try {
+    const { data, error } = await supabase
+      .from('plans')
+      .select('id, nom, plan_brut, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.warn('chargerPlansSupabase a échoué :', error.message);
+      return [];
+    }
+    // plan_brut porte déjà id/nom en interne (écrits par le wizard avant
+    // sauvegarde) — on les retrouve tels quels, la colonne id/nom de la
+    // table plans n'est qu'une redondance utile pour trier/nommer sans
+    // charger tout le jsonb à chaque fois.
+    return (data || []).map(row => ({ ...row.plan_brut, id: row.id, nom: row.nom || row.plan_brut?.nom }));
+  } catch (err) {
+    console.warn('chargerPlansSupabase a échoué :', err.message);
+    return [];
+  }
+}
+
+// ------------------------------------------------------------
 // Garantit qu'une ligne existe dans la table `plans` pour ce planId,
 // AVANT toute tentative d'écriture vers `plan_donnees` (qui a une
 // contrainte de clé étrangère vers plans.id — cf. schéma SQL). Sans
