@@ -1,13 +1,18 @@
 # Inventaire de l'application "Yoria"
 
 > Vue d'ensemble de référence — à relire en début de session pour retrouver le contexte
-> sans re-parcourir tout le repo. Mis à jour au 14 juillet 2026 (**bug synchro Strava
-> corrigé** — mismatch de domaine Vercel après rebranding, callback domain Strava à
-> resynchroniser si le domaine change à nouveau, voir §16 ; chantier **marche-course
-> / niveau grand-débutant CLOS** — moteur, pont v1, wizard et dashboard faits et poussés,
-> reste des tests réels sur l'app déployée à faire, voir §15 ; **bug POIDS_STATUT corrigé
-> au passage** (l'adaptation dynamique était silencieusement cassée depuis un moment),
-> voir §15.5 ; bug v2_gist_id résolu, voir §14 ; chantier ACWR toujours en cours ;
+> sans re-parcourir tout le repo. Mis à jour au 14 juillet 2026 (**périmètre v2.8 recueilli,
+> PAS ENCORE COMMENCÉ** — refonte du grand-débutant vers le Mode Forme, paliers de durée
+> continue, séances marche-course sur Strava, blocage séances futures, wizard sans données
+> de profil, navigation par flèches, suggestion de changement de niveau ; voir §17 pour le
+> détail complet des 8 points actés avec Laurent ; **bug synchro Strava corrigé** —
+> mismatch de domaine Vercel après rebranding, callback domain Strava à resynchroniser si
+> le domaine change à nouveau, voir §16 ; chantier **marche-course / niveau grand-débutant
+> CLOS pour sa version actuelle** — moteur, pont v1, wizard et dashboard faits et poussés
+> (mais périmètre remis en cause par v2.8, voir §17.1), reste des tests réels sur l'app
+> déployée à faire, voir §15 ; **bug POIDS_STATUT corrigé au passage** (l'adaptation
+> dynamique était silencieusement cassée depuis un moment), voir §15.5 ; bug v2_gist_id
+> résolu, voir §14 ; chantier ACWR toujours en cours ;
 > harmonisation visuelle app/wizard ; badge décharge onglet Semaines ; **v2.5 publiée** —
 > authentification Supabase, migration rétroactive, sync temps réel, wizard protégé,
 > nettoyage Réglages, variables d'env Vercel, file d'attente de sync ; **publication
@@ -1820,3 +1825,135 @@ la même erreur réapparaîtra et nécessitera de re-changer ce réglage côté
 Strava. Envisager à terme un domaine personnalisé fixe (ex. via Vercel
 Domains) plutôt que de dépendre des domaines `*.vercel.app` auto-générés,
 qui peuvent changer à chaque renommage de repo.
+
+## 17. Périmètre v2.8 (recueil du 14/07/2026, PAS ENCORE COMMENCÉ)
+
+Discussion avec Laurent en fin de session, en réaction directe au chantier
+marche-course (§15) qui vient d'être livré — plusieurs de ces points
+remettent en cause des choix faits dans ce chantier (notamment le
+rattachement du grand-débutant au plan course plutôt qu'au Mode Forme).
+Volontairement non codé cette session : recueilli et discuté, pas encore
+implémenté. Laurent a nommé cet ensemble "v2.8".
+
+### 17.1 Grand débutant → rattaché au Mode Forme, pas un niveau du plan course
+
+Revient sur le choix du §15 (niveau `grand-debutant` dans
+`plan-generator.js`, aux côtés de debutant/intermediaire/confirme). Le
+Mode Forme (`plan-forme.js`, §12) a déjà la bonne philosophie pour ce
+public : pas de date de course, cycle glissant, pas de pression
+d'échéance — plus cohérent qu'un wizard "plan course" avec des steps
+sautés artificiellement (§15.3). Implique de défaire une partie du
+rattachement fait en §15 et de le refaire côté `plan-forme.js`.
+
+### 17.2 Pas de phases (Construction/Spécifique/Affûtage) pour le grand débutant
+
+Déjà vrai par construction une fois rattaché au Mode Forme (qui n'a pas
+ces phases) — ce point se règle automatiquement via 17.1, pas de
+traitement séparé nécessaire.
+
+### 17.3 Séances marche-course programmables sur la montre via Strava
+
+Comme pour les séances qualité existantes (mécanisme déjà en place
+depuis le 8 juillet — détection des laps Strava par alternance
+positionnelle effort/récupération, cf. chantier "v2.0 streams" clos) :
+le coureur programme échauffement/intervalles/RAC directement sur sa
+montre, part courir, l'app récupère l'activité Strava correspondante et
+l'affiche — plutôt qu'un texte descriptif sans lien avec ce qui s'est
+réellement passé. Objectif annoncé par Laurent : motivant, et prépare
+le coureur au even réflexe qu'il gardera sur les vraies séances qualité
+plus tard. Réutilise un mécanisme existant, ne part pas de zéro.
+
+### 17.4 Blocage de validation des séances futures (tous modes)
+
+Point général, pas spécifique au marche-course : aujourd'hui rien
+n'empêche de valider (✅/❌/⚠️) une séance dont la date n'est pas encore
+arrivée. Décision de Laurent : blocage complet (bouton désactivé/
+invisible), pas un simple avertissement. Touche le cycle de statut au
+clic (`SOPTS`, cf. §15.5) sur tous les modes (course, forme, et le futur
+marche-course une fois migré en 17.1).
+
+### 17.5 Refonte des objectifs du grand débutant : paliers de durée continue
+
+Revient sur `PALIERS_MARCHE_COURSE` (§15.1, ratio course/marche) : les
+objectifs proposés au coureur deviennent des **paliers de durée de
+course continue croissants, de 5 à 30 minutes** (pas un ratio abstrait
+course/marche affiché comme objectif). Décisions actées avec Laurent :
+- **Validation manuelle par le coureur**, pas automatique (contrairement
+  au seuil de 2 séances codé en §15.1 via `palierMarcheCourseFor`) — le
+  coureur décide lui-même quand il se sent prêt à passer au palier
+  suivant, pas de détection algorithmique du seuil.
+- Les séances adaptatives (le contenu généré) doivent évoluer en
+  fonction du palier de durée validé.
+- Le coach (messages contextuels, cf. Mode Forme §12) doit avoir un ton
+  spécifiquement encourageant pour ce profil.
+- **Clôture à 30 minutes** : une fois ce palier validé, le coureur
+  n'est plus considéré "grand débutant" — le plan se clôture et l'app
+  lui propose explicitement de lancer un nouveau plan, soit en mode
+  course soit en Mode Forme, niveau debutant. Pas de suite automatique
+  en marche-course (contrairement à la mécanique actuelle du §15.4 qui
+  ne fait que proposer, sans clôturer).
+
+### 17.6 Wizard : navigation par flèches en haut, plus de bouton "Continuer"
+
+Les flèches de navigation (précédent/suivant) se placent au niveau de
+l'indicateur d'étape en haut de l'écran (zone "ÉTAPE N", cf. §15.3) et
+**remplacent** le bouton "Continuer" en bas — pas une coexistence des
+deux. Simplifie l'écran, touche tous les steps du wizard (pas
+spécifique au grand débutant).
+
+### 17.7 Données de profil retirées du wizard → Réglages / Profil uniquement
+
+Les champs de profil (année de naissance, FC max, et **le niveau du
+coureur** — décision confirmée par Laurent, pas seulement les données
+physiques) ne doivent plus être saisissables/modifiables depuis le
+wizard course/forme. Ils vivent uniquement dans Réglages → Profil
+(la structure `profilCoureur` / `lk_profil_coureur` existe déjà depuis
+la v2.3, cf. inventaire section correspondante — il s'agit d'aller plus
+loin que le pré-remplissage actuel du wizard, en retirant carrément ces
+champs de cet écran).
+
+Implication sur le parcours de création de compte (v2.5, auth
+Supabase) : comme ces données ne seront plus jamais demandées dans le
+wizard, il faut un autre moment de collecte, sinon un nouveau compte
+n'aura ni FC max ni niveau tant qu'il n'ira pas volontairement dans
+Réglages. Décision de Laurent : **ajouter une étape de profil dédiée
+juste après la création de compte**, avant le tout premier wizard
+course/forme — pas de collecte optionnelle a posteriori (bandeau
+incitatif), une vraie étape d'onboarding.
+
+### 17.8 Suggestion automatique de changement de niveau
+
+Nouvelle idée, ouverte pendant la discussion (pas demandée initialement
+par Laurent, proposée par Claude puis affinée avec lui) :
+
+- **Dans les deux sens** (monter ET descendre) — décision de Laurent
+  malgré la proposition initiale de Claude d'envisager uniquement la
+  hausse ; l'argument retenu est qu'un coureur en difficulté constante
+  sur un niveau trop ambitieux mérite le même accompagnement qu'un
+  coureur prêt à monter, cohérent avec l'esprit "ne pas décourager"
+  déjà présent ailleurs (progression douce v2.2, garde-fou marche-course
+  §15.1).
+- **Déclenchement après plusieurs PLANS TERMINÉS**, pas en cours de
+  plan — décision explicite de Laurent (Claude avait d'abord proposé
+  "tendance sur plusieurs semaines" à l'intérieur d'un même plan, jugé
+  trop bruité par les variations naturelles d'un cycle course : fatigue
+  de fin de cycle, affûtage, forme du moment). Le moment naturel pour se
+  poser la question est donc à la fin d'un plan / au début du suivant.
+- **Critères envisagés, encore à concevoir en détail** — Laurent a
+  proposé kilométrage et assiduité en plus des pistes initiales de
+  Claude (taux de réussite/échec sur séances qualité/longue, allures
+  réelles vs attendues) :
+  - Difficulté perçue : ratio de séances ✅/❌/⚠️ sur plusieurs plans
+  - Performance réelle : allures tenues vs attendues pour le niveau
+  - Volume : km réels (Strava) vs volume théorique du niveau déclaré
+  - Assiduité : taux de séances faites vs sautées/non renseignées
+  - **Décision de principe actée** : "ça devrait être un tout" (Laurent)
+    — un seul jugement d'ensemble combinant les 4 axes, pas plusieurs
+    signaux indépendants pouvant chacun déclencher une suggestion (même
+    logique que "une seule bannière d'adaptation" déjà retenue pour
+    l'ACWR, §33). La mécanique exacte de combinaison (score composite ?
+    règle à faisceau d'indices ?) reste à concevoir — probablement avec
+    la même rigueur que l'ACWR : validation manuelle sur les vraies
+    données Strava de Laurent avant tout codage.
+- Question encore ouverte, non tranchée : coupler ou non ce mécanisme
+  avec l'ACWR une fois ce chantier-ci terminé.
