@@ -15,7 +15,6 @@
  * convention que plan-generator.js (allures en secondes/km en interne).
  */
 
-
 // ---------------------------------------------------------------------------
 // Allures — variante sans objectif de course (pas de zone C). Réutilise
 // PACE_RATIOS tel quel (mêmes ratios recup/E/T/I/V que le moteur course,
@@ -167,6 +166,58 @@ function computeVolumeFormeSemaine({ volumeDepart, semaineNum }) {
 }
 
 // ---------------------------------------------------------------------------
+// Grand débutant — v2.8 (§17.1, correction du 14/07/2026 par rapport à la
+// première version du chantier marche-course, où ce niveau vivait dans
+// plan-generator.js/generatePlan). Le Mode Forme est la bonne maison pour ce
+// profil : pas de date de fin, cycle glissant — cohérent avec l'esprit
+// "pas de pression d'échéance" pour quelqu'un qui commence tout juste à
+// courir. Réutilise PALIERS_MARCHE_COURSE/genererContenuMarcheCourse
+// (plan-generator.js) tels quels, dans le contexte bloc glissant plutôt que
+// date de fin fixe. Toutes les séances du bloc sont identiques (même palier),
+// pas de distinction longue/EF/qualité (cf. placerSemaine, cas
+// grand-debutant déjà géré côté plan-generator.js).
+// ---------------------------------------------------------------------------
+
+function generatePlanFormeMarcheCourse(profil, params) {
+  const nbSemaines = params.nbSemainesBloc ?? TAILLE_BLOC_SEMAINES;
+  const palierId = profil.palierMarcheCourse ?? 0;
+  const semaines = [];
+  const warnings = [];
+
+  for (let semaineNum = 1; semaineNum <= nbSemaines; semaineNum++) {
+    const { assignment, warnings: warningsPlacement } = placerSemaine({
+      joursDisponibles: profil.joursDisponiblesHabituels,
+      niveau: 'grand-debutant',
+      renforcementActif: false
+    });
+    for (const seance of Object.values(assignment)) {
+      if (seance.type === 'marche-course') {
+        const { contenu, kmEstime, palierLabel } = genererContenuMarcheCourse({ palierId });
+        seance.contenu = contenu;
+        seance.kmEstime = kmEstime;
+        seance.palierLabel = palierLabel;
+      }
+    }
+    warningsPlacement.forEach(w => warnings.push({ ...w, message: `S${semaineNum} : ${w.message}` }));
+    semaines.push({ semaineNum, phase: 'MarcheCourse', estDechargeSemaine: false, assignment, warnings: warningsPlacement });
+  }
+
+  return {
+    mode: 'forme',
+    sousMode: 'marche-course', // distingue ce cas du Mode Forme classique côté app (index.html)
+    accent: null,
+    dateDebut: params.dateDebut,
+    dateCloture: params.dateCloture || undefined,
+    tailleBlocSemaines: nbSemaines,
+    allures: null, // pas d'allure établie à ce stade (cf. plan-generator.js, generatePlanMarcheCourse)
+    zoneFC: null,
+    palierMarcheCourse: palierId,
+    semaines,
+    warnings
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Orchestrateur — génère un bloc glissant de N semaines (défaut 4). Conforme
 // à un schéma de plan minimal compatible avec l'affichage existant
 // (semaines[].assignment, phase absente ou 'Forme' générique), avec
@@ -176,6 +227,10 @@ function computeVolumeFormeSemaine({ volumeDepart, semaineNum }) {
 const TAILLE_BLOC_SEMAINES = 4;
 
 function generatePlanForme(profil, params) {
+  if (profil.niveau === 'grand-debutant') {
+    return generatePlanFormeMarcheCourse(profil, params);
+  }
+
   const refTimeSeconds = parseTimeToSeconds(params.tempsReference);
   const refDistanceKm = { '5K': 5, '10K': 10, 'Semi': 21.1, 'Marathon': 42.2 }[params.refDistance ?? '10K'];
 
@@ -259,6 +314,14 @@ function generatePlanForme(profil, params) {
     mode: 'forme',
     accent,
     dateDebut: params.dateDebut,
+    // Date de clôture optionnelle (13 juillet 2026, décision avec Laurent) :
+    // permet de définir une fin explicite au plan Forme, pour pouvoir
+    // planifier un plan course à sa suite sans conflit — cf.
+    // trouverPlanEnConflit()/estPlanEnCours() dans gist-sync.js, qui
+    // considèrent un plan Forme "en cours" indéfiniment (pas de fin
+    // naturelle liée aux blocs générés) tant qu'aucune dateCloture n'est
+    // fixée. undefined si non renseignée, jamais une chaîne vide.
+    dateCloture: params.dateCloture || undefined,
     tailleBlocSemaines: nbSemaines,
     allures,
     zoneFC: (() => {
@@ -286,6 +349,14 @@ function generatePlanForme(profil, params) {
  * décharge — la décharge est un creux temporaire, pas le nouveau niveau de
  * référence), pour que la progression ne redémarre pas de zéro ni ne recule
  * à chaque enchaînement de bloc.
+ *
+ * IMPORTANT (13 juillet 2026) : ne jamais appeler cette fonction sur un plan
+ * dont dateCloture est déjà fixée — un plan Forme clôturé est figé de façon
+ * permanente (cf. sauvegarderPlan() dans gist-sync.js, qui rejette toute
+ * écriture ultérieure sur un tel plan). Ce module étant un générateur pur,
+ * il ne vérifie pas lui-même ce garde-fou : c'est à l'appelant (index.html)
+ * de contrôler planPrecedent.dateCloture avant d'invoquer genererBlocSuivant,
+ * et de ne jamais tenter de sauvegarder le résultat si le plan est clôturé.
  */
 function genererBlocSuivant(planPrecedent, profilOrigine, paramsOrigine) {
   const derniereSemaine = planPrecedent.semaines[planPrecedent.semaines.length - 1];
