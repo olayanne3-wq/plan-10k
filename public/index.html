@@ -1940,7 +1940,27 @@ function renderDashboard() {
           el("div",{class:"muted",style:{fontSize:"14px",marginBottom:"12px",lineHeight:"1.5"}},
             progression.seancesValidees+" séances de course continue réussies — la marche-course a fait son travail. Tu peux passer à un vrai plan d'entraînement, avec sortie longue et séances qualité, quand tu es prêt·e."),
           el("div",{style:{display:"flex",gap:"8px"}},
-            el("a",{href:"/v2",style:{flex:"1",display:"block",textAlign:"center",background:"var(--accent2)",border:"none",borderRadius:"8px",padding:"9px",color:"#F8FAFC",fontSize:"14px",fontWeight:"700",cursor:"pointer",textDecoration:"none"}
+            el("a",{href:"/v2",style:{flex:"1",display:"block",textAlign:"center",background:"var(--accent2)",border:"none",borderRadius:"8px",padding:"9px",color:"#F8FAFC",fontSize:"14px",fontWeight:"700",cursor:"pointer",textDecoration:"none"},
+              onClick: async (e)=>{
+                // Clôture le plan grand-débutant AVANT de rediriger — sans
+                // ça, il reste "actif indéfiniment" (pas de dateCloture) et
+                // bloque la création du nouveau plan via le garde-fou
+                // anti-chevauchement (assurerPlanExiste). Ajouté le
+                // 15/07/2026. e.preventDefault() le temps de l'appel
+                // réseau (best-effort, mais on attend quand même pour
+                // maximiser les chances que la clôture soit bien
+                // enregistrée avant que le nouveau plan tente de se créer).
+                e.preventDefault();
+                const dateCloture = new Date().toISOString().slice(0,10);
+                if (window.__UTILISATEUR__?.id && window.LkSync?.cloturerPlanSupabase && window.__PLAN_BRUT__?.id) {
+                  try {
+                    await window.LkSync.cloturerPlanSupabase(window.__PLAN_BRUT__.id, dateCloture);
+                  } catch (err) {
+                    console.warn("Clôture du plan grand-débutant échouée (non bloquant) :", err.message);
+                  }
+                }
+                window.location.href = "/v2";
+              }
             },"Configurer mon prochain plan"),
             el("button",{style:{flex:"1",background:"none",boxShadow:"0 1px 3px var(--shadow1), 0 1px 2px var(--shadow2)",borderRadius:"8px",padding:"9px",color:"var(--text-muted)",fontSize:"14px",fontWeight:"600",cursor:"pointer"},
               feedback:true,
