@@ -12,6 +12,8 @@
     { "src": "/api/delete-account", "dest": "/api/delete-account.js" },
     { "src": "/v2", "dest": "/public/v2/index.html" },
     { "src": "/v2/", "dest": "/public/v2/index.html" },
+    { "src": "/beta", "dest": "/public/beta/index.html" },
+    { "src": "/beta/", "dest": "/public/beta/index.html" },
     { "src": "/(.*)", "dest": "/public/$1" }
   ]
 }
