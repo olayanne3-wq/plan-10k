@@ -1,6 +1,6 @@
 /**
  * weather.js
- * Notes météo dynamiques sur les séances proches — Run by Léa v2.0
+ * Notes météo dynamiques sur les séances proches — Yoria v2.0
  *
  * Contrairement aux autres injections de contenu (jalons de transition,
  * notes pratiques, repères qualitatifs, jour de course), la météo ne peut
