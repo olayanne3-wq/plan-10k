@@ -15,8 +15,9 @@
 > Supabase (§8bis, v2.5) sont clos et stables. Publication Play Store en piste de
 > test interne (§11). Site "beta" indépendant à ne jamais toucher (§18.1).
 > **Domaine principal yoria.run** actif et opérationnel (§22) — Vercel (projet
-> renommé `yoria` le 16/07), Supabase et Strava tous alignés dessus ; reste juste
-> la config Android/TWA à refaire avant la publication Play Store définitive (§22.2).
+> renommé `yoria` le 16/07), Supabase et Strava tous alignés dessus ; **config
+> Android/TWA également migrée vers yoria.run le 16/07** (§22.2), suite à un
+> bug de barre d'adresse réapparue, corrigé et validé sur le téléphone réel.
 > **Nettoyage identité complet le 16/07** (§23) : plus aucune trace de "Run by Léa"
 > ou `plan-10k` dans le code fonctionnel — le persona du coach IA s'appelle
 > désormais Yoria (prompts, UI), headers de fichiers corrigés, doc dédupliquée.
@@ -149,8 +150,9 @@ yoria/
 â””â”€â”€ package.json                   # { "type": "module" }
 ```
 
-**Projet Android local (hors repo)** — `C:\Users\olaya\runbylea-android-v3\` sur la
-machine de Laurent. Généré via Bubblewrap (TWA), contient `android.keystore` (clé de
+**Projet Android local (hors repo)** — `C:\Users\olaya\Yoria\` (renommé
+depuis `runbylea-android-v3` le 16 juillet 2026) sur la machine de Laurent.
+Généré via Bubblewrap (TWA), contient `android.keystore` (clé de
 signature, **jamais dans le repo**, à sauvegarder séparément), `app-release-signed.apk`,
 et le projet Gradle complet. Voir §11 pour le détail du setup et des mots de passe à
 conserver précieusement en dehors de ce document.
@@ -660,6 +662,7 @@ ci-dessus** (13 juillet 2026, jusqu'à publication de la v2.5) :
 | Module client Strava manquant (wizard) | ✅ Clos (15 juillet) — voir §21 |
 | Domaine personnalisé yoria.run | ✅ Clos (15 juillet) — voir §22 |
 | Nettoyage identité complet (plus de Léa/plan-10k) | ✅ Clos (16 juillet) — voir §23 |
+| Migration Android/TWA vers yoria.run | ✅ Clos (16 juillet) — voir §22.2 |
 | v2.5 authentification Supabase | ✅ **Publiée** (13 juillet) — auth, migration rétroactive, wizard protégé, sync temps réel (Realtime), file d'attente, variables d'env Vercel, Réglages nettoyés |
 | v2.5 commercialisation (Stripe) | 🔜 Non commencé |
 | **Publication Play Store (TWA)** | 🟡 **En cours** (13 juillet) — voir §11 pour le détail complet |
@@ -2610,14 +2613,53 @@ envoyé à Strava. Le test suivant depuis le wizard a échoué avec
 encore le bon. Résolu en mettant à jour ce champ vers `yoria.run`
 explicitement.
 
-### 22.2 Reste à faire
+### 22.2 Migration Android/TWA vers yoria.run — FAIT (16/07/2026)
 
-- **Android / TWA** (§11) — `assetlinks.json` et la config Bubblewrap
-  (`android.keystore`, projet `runbylea-android-v3`) restent calés sur
-  `yoria-running.vercel.app`. Pas bloquant dans l'immédiat (ce domaine
-  redirige maintenant vers `yoria.run` en 308), mais l'app Android devra
-  être régénérée/republiée avec le nouveau domaine avant la publication
-  Play Store définitive.
+**Symptôme découvert** : après le nettoyage identité (§23) et le renommage
+du projet Vercel en `yoria`, la barre d'adresse est réapparue en permanence
+sur l'app Android installée (TWA), en plein écran auparavant. Diagnostic
+via `adb shell pm get-app-links app.vercel.plan_10k_alpha.twa` :
+`Domain verification state: yoria-running.vercel.app: verified` —
+`yoria.run` totalement absent de la liste, alors que la config TWA locale
+n'avait jamais été migrée depuis le passage au domaine personnalisé du
+15/07 (dette déjà identifiée mais non urgente à l'époque, cf. ancienne
+version de cette section). Le déclencheur exact reste incertain (la
+redirection 308 `yoria-running.vercel.app` → `yoria.run` existait déjà
+depuis le 15/07 sans provoquer ce symptôme auparavant) — possible lien
+avec le renommage du projet Vercel du 16/07, non confirmé formellement.
+
+**Migration effectuée** (`twa-manifest.json`, projet local
+`C:\Users\olaya\runbylea-android-v3\`, renommé `Yoria` après coup) : 5
+champs mis à jour de `yoria-running.vercel.app` vers `yoria.run` — `host`,
+`iconUrl`, `maskableIconUrl`, `webManifestUrl`, `fullScopeUrl`.
+`packageId` (`app.vercel.plan_10k_alpha.twa`) et `signingKey`
+**volontairement inchangés** — un `.aab` étant déjà uploadé sur Play
+Console (même sans testeur ajouté), l'`applicationId` est réservé de façon
+permanente côté Google ; le changer aurait signifié repartir de zéro sur
+une fiche d'app entièrement séparée. `appVersionCode` incrémenté à `7`
+(obligatoire pour qu'Android accepte de remplacer l'app déjà installée).
+
+**Bug de signature `BadPaddingException` reproduit une nouvelle fois**
+(déjà documenté §11/§13.2) — contournement habituel par `apksigner.jar`
+en ligne de commande, mot de passe keystore/clé confirmé identique
+(`keytool -list -v` avant signature, alias `android` retrouvé avec le bon
+SHA256, correspondant à `assetlinks.json`). Un seul mot de passe demandé
+par `apksigner` (comportement normal quand keystore et clé partagent la
+même valeur).
+
+**Validé en conditions réelles** : après `adb uninstall` /
+`adb install app-release-signed.apk`, `adb shell pm get-app-links` affiche
+désormais `yoria.run: verified`. Application testée sur le téléphone —
+plein écran confirmé, barre d'adresse disparue.
+
+**Non touché** (confirmé volontairement hors périmètre) :
+`public/.well-known/assetlinks.json` (déjà correct, aucune modification
+nécessaire — le fichier n'est pas lié à un domaine précis, juste servi
+depuis le domaine que le navigateur/TWA interroge) ; certificat de
+signature du keystore, qui contient encore `O=Run by Léa` dans son sujet
+(gravé à la création le 13/07, non modifiable sans regénérer une nouvelle
+clé — casserait la signature de l'app déjà publiée, aucun impact
+fonctionnel ni visible).
 
 ## 23. Nettoyage identité complet — plus de "Run by Léa"/plan-10k (16/07/2026)
 
@@ -2659,9 +2701,9 @@ mentions à corriger des mentions légitimes à garder :
   actée avec Laurent.
 - **`public/.well-known/assetlinks.json`** — lié au keystore/fingerprint
   Android existant, pas au nom du produit. Non touché.
-- **Nom de dossier local** `runbylea-android-v3` (machine Windows de
-  Laurent, hors repo) — cosmétique, aucun impact, non renommé (pas
-  d'intérêt à le faire).
+- **Nom de dossier local** `runbylea-android-v3` — **renommé `Yoria` le
+  16 juillet 2026**, après la migration Android/TWA (§22.2), une fois le
+  build testé et validé fonctionnel. Cosmétique, aucun impact technique.
 - **Sections narratives/historiques de cet inventaire** (§8bis, §12.5,
   §13-14, §16-22, diagnostics de bugs passés) — décrivent fidèlement l'état
   du code à un moment donné où "Léa"/`plan-10k` étaient encore les noms en
@@ -2696,10 +2738,12 @@ extrait d'`index.html`) effectuée avant push — aucune régression.
 
 ### 23.4 Reste à faire
 
-- **Android/TWA** (§22.2, inchangé) : toujours calé sur
-  `yoria-running.vercel.app`, à migrer vers `yoria.run` avant publication
-  Play Store définitive — indépendant de ce nettoyage d'identité.
-- Si Laurent veut un jour aussi renommer `runbylea-android-v3` (dossier
-  local Windows) ou changer l'`applicationId` Android : décision à part,
-  impliquant une republication Play Store complète — non fait ici par choix
-  explicite.
+- **Android/TWA** : migration vers `yoria.run` **finalement faite le
+  16 juillet 2026 également**, suite à un bug découvert (barre d'adresse
+  réapparue sur l'app installée) — voir §22.2 pour le détail complet.
+  N'était pas prévu dans le périmètre initial de ce nettoyage identité,
+  traité en parallèle le même jour.
+- `applicationId` Android (`app.vercel.plan_10k_alpha.twa`) : toujours
+  intentionnellement inchangé (un `.aab` étant déjà uploadé sur Play
+  Console, le changer impliquerait une republication complète) — décision
+  confirmée à nouveau lors de la migration §22.2.
