@@ -497,6 +497,12 @@ let stravaExpires = load("lk_strava_expires", 0);
 let stravaActivities = load("lk_strava_activities", []);
 let syncing = false;
 let syncMsg = "";
+let stravaAuthInvalide = false; // 16 juillet 2026 : détecte un access_token
+// Strava invalide (distinct d'une simple erreur réseau) pour proposer un
+// bouton de reconnexion directe au lieu du message générique "❌ Erreur
+// Strava" — cf. inventaire §18.2, piste identifiée après plusieurs
+// incidents de token invalidé silencieusement (ensureFreshToken() ne
+// vérifie que l'expiration locale, jamais la validité réelle côté Strava).
 let lastSyncTime = load("lk_last_sync", 0);
 let githubToken = load("lk_github_token", "");
 
@@ -5227,6 +5233,10 @@ function renderSettings() {
             el("div",{style:{color:"var(--warn)",fontSize:"15px",fontWeight:"600"}},"Connecté · "+stravaActivities.length+" activité"+(stravaActivities.length!==1?"s":""))
           ),
           syncMsg?el("div",{style:{fontSize:"14px",color:syncMsg.startsWith("✅")?"var(--accent2)":"var(--text2)",marginBottom:"10px",padding:"8px 10px",background:"var(--border-soft)",borderRadius:"8px"}},syncMsg):null,
+          stravaAuthInvalide
+            ?el("a",{href:"/api/strava/auth",style:{display:"block",background:"rgba(var(--warn-rgb),0.13)",border:"1px solid rgba(var(--warn-rgb),0.33)",borderRadius:"10px",padding:"11px",cursor:"pointer",color:"var(--warn)",fontWeight:"700",fontSize:"15px",marginBottom:"8px",textAlign:"center",textDecoration:"none",display:"block"}},
+              "🔄 Reconnecter Strava")
+            :null,
           el("button",{
             style:{width:"100%",background:syncing?"var(--bg)":"rgba(var(--warn-rgb),0.13)",border:"1px solid rgba(var(--warn-rgb),0.33)",borderRadius:"10px",padding:"11px",cursor:"pointer",color:"var(--warn)",fontWeight:"700",fontSize:"15px",marginBottom:"8px"},
             feedback:true,
@@ -5553,7 +5563,7 @@ async function syncStrava() {
     render();
     return;
   }
-  syncing=true; syncMsg="Connexion à Strava..."; render();
+  syncing=true; syncMsg="Connexion à Strava..."; stravaAuthInvalide=false; render();
   const ok = await ensureFreshToken();
   if (!ok) { syncing=false; syncMsg="Erreur de token"; render(); return; }
   try {
@@ -5585,13 +5595,32 @@ async function syncStrava() {
         coachMsg = null; coachDate = "";
         setTimeout(fetchCoachMsg, 1500);
       }
-    } else { syncMsg="❌ Erreur Strava"; }
+    } else {
+      // 16 juillet 2026 : distinguer le cas "token invalide côté Strava"
+      // (errors[].field === "access_token", cf. inventaire §18.2) du reste
+      // — ensureFreshToken() ne vérifie que l'expiration locale, jamais la
+      // validité réelle côté Strava, donc ce cas passe le contrôle plus
+      // haut sans être détecté avant l'appel réseau.
+      const invalidToken = activities?.errors?.some(e => e.field === "access_token" && e.code === "invalid");
+      if (invalidToken) {
+        stravaAuthInvalide = true;
+        syncMsg = "❌ Connexion Strava expirée — reconnecte-toi pour continuer la synchro.";
+      } else {
+        syncMsg="❌ Erreur Strava";
+      }
+    }
   } catch(e) {
     syncMsg="❌ Erreur réseau — activités précédentes conservées";
     // On ne vide pas stravaActivities — on conserve le cache
   }
   syncing=false; render();
-  setTimeout(()=>{ syncMsg=""; render(); },3000);
+  // Le message reste affiché tant qu'une reconnexion est nécessaire — sinon
+  // le bouton "Reconnecter Strava" disparaîtrait avant que l'utilisateur
+  // ait pu cliquer dessus (comportement d'auto-effacement à 3s inchangé
+  // pour tous les autres cas, succès comme erreurs ordinaires).
+  if (!stravaAuthInvalide) {
+    setTimeout(()=>{ syncMsg=""; render(); },3000);
+  }
 }
 
 function parseTargetMinutes(session) {
