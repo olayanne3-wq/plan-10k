@@ -665,6 +665,7 @@ ci-dessus** (13 juillet 2026, jusqu'à publication de la v2.5) :
 | Nettoyage identité complet (plus de Léa/plan-10k) | ✅ Clos (16 juillet) — voir §23 |
 | Migration Android/TWA vers yoria.run | ✅ Clos (16 juillet) — voir §22.2 |
 | Bug intermittent écran d'accueil wizard (course async) | ✅ Clos (16 juillet) — voir §24 |
+| Génération et signature du bundle .aab (jamais fait avant) | ✅ Fait (16 juillet) — voir §25 |
 | v2.5 authentification Supabase | ✅ **Publiée** (13 juillet) — auth, migration rétroactive, wizard protégé, sync temps réel (Realtime), file d'attente, variables d'env Vercel, Réglages nettoyés |
 | v2.5 commercialisation (Stripe) | 🔜 Non commencé |
 | **Publication Play Store (TWA)** | 🟡 **En cours** (13 juillet) — compte développeur vérifié le 16/07, voir §11 pour le détail complet |
@@ -2937,3 +2938,88 @@ réalistes, donc pas de risque de course identique.
 
 **Validé en conditions réelles** par Laurent — plusieurs rechargements
 successifs de page, toujours le bon écran d'accueil affiché.
+
+## 25. Publication Play Store — génération du bundle .aab et exigences de test fermé (16/07/2026)
+
+**Contexte** : suite à la validation du compte développeur (§11), Laurent a
+commencé à remplir Play Console — orienté automatiquement vers un canal
+**Tests fermés** plutôt que Test interne (piste initialement retenue,
+§11, décision du 13/07). Vérification faite : ce n'est pas un choix
+optionnel contournable, mais une vraie exigence Google en vigueur depuis
+novembre 2023 pour tout nouveau compte développeur personnel — un test
+fermé avec un minimum de testeurs (12 selon la documentation officielle
+actuelle, certaines sources plus anciennes mentionnent 20) inscrits en
+continu pendant 14 jours consécutifs est un prérequis obligatoire avant
+tout accès à la production. Le canal "Test interne" reste disponible et
+recommandé pour itérer rapidement, mais **ne compte pas** pour cette
+exigence — les deux canaux sont indépendants. Laurent devra donc recruter
+au moins une douzaine de testeurs (famille, amis coureurs, communauté
+running) avant de pouvoir un jour publier en production, cohérent avec
+l'objectif confirmé (app accessible à tous sur le Play Store à terme, pas
+seulement famille/proches).
+
+### 25.1 Découverte : aucun bundle .aab n'avait jamais été généré
+
+En voulant uploader une release sur Play Console, constat que
+`C:\Users\olaya\Yoria\` (renommé depuis `runbylea-android-v3`, cf. §23)
+ne contenait qu'un `app-release-signed.apk` — **aucun fichier `.aab`**,
+alors que Play Console exige un Android App Bundle, pas un APK, pour
+toute publication (même en test fermé). Pourtant `bubblewrap build`
+génère normalement les deux fichiers en une seule commande
+(`app-release-signed.apk` et `app-release-bundle.aab`, documentation
+officielle Bubblewrap) — investigation : `app\build\outputs\` ne
+contenait qu'un dossier `apk\`, jamais de dossier `bundle\`, confirmant
+que l'étape de construction du bundle (`bundleRelease`, tâche Gradle
+distincte de `assembleRelease` pour l'APK) n'avait tout simplement jamais
+été exécutée par Bubblewrap dans cette configuration — pas seulement
+échouée à la signature comme pour l'APK (§11, bug `BadPaddingException`
+déjà connu), mais carrément jamais lancée.
+
+**Corrigé** : lancement manuel de la tâche Gradle correspondante,
+directement depuis le projet Android local :
+```
+gradlew.bat bundleRelease
+```
+`BUILD SUCCESSFUL`, génère `app\build\outputs\bundle\release\app-release.aab`
+(non signé). Un warning cosmétique sur `package=` dans
+`AndroidManifest.xml` (recommandation Gradle moderne de retirer cet
+attribut, namespace désormais géré ailleurs) — sans impact fonctionnel,
+non traité.
+
+### 25.2 Signature du bundle — apksigner ne fonctionne PAS sur un .aab
+
+Première tentative avec `apksigner.jar` (l'outil habituel pour signer
+l'APK, cf. §11/§13.2) — échec :
+```
+Exception in thread "main" com.android.apksig.apk.MinSdkVersionException:
+Failed to determine APK's minimum supported platform version
+Caused by: com.android.apksig.apk.ApkFormatException: Missing AndroidManifest.xml
+```
+Cause : un fichier `.aab` n'a pas la même structure interne qu'un `.apk`
+(pas de `AndroidManifest.xml` à la racine — c'est un conteneur de modules,
+pas un paquet installable directement) ; `apksigner` attend spécifiquement
+un APK et ne sait pas traiter un bundle.
+
+**Corrigé** : utilisation de `jarsigner` (signature générique de fichiers
+ZIP/JAR, dont fait partie le format `.aab`) plutôt que `apksigner` :
+```
+jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore android.keystore -signedjar app-release-bundle-signed.aab app\build\outputs\bundle\release\app-release.aab android
+```
+Réussi (`jar signed.`), même keystore/mot de passe que pour l'APK. Warning
+"self-signed certificate" normal et attendu (keystore personnel, pas émis
+par une autorité tierce) — pas une erreur.
+
+Fichier final : `app-release-bundle-signed.aab` (~1,7 Mo), prêt à être
+uploadé dans Play Console.
+
+### 25.3 Point de vigilance retenu pour les prochaines releases
+
+Si une future mise à jour de l'app native (icône, permissions, thème —
+cf. §11, les mises à jour de contenu web n'en ont pas besoin) nécessite un
+nouveau build : refaire les deux étapes dans l'ordre — `bubblewrap build`
+(génère l'APK signé, échoue probablement à la signature comme d'habitude,
+contournement par `apksigner.jar` déjà documenté) **puis**
+`gradlew.bat bundleRelease` (génère le bundle non signé, jamais fait
+automatiquement par Bubblewrap dans cette configuration) **puis**
+`jarsigner` pour le signer. Ne pas réutiliser `apksigner.jar` sur le
+`.aab`, ça échoue systématiquement.
