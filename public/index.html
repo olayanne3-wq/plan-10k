@@ -86,6 +86,7 @@ input[type=text], input[type=number], input[type=password] {
 <script src="/engine-classic-scripts/decision-engine-runner-state.classic.js"></script>
 <script src="/engine-classic-scripts/decision-engine-engagement.classic.js"></script>
 <script src="/engine-classic-scripts/decision-engine-rules.classic.js"></script>
+<script src="/engine-classic-scripts/decision-engine-apply.classic.js"></script>
 <script>
   // Démarre le montage de l'écran d'auth dès que possible ; la promesse
   // se résout avec l'utilisateur dès qu'une session est active (existante
@@ -2219,6 +2220,104 @@ function renderDashboard() {
     );
   })();
 
+  // ── Proposition du moteur de décision (étape 4, doc intégration moteur-decision) ──
+  // Cf. §8.2 doc intégration : carte au-dessus du plan de la semaine, même
+  // esprit que adaptationEl ci-dessus. Détection AUTOMATIQUE à chaque rendu
+  // du dashboard (§5 doc intégration, "fréquence de calcul : à chaque
+  // ouverture"), application seulement sur clic explicite "Appliquer" —
+  // §7.1 doc intégration : rien n'est automatique en V1, même les décisions
+  // de sécurité à haute confiance. "Ignorer" ne mémorise le refus que pour
+  // CETTE décision précise (regleId + date du jour) — une nouvelle décision
+  // (même règle, jour différent, ou règle différente) sera reproposée
+  // normalement, cohérent avec le comportement documenté en §8.1 point 7
+  // ("le moteur pourra re-proposer... il ne insiste pas activement, il
+  // réévalue simplement à chaque nouveau calcul").
+  const moteurDecisionEl = (() => {
+    if (!window.__PLAN_BRUT__ || window.__PLAN_BRUT__.estPlanRepli) return null;
+    if (typeof DecisionEngineAdapter === 'undefined' || typeof DecisionEngineRunnerState === 'undefined'
+        || typeof DecisionEngineEngagement === 'undefined' || typeof DecisionEngineRules === 'undefined'
+        || typeof DecisionEngineApply === 'undefined') return null; // scripts pas encore chargés, jamais planter le dashboard pour ça
+
+    let resultatMoteur;
+    try {
+      const samples = DecisionEngineAdapter.adapterHistoriqueComplet(window.stravaActivities || [], {}, "strava_gratuit");
+      const runnerState = DecisionEngineRunnerState.calculerRunnerState(samples, {
+        fcMaxReference: window.profilCoureur ? window.profilCoureur.fcMax : undefined,
+        fcReposReference: 55, // valeur d'exemple tant que le vrai champ n'existe pas dans profilCoureur, cf. inventaire §26.4
+        // 'autre' fait basculer le calcul TRIMP sur la moyenne des deux jeux de
+        // constantes (cf. §5.1 doc archi) — pas idéal, mais pas arbitrairement
+        // faux pour la moitié des utilisateurs comme le serait 'homme' en dur.
+        // TODO : lire depuis profilCoureur une fois un vrai champ sexe ajouté
+        // au profil (pas encore le cas au 16/07/2026, cf. mémoire).
+        sexe: window.profilCoureur && window.profilCoureur.sexe ? window.profilCoureur.sexe : 'autre',
+      });
+      const engagementState = DecisionEngineEngagement.calculerEngagementState(samples, {});
+      resultatMoteur = DecisionEngineRules.evaluerRegles({ runnerState, engagementState, activitySamples: samples });
+    } catch (err) {
+      console.warn("Moteur de décision : erreur de calcul, carte masquée par sécurité.", err.message);
+      return null; // ne jamais planter le dashboard sur une erreur du moteur — juste ne rien proposer
+    }
+
+    if (!resultatMoteur || !resultatMoteur.decision) return null;
+    const decision = resultatMoteur.decision;
+
+    // Décisions informatives (alerter_*) : affichées mais sans bouton "Appliquer" (rien à appliquer au plan, cf. decision-engine-apply.classic.js)
+    const estInformative = decision.type !== 'reduire_charge';
+
+    const cleIgnoree = clePourPlan("lk_decision_moteur_ignoree");
+    const ignoree = load(cleIgnoree, null);
+    const idDecisionDuJour = decision.id + "_" + today();
+    if (ignoree === idDecisionDuJour) return null;
+
+    // Pour une décision reduire_charge, vérifie qu'une cible sûre existe AVANT
+    // d'afficher la carte — sinon on proposerait "Appliquer" sur un bouton qui
+    // échouerait silencieusement, cf. limite actée le 16/07/2026 (séances de
+    // qualité non modifiables automatiquement).
+    let cibleInfo = null;
+    if (!estInformative) {
+      cibleInfo = DecisionEngineApply.trouverProchaineSeanceCible(window.__PLAN_BRUT__, new Date().toISOString());
+      if (!cibleInfo) return null; // aucune cible sûre cette semaine — le moteur reste muet plutôt que de proposer une action impossible
+    }
+
+    const texteApercu = estInformative
+      ? decision.justification
+      : decision.justification + ` (${cibleInfo.session.type}, ${cibleInfo.session.kmEstime}→${Math.round(cibleInfo.session.kmEstime * (1 + decision.ampleurPourcent / 100) * 10) / 10}km)`;
+
+    return el("div",{style:{background:"rgba(var(--accent-rgb),0.07)",border:"1px solid rgba(var(--accent-rgb),0.2)",borderRadius:"12px",padding:"14px 16px",marginBottom:"16px"}},
+      el("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"8px"}},
+        el("span",{style:{fontSize:"20px"}},"🟠"),
+        el("span",{style:{color:"var(--accent)",fontSize:"15px",fontWeight:"700"}},"Yoria te propose un ajustement")
+      ),
+      el("div",{class:"muted",style:{fontSize:"14px",marginBottom:"12px",lineHeight:"1.5"}}, texteApercu),
+      el("div",{style:{display:"flex",gap:"8px"}},
+        estInformative ? null : el("button",{style:{flex:"1",background:"var(--accent)",border:"none",borderRadius:"8px",padding:"9px",color:"#F8FAFC",fontSize:"14px",fontWeight:"700",cursor:"pointer"},
+          feedback:true,
+          onClick:()=>{
+            const resultat = DecisionEngineApply.appliquerDecisionAuPlan(window.__PLAN_BRUT__, decision, new Date().toISOString());
+            if (!resultat.succes) {
+              console.warn("Application de la décision du moteur échouée :", resultat.raison);
+              return;
+            }
+            window.__PLAN_GENERE__ = traduirePlanVersFormatV1(window.__PLAN_BRUT__);
+            PLAN = window.__PLAN_GENERE__;
+            ALL_SESSIONS = recalculerAllSessions();
+            if (getGithubToken && getGithubToken() && sauvegarderPlan) {
+              sauvegarderPlan(window.__PLAN_BRUT__).catch(e => console.warn("Décision du moteur appliquée localement, sauvegarde échouée :", e.message));
+            }
+            render();
+          }
+        },"Appliquer"),
+        el("button",{style:{flex:"1",background:"none",boxShadow:"0 1px 3px var(--shadow1), 0 1px 2px var(--shadow2)",borderRadius:"8px",padding:"9px",color:"var(--text-muted)",fontSize:"14px",fontWeight:"600",cursor:"pointer"},
+          feedback:true,
+          onClick:()=>{
+            save(cleIgnoree, idDecisionDuJour);
+            render();
+          }
+        },"Ignorer")
+      )
+    );
+  })();
+
   // Banniere post-course
   const raceResult = load(clePourPlan("lk_race_result"), null);
   if (!ESTMODEFORME && today() >= DATE_COURSE_REFERENCE && raceResult) {
@@ -2929,7 +3028,7 @@ function renderDashboard() {
   // principal (décision d'emplacement tranchée le 6 juillet 2026).
   const selecteurPlanEl = renderSelecteurPlan();
 
-  return el("div",{style:{padding:"0 16px 100px"}},dashHeaderEl,selecteurPlanEl,progressionMarcheCourseEl,adaptationEl,prochainPalierEl,ESTMODEFORME?null:heroPred,todayEl||"",phaseEl,stravaSection);
+  return el("div",{style:{padding:"0 16px 100px"}},dashHeaderEl,selecteurPlanEl,progressionMarcheCourseEl,adaptationEl,moteurDecisionEl,prochainPalierEl,ESTMODEFORME?null:heroPred,todayEl||"",phaseEl,stravaSection);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
