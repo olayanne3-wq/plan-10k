@@ -2185,6 +2185,31 @@ Strava" (réutilise `connecterStrava()` déjà existant). Pas de fichier de test
 isolation dans `test-strava.mjs` (comme documenté dans les commentaires du
 fichier lui-même).
 
+**Deux ajustements testés en conditions réelles le même jour** (côté v1,
+`index.html`, après validation manuelle du bouton "Reconnecter Strava" via
+révocation volontaire de l'accès sur strava.com/settings/apps) :
+
+1. **Synchro relancée automatiquement après reconnexion** — cliquer
+   "Reconnecter Strava" ramenait un token valide mais n'actualisait pas les
+   activités tant que l'utilisateur ne recliquait pas manuellement sur
+   "Synchroniser avec Strava". `checkOAuthCallback()` appelle désormais
+   `syncStrava()` après capture du nouveau token.
+2. **Bug de viewport découvert en testant le point 1** — le retour d'une
+   navigation externe (Strava) laisse la page affichée "dézoomée" en
+   contexte TWA/PWA Android (corrigé seulement par un reload manuel ou une
+   fermeture/réouverture de l'app) — même famille de bug que celui déjà
+   contourné côté wizard (`capterRetourStravaOAuth`, `v2/index.html`, cf.
+   §17.10), mais jamais traité côté v1 jusqu'ici. Corrigé en forçant un
+   `window.location.href = "/"` (reload complet) dans `checkOAuthCallback()`
+   dès qu'un token est capté, plutôt que de laisser le state JS en place —
+   le token est déjà sauvegardé en `localStorage` juste avant, donc rien
+   n'est perdu au rechargement. Comme un reload complet interrompt
+   l'exécution du script en cours, l'appel à `syncStrava()` du point 1 ne
+   pouvait plus se faire au même endroit : un marqueur
+   `sessionStorage.lk_strava_sync_apres_reload` est posé juste avant le
+   reload, puis lu et consommé juste après le rechargement complet de la
+   page pour relancer la synchro à ce moment-là.
+
 ### 18.3 Bug résolu : sélection du plan actif au démarrage
 
 **Contexte découvert en diagnostiquant 18.4** (onboarding en boucle) : Laurent a
