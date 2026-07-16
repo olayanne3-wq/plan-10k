@@ -1,4 +1,4 @@
-// Run by Léa — api/config.js
+// Yoria — api/config.js
 // Route serverless Vercel exposant la config publique (clé anon Supabase,
 // publique par conception) depuis de vraies variables d'environnement,
 // plutôt qu'en dur dans le code client. Ajoutée le 13 juillet 2026.
