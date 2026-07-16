@@ -83,6 +83,7 @@ input[type=text], input[type=number], input[type=password] {
 <script src="/engine-classic-scripts/auth.classic.js"></script>
 <script src="/engine-classic-scripts/sync-storage.classic.js"></script>
 <script src="/engine-classic-scripts/decision-engine-adapter.classic.js"></script>  
+<script src="/engine-classic-scripts/decision-engine-runner-state.classic.js"></script>
 <script>
   // Démarre le montage de l'écran d'auth dès que possible ; la promesse
   // se résout avec l'utilisateur dès qu'une session est active (existante
@@ -593,6 +594,7 @@ function migrerVersProfilCoureur() {
   return profil;
 }
 let profilCoureur = migrerVersProfilCoureur();
+window.profilCoureur = profilCoureur; // exposition pour scripts externes (moteur de décision)
 // BUG CORRIGÉ (15/07/2026, signalé par Laurent — "j'ai perdu les données de
 // profil" après une déconnexion/reconnexion pour un tout autre correctif
 // Strava). Cause : cette fonction ne sauvegardait qu'en localStorage
