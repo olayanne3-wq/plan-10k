@@ -1,6 +1,6 @@
 /**
  * plan-generator.js
- * Moteur de génération de plan — Run by Léa v2.0
+ * Moteur de génération de plan — Yoria v2.0
  *
  * Implémente les sections 2, 4bis, 5, 6, 7, 9 et 10 de bibliotheque-seances.md.
  * Module pur (aucune dépendance DOM) — testable en isolation.
