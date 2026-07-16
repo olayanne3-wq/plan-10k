@@ -14,6 +14,9 @@
 > bugs de synchro/onboarding. Le rebranding Yoria (§13-§14) et l'authentification
 > Supabase (§8bis, v2.5) sont clos et stables. Publication Play Store en piste de
 > test interne (§11). Site "beta" indépendant à ne jamais toucher (§18.1).
+> **Domaine personnalisé yoria.run** en cours de bascule (§22) — code déjà à
+> jour, checklist de configuration externe (Vercel/Strava/Supabase) à faire
+> par Laurent, Strava étant le point historiquement fragile à ce changement.
 >
 > Pour l'historique des décisions et le "pourquoi", voir les autres docs de ce dossier
 > (bibliotheque-seances.md, convergence-v1-v2.md, etc.) et les mémoires de session.
@@ -637,6 +640,7 @@ ci-dessus** (13 juillet 2026, jusqu'à publication de la v2.5) :
 | Écran "Aucun plan en cours" (plan de repli marqué explicitement) | ✅ Clos (15 juillet) — voir §21 |
 | Grand débutant redirigé vers le mauvais flux (accent) | ✅ Clos (15 juillet) — voir §21 |
 | Module client Strava manquant (wizard) | ✅ Clos (15 juillet) — voir §21 |
+| Domaine personnalisé yoria.run | 🟡 En cours (15 juillet) — code fait, checklist config externe (Vercel/Strava/Supabase) à faire par Laurent, voir §22 |
 | v2.5 authentification Supabase | ✅ **Publiée** (13 juillet) — auth, migration rétroactive, wizard protégé, sync temps réel (Realtime), file d'attente, variables d'env Vercel, Réglages nettoyés |
 | v2.5 commercialisation (Stripe) | 🔜 Non commencé |
 | **Publication Play Store (TWA)** | 🟡 **En cours** (13 juillet) — voir §11 pour le détail complet |
@@ -2531,3 +2535,57 @@ de duplication à faire.
   `Engine.xxx` contre les exports réels de chaque module `v2/engine/*.js`)
   n'a pas été fait de façon exhaustive au-delà de Strava dans cette
   session.
+
+## 22. Domaine personnalisé yoria.run (15/07/2026)
+
+Laurent a acheté le domaine `yoria.run`, destiné à devenir le domaine
+**principal** du projet (remplace `yoria-running.vercel.app`). Audit fait
+avant tout changement de config externe : recherche exhaustive de domaines
+en dur dans le code (`grep` sur tous les fichiers `index.html`/`v2/index.html`,
+manifests PWA, `assetlinks.json`).
+
+**Résultat de l'audit** : le changement de domaine est presque entièrement
+une affaire de configuration externe (Vercel/Strava/Supabase), pas de code.
+Une seule mention en dur trouvée et corrigée (texte affiché en Paramètres,
+`index.html`, cosmétique) — tout le reste (manifests PWA, routes internes)
+utilise des chemins relatifs, donc suit automatiquement n'importe quel
+domaine.
+
+### 22.1 Fait
+
+- **`index.html`** : texte "vX.Y · plan-10k-alpha.vercel.app" (écran
+  Paramètres) mis à jour en "vX.Y · yoria.run".
+
+### 22.2 Checklist à faire par Laurent (configuration externe, hors code)
+
+1. **Vercel** — Settings → Domains du projet : ajouter `yoria.run`, suivre
+   les instructions DNS (A ou CNAME chez le registrar), puis le définir
+   comme domaine principal (les autres domaines Vercel redirigent
+   automatiquement dessus une fois ça fait).
+
+2. **Strava — point le plus sensible.** `api/strava.js` calcule le
+   `redirect_uri` dynamiquement depuis le domaine réellement utilisé
+   (`req.headers.host`) — **exactement le mécanisme qui a déjà cassé la
+   synchro une première fois lors du rebranding vers yoria-running.vercel.app
+   (§16)**. Sans action : "Authorization Error — access_token invalid" au
+   premier login Strava depuis `yoria.run`. À faire : paramètres de
+   l'application Strava (My API Application) → ajouter `yoria.run` à
+   l'**Authorization Callback Domain**.
+
+3. **Supabase** — Authentication → URL Configuration : ajouter
+   `https://yoria.run` (et `https://yoria.run/**` si des wildcards sont
+   utilisés) aux Redirect URLs autorisées. Sans ça, les emails de
+   confirmation/reset de mot de passe risquent de rediriger vers l'ancien
+   domaine ou d'échouer.
+
+4. **Android / TWA** (§11) — `assetlinks.json` et la config Bubblewrap
+   (`android.keystore`, projet `runbylea-android-v3`) sont calés sur
+   `yoria-running.vercel.app`. Pas bloquant dans l'immédiat (l'ancien
+   domaine restera fonctionnel en redirection Vercel), mais l'app Android
+   devra être régénérée/republiée avec le nouveau domaine avant la
+   publication Play Store définitive.
+
+**Reste à faire** : confirmer avec Laurent une fois les points 1-3
+effectués côté configuration externe, puis retester le flow Strava complet
+depuis `yoria.run` en particulier (point historiquement fragile à chaque
+changement de domaine).
