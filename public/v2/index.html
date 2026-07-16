@@ -1016,6 +1016,10 @@
         <div class="strava-head"><span class="strava-badge">📡 Strava connecté</span></div>
         <span class="alt-toggle" onclick="deconnecterStrava()" style="opacity:0.6;">Déconnecter</span>
       </div>
+      <div class="flag" id="stravaAuthInvalideFlagGrandDebutant" style="display:none; margin-top:16px; flex-direction:column; align-items:flex-start; gap:10px;">
+        <span style="display:flex; align-items:center; gap:8px;"><span class="ico">⚠️</span><span>Connexion Strava expirée.</span></span>
+        <button class="btn-mini" onclick="connecterStrava()">🔄 Reconnecter Strava</button>
+      </div>
     </div>
     <div class="footer">
       <button class="btn btn-next" style="width:100%;" onclick="genererPlanGrandDebutantUI()">Générer mon plan</button>
@@ -2168,6 +2172,23 @@
       return;
     }
 
+    // 16 juillet 2026 : même correctif que ci-dessus, pour le wizard Mode
+    // Forme (v2_wizard_step_forme, posée par showStepForme()). Le mode
+    // Forme n'a normalement pas de mécanisme de persistance d'étape (flux
+    // volontairement plus court, cf. commentaire historique plus haut dans
+    // ce fichier), mais un retour Strava en pleine étape 2/3/4 doit quand
+    // même éviter de renvoyer l'utilisateur à l'écran d'accueil.
+    const etapeWizardFormeAuReload = parseInt(sessionStorage.getItem('v2_wizard_step_forme') || '0', 10);
+    if (etapeWizardFormeAuReload >= 1 && etapeWizardFormeAuReload <= totalStepsForme
+        && document.getElementById('accueil-wizard-contenu')?.style.display === 'block') {
+      document.getElementById('accueil-wizard-contenu').style.display = 'none';
+      document.getElementById('choix-mode-contenu').style.display = 'none';
+      document.getElementById('wizard-forme-contenu').style.display = 'block';
+      currentForme = etapeWizardFormeAuReload;
+      showStepForme(currentForme);
+      return;
+    }
+
     if (document.getElementById('accueil-wizard-contenu')?.style.display === 'block') {
       let plans = [];
       try {
@@ -3180,6 +3201,14 @@
     nextBtnForme.innerHTML = n === totalStepsForme ? '✓' : '→';
     nextBtnForme.setAttribute('aria-label', n === totalStepsForme ? 'Générer le plan' : 'Étape suivante');
     nextBtnForme.title = n === totalStepsForme ? 'Générer le plan' : 'Continuer';
+    // 16 juillet 2026 : persiste l'étape courante du wizard Forme, même
+    // principe que showStep() (wizard course) — permet de restaurer la
+    // bonne étape après un window.location.reload() forcé par
+    // capterRetourStravaOAuth() (ex: clic "Reconnecter Strava"), au lieu
+    // de retomber sur l'écran d'accueil. Clé distincte de v2_wizard_step
+    // (wizard course) pour ne jamais les confondre au moment de la
+    // restauration.
+    sessionStorage.setItem('v2_wizard_step_forme', n);
     if (n === 1) {
       // Grand débutant (v2.8, §17.9) : pas d'objectif/estimation de temps —
       // le champ de référence n'a pas de sens tant qu'aucune course continue
@@ -3302,11 +3331,35 @@
     document.getElementById('dayCountGrandDebutant').textContent = n;
   }
 
-  function rafraichirBlocStravaGrandDebutant() {
+  async function rafraichirBlocStravaGrandDebutant() {
     if (!window.Engine) return; // pas encore chargé, l'appel via engineReady réessaiera
-    const { accessToken } = Engine.getStravaTokens();
-    document.getElementById('stravaConnexionBlocGrandDebutant').style.display = accessToken ? 'none' : '';
-    document.getElementById('stravaConnecteBlocGrandDebutant').style.display = accessToken ? '' : 'none';
+    const { accessToken: accessTokenBrut } = Engine.getStravaTokens();
+    if (!accessTokenBrut) {
+      document.getElementById('stravaConnexionBlocGrandDebutant').style.display = '';
+      document.getElementById('stravaConnecteBlocGrandDebutant').style.display = 'none';
+      document.getElementById('stravaAuthInvalideFlagGrandDebutant').style.display = 'none';
+      return;
+    }
+    // 16 juillet 2026 : ce flux se contentait jusqu'ici de vérifier la
+    // seule PRÉSENCE d'un token local, jamais sa validité réelle côté
+    // Strava (contrairement aux wizards course/Forme, qui appellent
+    // recupererVolumeStrava() et peuvent donc détecter un access_token
+    // invalide). Un token périmé restait donc affiché comme "connecté"
+    // ici, sans que l'utilisateur le découvre avant la vraie synchro
+    // (plus tard, une fois le plan créé). assurerTokenStravaValide()
+    // rafraîchit le token si expiré localement ET peut échouer si le
+    // rafraîchissement lui-même est rejeté par Strava — cf. inventaire
+    // §18.2/§23 pour le même correctif côté v1/wizard course/Forme.
+    const accessToken = await Engine.assurerTokenStravaValide();
+    if (accessToken) {
+      document.getElementById('stravaConnexionBlocGrandDebutant').style.display = 'none';
+      document.getElementById('stravaConnecteBlocGrandDebutant').style.display = '';
+      document.getElementById('stravaAuthInvalideFlagGrandDebutant').style.display = 'none';
+    } else {
+      document.getElementById('stravaConnexionBlocGrandDebutant').style.display = 'none';
+      document.getElementById('stravaConnecteBlocGrandDebutant').style.display = 'none';
+      document.getElementById('stravaAuthInvalideFlagGrandDebutant').style.display = 'flex';
+    }
   }
 
   function genererPlanGrandDebutantUI() {
