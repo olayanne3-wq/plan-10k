@@ -743,15 +743,25 @@ setInterval(fetchWeather, 30 * 60 * 1000); // refresh toutes les 30 min
     save("lk_strava_token", stravaToken);
     save("lk_strava_refresh", stravaRefresh);
     save("lk_strava_expires", stravaExpires);
-    window.history.replaceState({}, "", "/");
-    // 16 juillet 2026 : lance la synchro automatiquement après une
-    // (re)connexion Strava réussie — évite d'avoir à cliquer une seconde
-    // fois sur "Synchroniser avec Strava" juste après avoir cliqué
-    // "Reconnecter Strava" (cf. bouton stravaAuthInvalide plus haut).
-    // setTimeout léger pour laisser le premier render() s'exécuter avant.
-    setTimeout(syncStrava, 300);
+    // 16 juillet 2026 : le retour d'une navigation externe (Strava) casse
+    // le rendu du viewport en contexte TWA/PWA Android (page affichée
+    // "dézoomée", corrigée seulement par un reload/refermeture manuelle) —
+    // même famille de bug que celui déjà contourné côté wizard
+    // (capterRetourStravaOAuth, v2/index.html, cf. inventaire §17.10).
+    // On force un reload complet plutôt que de laisser le state JS en
+    // place : le token est déjà sauvegardé en localStorage juste au-dessus,
+    // donc rien n'est perdu au rechargement. Marqueur sessionStorage pour
+    // relancer la synchro juste après ce rechargement (l'appel direct à
+    // syncStrava() ici ne survivrait pas à la navigation).
+    sessionStorage.setItem("lk_strava_sync_apres_reload", "1");
+    window.location.href = "/";
   }
 })();
+
+if (sessionStorage.getItem("lk_strava_sync_apres_reload")) {
+  sessionStorage.removeItem("lk_strava_sync_apres_reload");
+  setTimeout(syncStrava, 300);
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // UTILS
