@@ -157,10 +157,17 @@ export async function recupererVolumeStrava(accessToken) {
     const resp = await fetch(`/api/strava/activities?token=${accessToken}&plan_start=${planStart}`);
     const activites = await resp.json();
     if (!Array.isArray(activites)) {
-      return { mediane: null, erreur: activites?.error || 'Réponse Strava invalide' };
+      // 16 juillet 2026 : distinguer le cas "token invalide côté Strava"
+      // (errors[].field === "access_token", même pattern que côté v1
+      // index.html, cf. inventaire §18.2/§23) du reste — assurerTokenStravaValide()
+      // ne vérifie que l'expiration locale, jamais la validité réelle côté
+      // Strava, donc ce cas passe le contrôle plus haut sans être détecté
+      // avant l'appel réseau.
+      const authInvalide = activites?.errors?.some(e => e.field === 'access_token' && e.code === 'invalid');
+      return { mediane: null, erreur: activites?.error || 'Réponse Strava invalide', authInvalide: !!authInvalide };
     }
-    return { mediane: calculerMedianeVolumeHebdo(activites), erreur: null };
+    return { mediane: calculerMedianeVolumeHebdo(activites), erreur: null, authInvalide: false };
   } catch (e) {
-    return { mediane: null, erreur: e.message };
+    return { mediane: null, erreur: e.message, authInvalide: false };
   }
 }
