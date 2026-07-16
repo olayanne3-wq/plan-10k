@@ -45,7 +45,7 @@ Utilisateur principal actuel : Laurent, qui prépare un Semi le 1er novembre 202
 ## 2. Arborescence du repo
 
 ```
-plan-10k/
+yoria/
 â”œâ”€â”€ api/                          # Endpoints serverless (Vercel/Node)
 â”‚   â”œâ”€â”€ coach.js                  # Proxy vers Claude Haiku (messages coach courts)
 â”‚   â”œâ”€â”€ strava.js                 # OAuth Strava (auth, callback, refresh, activities)
@@ -55,16 +55,27 @@ plan-10k/
 │                                    # 13 juillet 2026. Route déclarée explicitement dans
 â”‚                                    # vercel.json (routing en liste blanche, absence
 â”‚                                    # initiale de cette route causait un 404).
-├── docs/v2-methodologie/         # Documentation méthodologique et architecture
-â”‚   â”œâ”€â”€ inventaire-application.md # CE FICHIER
-│   ├── bibliotheque-seances.md   # Méthodologie détaillée des types de séances qualité
-│   ├── convergence-v1-v2.md      # Historique des décisions de convergence v1→v2
-â”‚   â”œâ”€â”€ coherence-semaine-test.md
-â”‚   â”œâ”€â”€ jalons-narratifs.md
-â”‚   â”œâ”€â”€ jour-de-course.md
-â”‚   â”œâ”€â”€ notes-meteo.md
-â”‚   â””â”€â”€ notes-pratiques.md
-â”‚   â””â”€â”€ reperes-qualitatifs.md
+├── docs/
+â”‚   â”œâ”€â”€ README.md                 # Point d'entrée de la doc — ajouté le 16 juillet 2026
+â”‚   â”œâ”€â”€ legal/                    # Documentation légale/conformité — ajoutée le 16 juillet
+â”‚   â”‚                             # 2026 (11 fichiers) : README.md, privacy.md,
+â”‚   â”‚                             # mentions-legales.md, cgu.md, cgv.md, conditions-beta.md,
+â”‚   â”‚                             # cookies.md, google-play-data-safety.md,
+â”‚   â”‚                             # apple-privacy-labels.md, rgpd-registre.md, ia-policy.md,
+â”‚   â”‚                             # changelog-legal.md
+â”‚   â””â”€â”€ v2-methodologie/          # Documentation méthodologique et architecture
+â”‚       â”œâ”€â”€ inventaire-application.md # CE FICHIER
+│       â”œâ”€â”€ bibliotheque-seances.md   # Méthodologie détaillée des types de séances qualité
+│       â”œâ”€â”€ convergence-v1-v2.md      # Historique des décisions de convergence v1→v2
+â”‚       â”œâ”€â”€ coherence-semaine-test.md
+â”‚       â”œâ”€â”€ jalons-narratifs.md
+â”‚       â”œâ”€â”€ jour-de-course.md
+â”‚       â”œâ”€â”€ notes-meteo.md
+â”‚       â”œâ”€â”€ notes-pratiques.md
+â”‚       â”œâ”€â”€ reperes-qualitatifs.md
+â”‚       â”œâ”€â”€ fiche-store.md            # Textes de fiche Play Store (titre, description, mots-clés)
+â”‚       â”œâ”€â”€ source-donnees-seances.md
+â”‚       â””â”€â”€ privacy.html              # Doublon de public/privacy.html — à clarifier
 â”œâ”€â”€ public/
 │   ├── index.html                 # App principale (dashboard) — sert le plan v2, ~300K
 │   ├── manifest.json, sw.js, icônes  # PWA v1 (racine)
