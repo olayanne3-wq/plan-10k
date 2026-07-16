@@ -2147,6 +2147,24 @@ invalid` retourné par Strava dans `syncStrava()` et soit déclencher automatiqu
 la reconnexion Strava, plutôt que d'afficher seulement "❌ Erreur Strava" sans piste
 d'action pour l'utilisateur.
 
+**Suite — implémenté le 16/07/2026** : le même symptôme (`❌ Erreur Strava`) s'est
+reproduit après la migration du domaine `yoria.run` (§22.2) — cause probable un
+changement de `redirect_uri` calculé par `api/strava.js` (dynamique sur
+`req.headers.host`, cf. §16), résolu par une reconnexion manuelle Strava. Cette
+fois, la piste ci-dessus a été codée dans `syncStrava()` (`public/index.html`) :
+détection explicite de `activities?.errors?.some(e => e.field === "access_token"
+&& e.code === "invalid")`, nouvelle variable `stravaAuthInvalide`. Si vrai :
+message dédié ("❌ Connexion Strava expirée — reconnecte-toi pour continuer la
+synchro.") + bouton **"🔄 Reconnecter Strava"** (lien direct `/api/strava/auth`,
+même mécanisme que le bouton "Connecter Strava" initial) affiché juste sous le
+message, dans la section Paramètres. Semi-automatique par choix délibéré (pas de
+redéclenchement silencieux du flow OAuth) — une reconnexion Strava sort forcément
+vers le navigateur/Strava à un moment donné, un déclenchement invisible aurait
+surpris l'utilisateur et risqué une boucle en cas d'échec répété non lié au token
+(ex. vrai problème réseau). Le message ne s'auto-efface plus après 3s dans ce cas
+précis (laisse le temps de cliquer), contrairement aux autres messages
+succès/erreur qui gardent ce comportement.
+
 ### 18.3 Bug résolu : sélection du plan actif au démarrage
 
 **Contexte découvert en diagnostiquant 18.4** (onboarding en boucle) : Laurent a
