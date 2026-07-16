@@ -47,7 +47,7 @@ import { trouverPlanEnConflit } from './gist-sync.js';
 // même temps que ce correctif.
 const CLES_INTEGRATIONS = [
   'lk_strava_token', 'lk_strava_refresh', 'lk_strava_expires',
-  'lk_strava_activities', 'lk_last_sync', 'lk_github_token', 'lk_gist_id',
+  'lk_strava_activities', 'lk_last_sync', 'lk_github_token',
   'v2_gist_id',
 ];
 
@@ -184,12 +184,13 @@ export async function migrerDonneesExistantes(userId, planId) {
 
       // Intégrations (tokens Strava/GitHub/Gist)
       // v2_gist_id ajouté le 14 juillet 2026 — cf. commentaire sur
-      // CLES_INTEGRATIONS plus haut dans ce fichier.
+      // CLES_INTEGRATIONS plus haut dans ce fichier. lk_gist_id retiré le
+      // 16 juillet 2026 (résidu mort de l'ancien backup v1, jamais
+      // consommé par gist-sync.js — cf. inventaire, dette technique).
       const colonnes = {
         lk_strava_token: 'strava_token',
         lk_strava_refresh: 'strava_refresh',
         lk_github_token: 'github_token',
-        lk_gist_id: 'gist_id',
       };
       const payloadIntegrations = { user_id: userId };
       let auMoinsUneIntegration = false;
@@ -290,13 +291,16 @@ export async function precharger(userId, planId) {
       if (i.strava_expires) localStorage.setItem('lk_strava_expires', JSON.stringify(new Date(i.strava_expires).getTime()));
       if (i.strava_activities_cache) localStorage.setItem('lk_strava_activities', JSON.stringify(i.strava_activities_cache));
       if (i.github_token) localStorage.setItem('lk_github_token', JSON.stringify(i.github_token));
-      if (i.gist_id) localStorage.setItem('lk_gist_id', JSON.stringify(i.gist_id));
+      // lk_gist_id retiré le 16 juillet 2026 (résidu mort de l'ancien
+      // backup v1, jamais consommé par gist-sync.js — cf. inventaire,
+      // dette technique nettoyée). i.gist_id reste en base côté Supabase
+      // (colonne non supprimée) mais n'est plus jamais lu ni restauré ici.
       // v2_gist_id ajouté le 14 juillet 2026 — cf. commentaire sur
       // CLES_INTEGRATIONS plus haut dans ce fichier. Sans cette ligne,
-      // le préchargement restaurait bien lk_gist_id (résidu v1) mais
-      // jamais v2_gist_id (le vrai id utilisé par chargerPlans()), donc
-      // une nouvelle installation ne retrouvait jamais les plans v2
-      // pourtant bien migrés au premier login.
+      // le préchargement ne restaurait jamais v2_gist_id (le vrai id
+      // utilisé par chargerPlans()), donc une nouvelle installation ne
+      // retrouvait jamais les plans v2 pourtant bien migrés au premier
+      // login.
       //
       // IMPORTANT — pas de JSON.stringify() ici, contrairement aux autres
       // clés d'intégration : getV2GistId() dans gist-sync.js lit v2_gist_id
@@ -372,7 +376,6 @@ export function synchroniserVersSupabase(userId, planId, cle, valeur) {
       lk_strava_activities: 'strava_activities_cache',
       lk_last_sync: 'last_sync',
       lk_github_token: 'github_token',
-      lk_gist_id: 'gist_id',
       v2_gist_id: 'v2_gist_id',
     };
     const colonne = colonnes[cle];
