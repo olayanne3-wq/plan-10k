@@ -2252,6 +2252,10 @@ function renderDashboard() {
         sexe: window.profilCoureur && window.profilCoureur.sexe ? window.profilCoureur.sexe : 'autre',
       });
       const engagementState = DecisionEngineEngagement.calculerEngagementState(samples, {});
+      // ⚠️ PATCH TEMPORAIRE DE TEST (16/07/2026) — force une fatigue élevée
+      // factice pour valider visuellement l'affichage de la carte. À RETIRER
+      // après le test, cf. mémoire de session.
+      runnerState.fatigue = 78;
       resultatMoteur = DecisionEngineRules.evaluerRegles({ runnerState, engagementState, activitySamples: samples });
     } catch (err) {
       console.warn("Moteur de décision : erreur de calcul, carte masquée par sécurité.", err.message);
