@@ -266,6 +266,13 @@
         { val: 'confirme', label: 'Confirmé', desc: "Plusieurs courses, je connais mes allures" },
       ];
       let niveauChoisi = profilExistant.niveau || null;
+      let sexeChoisi = profilExistant.sexe || null;
+
+      const SEXES = [
+        { val: 'homme', label: 'Homme' },
+        { val: 'femme', label: 'Femme' },
+        { val: 'autre', label: 'Autre / préfère ne pas dire' },
+      ];
 
       hote.innerHTML = `
         <style>
@@ -294,6 +301,12 @@
         #ecran-onboarding .niveau-opt.actif { border-color: var(--accent); background: rgba(var(--accent-rgb),0.08); }
         #ecran-onboarding .niveau-opt .titre { font-weight: 700; font-size: 0.9rem; }
         #ecran-onboarding .niveau-opt .desc { font-size: 0.78rem; color: var(--text-muted); }
+        #ecran-onboarding .sexe-opt {
+          display: inline-block; padding: 8px 14px; margin: 0 8px 8px 0;
+          border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+          font-size: 0.85rem; font-weight: 600; transition: border-color 0.15s, background 0.15s;
+        }
+        #ecran-onboarding .sexe-opt.actif { border-color: var(--accent); background: rgba(var(--accent-rgb),0.08); color: var(--accent); }
         #ecran-onboarding .btn-principal {
           width: 100%; padding: 12px; border-radius: 8px; border: none;
           background: var(--accent); color: var(--bg); font-weight: 700;
@@ -316,6 +329,10 @@
             <input type="number" id="onb-annee" placeholder="1985" min="1920" max="2020" value="${profilExistant.anneeNaissance || ''}">
             <label for="onb-fcmax">FC max (bpm)</label>
             <input type="number" id="onb-fcmax" placeholder="185" value="${profilExistant.fcMax && profilExistant.fcMax !== 181 ? profilExistant.fcMax : ''}">
+            <label for="onb-fcrepos">FC repos (bpm) — optionnel</label>
+            <input type="number" id="onb-fcrepos" placeholder="55" value="${profilExistant.fcRepos || ''}">
+            <label>Sexe — optionnel, affine le calcul de charge</label>
+            <div id="onb-sexes"></div>
             <label>Ton niveau</label>
             <div id="onb-niveaux"></div>
             <button class="btn-principal" id="onb-valider" disabled>Valider</button>
@@ -324,7 +341,26 @@
       `;
 
       const niveauxHost = hote.querySelector('#onb-niveaux');
+      const sexesHost = hote.querySelector('#onb-sexes');
       const validerBtn = hote.querySelector('#onb-valider');
+
+      // Rendu des options sexe — champ optionnel, ne touche JAMAIS à
+      // validerBtn.disabled (seul niveauChoisi contrôle la validation,
+      // cf. correctif du 15/07/2026 sur le bug de redéclenchement infini).
+      function rafraichirSexes() {
+        sexesHost.innerHTML = '';
+        SEXES.forEach(function (s) {
+          const opt = document.createElement('div');
+          opt.className = 'sexe-opt' + (sexeChoisi === s.val ? ' actif' : '');
+          opt.textContent = s.label;
+          opt.addEventListener('click', function () {
+            sexeChoisi = sexeChoisi === s.val ? null : s.val; // re-clic désélectionne, champ optionnel
+            rafraichirSexes();
+          });
+          sexesHost.appendChild(opt);
+        });
+      }
+      rafraichirSexes();
 
       function rafraichirNiveaux() {
         niveauxHost.innerHTML = '';
@@ -354,9 +390,12 @@
         hote.querySelector('#ecran-onboarding').style.display = 'none';
         const annee = parseInt(hote.querySelector('#onb-annee').value) || profilExistant.anneeNaissance || null;
         const fcmax = parseInt(hote.querySelector('#onb-fcmax').value) || profilExistant.fcMax || 181;
+        const fcrepos = parseInt(hote.querySelector('#onb-fcrepos').value) || profilExistant.fcRepos || null;
         resolve({
           anneeNaissance: annee,
           fcMax: fcmax,
+          fcRepos: fcrepos,
+          sexe: sexeChoisi,
           niveau: niveauChoisi
         });
       }
