@@ -791,9 +791,13 @@ interface GoalFeasibilityCalculator {
 >   peut rester proche de la cible malgré une vraie répétition ratée au
 >   milieu de la séance — signal peu fiable pour ce cas.
 >
-> Non implémenté à ce jour : les Modules 3 (WeekAnalyzer) et 4
-> (TrendAnalyzer) ci-dessous, qui consommeraient normalement les sorties de
-> ce module.
+> Modules 3 (WeekAnalyzer) et 4 (TrendAnalyzer) implémentés le 17/07/2026
+> (cf. inventaire §30/§31) — mais indépendamment de ce module (Module 2),
+> pas en tant que consommateurs de ses sorties : décision actée lors de leur
+> codage, le Module 2 ne couvre que les séances de qualité, un
+> WeekAnalyzer qui en dépendrait perdrait la vue sur EF/LONGUE/repos. Cette
+> anticipation ("qui consommeraient normalement les sorties de ce module")
+> ne s'est donc pas vérifiée.
 
 **Responsabilité** : comparer une séance prévue à sa réalisation.
 
@@ -973,8 +977,10 @@ interface DecisionFormatter {
 >   17/07/2026) — compare 3 points de fatigue (J, J-4, J-7) recalculés via
 >   `calculerRunnerState()`, se déclenche uniquement si aucun point n'a
 >   franchi le seuil dur de R-024s ; approche différente de la donnée requise
->   `EngineInput` du contrat théorique (pas de vrai historique persisté de
->   `WeekAnalysis`/`TrendAnalysis`, cf. §3.4, Module 4 non codé)
+>   `EngineInput` du contrat théorique — reste ainsi même après le codage du
+>   Module 4 (17/07/2026, cf. inventaire §31) : R-060 n'a pas été réécrite
+>   pour consommer `trendAnalysis`, les deux mécanismes coexistent
+>   (§13.4 doc intégration)
 > - **R-070** Séances planifiées ratées consécutives (engagement, priorité
 >   55, ajoutée 17/07/2026) — 2 séances *prévues au plan* marquées ❌
 >   d'affilée (lit `ALL_SESSIONS`/`statuses` côté index.html, transmis en
@@ -987,8 +993,12 @@ interface DecisionFormatter {
 > irrégulier détecté (R-051 ci-dessous), Objectif compromis (les deux
 > variantes), Progression bloquée si engagement en baisse, Progression
 > suspendue en fenêtre critique, Plaisir déclaré en baisse, Routine mais
-> isolement. Nécessitent pour la plupart les Modules 2/3/4
-> (SessionAnalysis/WeekAnalysis/TrendAnalysis) ou GoalFeasibility, non codés
+> isolement. Modules 2/3/4 (SessionAnalysis/WeekAnalysis/TrendAnalysis)
+> tous codés depuis le 17/07/2026 (cf. inventaire §27/§30/§31) et
+> `weekAnalysis`/`trendAnalysis` branchés dans l'input du RuleEngine (cf.
+> inventaire §32) — mais aucune règle ci-dessus ne les consomme encore ;
+> concevoir/coder ces règles reste donc nécessaire pour la plupart des
+> signaux listés ici. GoalFeasibility reste non codé
 > — cf. état d'implémentation en tête de §6 Module 2 ci-dessous.
 
 Les règles ne sont pas codées en dur dans le moteur : elles vivent dans un registre chargé au démarrage (fichier(s) séparé(s), ex. `rules/securite.rules.ts`, `rules/progression.rules.ts`, etc.). Cela permet d'ajouter/retirer une règle sans toucher à `RuleEngine`.
