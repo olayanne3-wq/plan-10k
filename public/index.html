@@ -1404,17 +1404,31 @@ function fcStatus(type, avgHr) {
   return "🟡";
 }
 
-// ── Branchement Module 2 (SessionAnalyzer) — 17/07/2026 ────────────────────
+// ── Branchement Module 2 (SessionAnalyzer) — 17/07/2026, corrigé le 17/07 ──
 // Pour une séance qualité (VMA/SPEC/SEUIL/TEST) prévue à une date donnée,
 // retrouve l'activité Strava du même jour et produit un SessionAnalysis via
 // DecisionEngineSessionAnalysis. Périmètre restreint aux séances qualité,
 // cf. en-tête de decision-engine-session-analysis.classic.js (décision
-// Laurent 17/07/2026). Construit les inputs attendus par le module
-// (allureMoyenneSec en nombre, pas une string) à partir de SESSION_TARGETS/
-// FC_ZONES déjà définis ci-dessus et de stravaActivities. Retourne null si
-// le module n'est pas chargé, si la séance n'est pas une séance qualité, ou
-// si aucune activité Strava ne correspond à cette date (séance non réalisée
-// ou non synchronisée).
+// Laurent 17/07/2026).
+//
+// CORRECTIF (même jour, avant toute mise en usage réelle) : la première
+// version comparait activite.average_speed, la vitesse MOYENNE DE TOUTE
+// L'ACTIVITÉ (échauffement + intervalles + récup + retour au calme confondus)
+// — non représentative d'une séance fractionnée. Utilise maintenant
+// getLapsAffichage(activite, seance.structureIntervalles), la fonction déjà
+// validée ailleurs dans l'app (carte "Aujourd'hui", stats SPEC/VMA §3084/1764/
+// 1772) qui isole précisément les laps d'EFFORT — jamais l'échauffement, la
+// récupération courte/longue entre répétitions, ni le retour au calme.
+// L'allure et la FC transmises au module sont la MOYENNE DES SEULS LAPS
+// D'EFFORT, pondérée par leur distance respective (un lap de 1000m compte
+// plus qu'un lap de 200m dans la moyenne — sinon un protocole à distances
+// inégales serait faussé par une simple moyenne arithmétique des allures).
+//
+// Retourne null si le module n'est pas chargé, si la séance n'est pas une
+// séance qualité, si aucune activité Strava ne correspond à cette date, ou
+// si aucun lap d'effort n'a pu être isolé (structure non reconnue, laps
+// insuffisants, etc. — cf. getLapsAffichage/getEffortLaps, jamais d'exception
+// remontée, juste un tableau vide dans ce cas).
 function analyserSeanceQualite(seance) {
   if (typeof DecisionEngineSessionAnalysis === 'undefined') return null;
   if (!seance || !seance.date || !seance.type) return null;
@@ -1423,19 +1437,50 @@ function analyserSeanceQualite(seance) {
   const activite = (stravaActivities || []).find(a => a.start_date_local?.slice(0, 10) === seance.date);
   if (!activite) return null;
 
-  const allureMoyenneSec = activite.average_speed ? Math.round(1000 / activite.average_speed) : null;
+  const lapsEffort = getLapsAffichage(activite, seance.structureIntervalles);
+  if (!lapsEffort.length) return null; // pas de laps d'effort isolables, rien à analyser
+
+  // Moyennes pondérées par la distance de chaque lap (cf. note ci-dessus) —
+  // repli sur une moyenne simple si la distance des laps est absente.
+  let distanceTotaleEffortM = 0;
+  let sommeVitesseXDistance = 0;
+  let sommeFcXDistance = 0;
+  let distanceAvecFcM = 0;
+  lapsEffort.forEach(l => {
+    const d = l.distance || 0;
+    if (l.average_speed > 0 && d > 0) {
+      sommeVitesseXDistance += l.average_speed * d;
+      distanceTotaleEffortM += d;
+    }
+    if (l.average_heartrate && d > 0) {
+      sommeFcXDistance += l.average_heartrate * d;
+      distanceAvecFcM += d;
+    }
+  });
+
+  const vitesseMoyEffort = distanceTotaleEffortM > 0 ? sommeVitesseXDistance / distanceTotaleEffortM : null;
+  const allureMoyenneSec = vitesseMoyEffort ? Math.round(1000 / vitesseMoyEffort) : null;
+  const fcMoyenneEffort = distanceAvecFcM > 0 ? Math.round(sommeFcXDistance / distanceAvecFcM) : undefined;
+  const distanceEffortKm = distanceTotaleEffortM > 0 ? Math.round(distanceTotaleEffortM / 100) / 10 : null;
 
   const seanceRealisee = {
     seanceId: seance.uid,
-    distanceKm: activite.distance != null ? Math.round(activite.distance / 100) / 10 : null,
+    distanceKm: distanceEffortKm, // distance des SEULS laps d'effort, pas la distance totale de l'activité
     allureMoyenneSec,
-    fcMoyenne: activite.average_heartrate || undefined,
+    fcMoyenne: fcMoyenneEffort,
     ressentiRPE: (sessionNotes && sessionNotes[seance.uid + '_rpe']) || undefined, // repli propre si jamais saisi
   };
 
+  // distancePrevueKm : distance d'effort attendue par la structure du plan
+  // (distanceEffortStructure, déjà utilisée ailleurs §3575/3613), pas le
+  // volume total de la séance (qui inclut échauffement/récup/retour au calme).
+  const distancePrevueEffortKm = seance.structureIntervalles
+    ? distanceEffortStructure(seance.structureIntervalles)
+    : (seance.km || seance.distanceKm || undefined);
+
   const ciblesSeance = {
     type: seance.type,
-    distancePrevueKm: seance.km || seance.distanceKm || undefined,
+    distancePrevueKm: distancePrevueEffortKm,
     allureCible: SESSION_TARGETS[seance.type],
     zoneFC: FC_ZONES[seance.type],
   };
