@@ -3163,3 +3163,128 @@ une autre raison ?). Prochaine étape : reconfirmer avec
 est toujours listé `verified` ; si non, réinstaller le build déjà signé et
 validé le 16/07/2026 (procédure complète documentée en §22.2, pas besoin
 de repartir de zéro).
+
+## 27. Moteur de décision — Module 2 (SessionAnalyzer) et garde-fous anti-régénération rétroactive (17/07/2026)
+
+### 27.1 Module 2 — SessionAnalyzer livré
+
+Nouveau fichier `decision-engine-session-analysis.classic.js` (+ synchronisé
+`public/v2/engine/session-analysis.js` non créé — **ce module n'existe qu'en
+version classic**, pas de version ES source, car il ne dépend d'aucun autre
+module ES et a été écrit directement pour l'usage classic ; à garder en tête
+si l'architecture duale ES/classic doit être généralisée plus tard).
+
+**Périmètre restreint** (décision Laurent) : analyse uniquement les séances
+de qualité (VMA/SPEC/SEUIL/TEST), jamais EF/LONGUE/RECUP — ces dernières
+n'ont pas de cible d'allure resserrée dans Yoria, l'écart n'y a pas le même
+sens.
+
+**Fonction principale** : `DecisionEngineSessionAnalysis.analyser(seanceRealisee, ciblesSeance)`
+→ `SessionAnalysis` (score de réussite, écarts par dimension avec
+commentaires, difficulté ressentie déduite, alertes). Branchée côté
+`index.html` via `analyserSeanceQualite(seance)` (~ligne 1432), qui construit
+les inputs depuis `stravaActivities`/`SESSION_TARGETS`/`FC_ZONES`/
+`getLapsAffichage()`.
+
+**Bugs trouvés et corrigés le jour même**, avant toute mise en usage réelle
+prolongée (bloc de test dédié dans Stats, cf. 27.2) :
+1. Comparaison initiale sur `activite.average_speed` (moyenne de TOUTE
+   l'activité, échauffement/récup/retour au calme confondus) → corrigé pour
+   utiliser `getLapsAffichage()` et ne comparer que les laps d'effort réels.
+2. `distanceEffortStructure()` retourne des **mètres**, pas des km —
+   conversion par 1000 manquante, faussait tout calcul de volume prévu par
+   un facteur ~1000.
+3. `distanceEffortStructure()` ne lisait que `bloc.distanceM`, ignorant
+   silencieusement les blocs définis en **durée** (`dureeEffortSec` +
+   `allure`, ex. "5×30s-30s" — protocole VMA courant) → distance nulle,
+   "Volume non disponible" systématique sur ce type de séance. Corrigé :
+   calcule la distance depuis durée/allure quand `distanceM` est absent.
+
+**Refonte des 3 dimensions analysées** (décision issue d'une discussion
+approfondie avec Laurent sur le sens sportif de chaque écart) :
+- **Allure** : reste symétrique (trop rapide et trop lent pénalisent à la
+  même hauteur). Une asymétrie (trop rapide plus pénalisant, cf. littérature
+  sur le respect du protocole d'intervalles) a été envisagée mais **reportée
+  faute de données réelles pour la calibrer** — décision explicite : "on
+  verra l'asymétrique des allures si nécessaire plus tard".
+- **FC** : une FC trop **basse** ne pénalise plus (n'est pas un signal
+  négatif en soi, contrairement à l'allure) — seule une FC trop **haute**
+  reste pénalisée.
+- **Volume → Répétitions** : dimension entièrement repensée. L'ancienne
+  comparaison de distance totale ne capturait pas un abandon en cours de
+  séance (la montre continue d'enregistrer les créneaux prévus même en cas
+  de répétition "marchée"/ratée — la distance totale peut rester proche de
+  la cible malgré une vraie répétition ratée au milieu). Remplacée par
+  `analyserRepetitions()` : compte le taux de répétitions dans la zone
+  `okPace`, avec ratio de complétion `repOk`/`repWarn` — **réutilise
+  exactement la même logique que `autoValidate()`/`validateReason()`**
+  (§6097-6178 index.html, déjà existants) pour qu'il n'existe qu'une seule
+  définition de "séance de qualité réussie" dans toute l'app.
+
+Pondérations du score : allure 0.4, FC 0.25, répétitions 0.35 (remonté par
+rapport à l'ancien "volume" à 0.15 — c'est le signal le plus fiable pour
+détecter un abandon).
+
+### 27.2 UI de test — bloc "🧪 Test Module 2" dans Stats
+
+Sélecteur (menu déroulant) de toutes les séances qualité passées avec statut
+renseigné, affiche le `SessionAnalysis` complet pour la séance choisie. Bug
+trouvé et corrigé le jour même : `select.value` doit être forcé
+explicitement après construction du DOM (l'attribut `selected` posé sur les
+`<option>` par `el()` ne suffit pas à faire refléter la sélection après
+re-render).
+
+### 27.3 Garde-fous anti-régénération rétroactive des séances passées
+
+**Origine** : Laurent a observé qu'une séance déjà réalisée (10/07/2026,
+initialement "2×8×30-30") apparaissait a posteriori comme "4×30-30" dans le
+plan — changement rétroactif trompeur pour toute analyse a posteriori (dont
+le Module 2). Cause identifiée : un bouton UI "rattraper les structures
+d'intervalles" existait dans Réglages avant le 13/07/2026 (retiré depuis),
+appelant `regenererStructuresIntervalles()` — cette fonction attribuait une
+structure fraîchement calculée à toute séance qui n'en avait pas encore, **y
+compris les séances déjà passées**, sans aucun garde-fou de date à l'époque.
+
+**Principe retenu, appliqué aux 3 mécanismes identifiés qui modifient un
+plan existant en place** : avant toute modification du contenu d'une
+séance/semaine, vérifier si sa date est strictement antérieure à aujourd'hui
+— si oui, ne jamais la toucher.
+
+1. **`changerPalierGrandDebutant()`** (index.html, ~ligne 3402) — seul point
+   de régénération *complète* du plan trouvé (mode grand-débutant/marche-
+   course). Garde-fou : pour chaque semaine du nouveau plan généré, si
+   TOUTES ses séances ont une date déjà passée, la semaine du nouveau plan
+   est remplacée par celle de l'ancien plan (fusion semaine par semaine, pas
+   jour par jour — une semaine partiellement passée suit le nouveau plan en
+   entier, plus simple à maintenir cohérent).
+
+2. **`appliquerAdaptations()`** (plan-generator, ES + classic synchronisés)
+   — mécanisme "Adaptation suggérée" (allégement ×0.75 d'une semaine suite à
+   des séances difficiles). Ne cible normalement que la semaine SUIVANTE une
+   semaine déjà notée (donc rarement déjà passée par construction), mais cas
+   limite possible si la proposition est ignorée plusieurs semaines ou
+   appliquée en retard. Garde-fou ajouté : si la semaine ciblée est déjà
+   entièrement passée, elle est ignorée avec un nouveau code d'avertissement
+   `ADAPTATION_IGNOREE_SEMAINE_PASSEE`, pas modifiée.
+
+3. **`regenererStructuresIntervalles()`** (plan-generator, ES + classic
+   synchronisés) — la cause identifiée en 27.3 ci-dessus. Le bouton UI
+   correspondant n'existe plus (retiré 13/07), mais la fonction restait
+   appelable manuellement depuis le moteur. Garde-fou ajouté : calcule la
+   date de chaque séance qualité avant de lui attribuer une structure, `skip`
+   silencieusement si déjà passée.
+
+**Mode Forme (`plan-forme.js`/`.classic.js`)** : vérifié séparément,
+`genererBlocSuivant()` (extension du cycle glissant) ne modifie jamais le
+plan précédent en place — ajoute seulement un nouveau bloc à la suite, donc
+aucun risque par construction. Pas encore branché à une UI dans
+`index.html` à ce jour ; **point de vigilance pour plus tard** : vérifier au
+moment de son branchement que la fusion avec le plan existant ne touche que
+les semaines futures.
+
+**Limite connue** : ces 3 garde-fous couvrent tous les mécanismes de
+modification de plan existant identifiés dans le code au 17/07/2026. Toute
+future fonctionnalité qui modifierait le contenu d'un plan déjà en place
+(ex. futur "adapter mon plan suite à une blessure") devra implémenter le
+même principe explicitement — ce n'est pas un garde-fou générique/transverse
+appliqué automatiquement à toute écriture sur `plan.semaines`.
