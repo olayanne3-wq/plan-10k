@@ -152,6 +152,34 @@
   // (cf. §6.2 doc intégration, distinction essentielle entre les deux
   // familles de décisions).
   //
+  // Garde-fou §10.2 doc intégration (cause 1, 17/07/2026) : plafond de
+  // réduction cumulée sur une fenêtre glissante. Empêche plusieurs décisions
+  // reduire_charge individuellement raisonnables de s'additionner en un
+  // effet cumulé excessif sur peu de jours (ex: -20% puis -15% en 3 jours).
+  // Valeur proposée dans le doc : pas plus de 25% de réduction cumulée sur
+  // 14 jours glissants — chiffre à valider avec un regard coach, pas
+  // définitif. Vérifié AVANT d'écrire sur planBrut, jamais après.
+  const PLAFOND_REDUCTION_CUMULEE_POURCENT = 25;
+  const FENETRE_CUMUL_JOURS = 14;
+
+  // Journal des réductions déjà appliquées, distinct de semaine.origineModification
+  // (qui ne garde qu'UNE entrée par semaine, écrasée à chaque nouvelle
+  // application — insuffisant pour calculer un cumul). Stocké au niveau du
+  // plan entier (planBrut.historiqueReductionsMoteur), jamais réinitialisé
+  // par ce module — persiste tant que le plan brut lui-même persiste
+  // (Supabase, cf. sauvegarderPlan côté index.html).
+  function calculerReductionCumulee(planBrut, dateReference) {
+    const historique = Array.isArray(planBrut.historiqueReductionsMoteur) ? planBrut.historiqueReductionsMoteur : [];
+    const maintenant = new Date(dateReference || new Date().toISOString()).getTime();
+    const fenetreMs = FENETRE_CUMUL_JOURS * 24 * 60 * 60 * 1000;
+    return historique
+      .filter(entree => {
+        const ecart = maintenant - new Date(entree.appliqueLe).getTime();
+        return ecart >= 0 && ecart <= fenetreMs;
+      })
+      .reduce((total, entree) => total + Math.abs(entree.ampleurPourcent || 0), 0);
+  }
+
   // Retourne { succes: bool, raison?: string } — ne modifie planBrut qu'en
   // cas de succès, jamais partiellement.
   // --------------------------------------------------------------------------
@@ -180,6 +208,19 @@
       return { succes: false, raison: 'kmEstime absent sur la séance cible, impossible de réduire un volume inconnu.' };
     }
 
+    // Garde-fou cumulé : refuse d'appliquer si le cumul (réductions déjà
+    // appliquées sur la fenêtre + cette nouvelle décision) dépasserait le
+    // plafond. Le moteur reste muet plutôt que d'aggraver une réduction déjà
+    // conséquente — cohérent avec le principe "sécurité avant performance".
+    const cumulExistant = calculerReductionCumulee(planBrut, dateReference);
+    const cumulApresApplication = cumulExistant + Math.abs(ampleur);
+    if (cumulApresApplication > PLAFOND_REDUCTION_CUMULEE_POURCENT) {
+      return {
+        succes: false,
+        raison: 'Plafond de réduction cumulée atteint (' + Math.round(cumulExistant) + '% déjà appliqués sur ' + FENETRE_CUMUL_JOURS + ' jours, plafond ' + PLAFOND_REDUCTION_CUMULEE_POURCENT + '%) — décision non appliquée par sécurité.',
+      };
+    }
+
     cible.seance.kmEstime = Math.round(cible.seance.kmEstime * (1 + ampleur / 100) * 10) / 10;
     cible.semaine.origineModification = {
       regleId: decision.id,
@@ -188,12 +229,20 @@
       appliqueLe: new Date().toISOString(),
     };
 
+    if (!Array.isArray(planBrut.historiqueReductionsMoteur)) planBrut.historiqueReductionsMoteur = [];
+    planBrut.historiqueReductionsMoteur.push({
+      regleId: decision.id,
+      ampleurPourcent: ampleur,
+      appliqueLe: new Date().toISOString(),
+    });
+
     return { succes: true, semaineNum: cible.semaine.semaineNum, jourIndex: cible.jourIndex, dateStr: cible.dateStr };
   }
 
   global.DecisionEngineApply = {
     appliquerDecisionAuPlan,
     trouverProchaineSeanceCible, // exposée pour tests unitaires isolés et pour l'affichage (savoir QUOI proposer avant de l'appliquer)
+    calculerReductionCumulee,    // exposée pour tests unitaires isolés
   };
 
 })(window);
