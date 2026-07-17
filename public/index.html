@@ -1185,7 +1185,9 @@ function analyserSemaineActuelle(weekNum, semainePrecedenteAnalyse) {
     semaine: weekNum,
     phase: phaseOf(weekNum).label || 'developpement',
     volumeHebdoPrevu: week.volumeCibleKm != null ? week.volumeCibleKm : seancesPrevues.reduce((s, p) => s + p.volumePrevuKm, 0),
-    chargePrevue: null, // pas de notion de "charge prévue" calculée ailleurs dans l'app aujourd'hui — recuperationEstimee retombe sur sa valeur neutre (50)
+    // chargePrevue non fournie ici : DecisionEngineWeekAnalysis.analyser()
+    // la calcule désormais lui-même depuis seancesPrevues (chantier du
+    // 17/07/2026, cf. en-tête decision-engine-week-analysis.classic.js).
   };
 
   const fcMax = runnerFcMax || null;
