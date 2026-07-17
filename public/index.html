@@ -502,6 +502,45 @@ let stravaRefresh = load("lk_strava_refresh", null);
 let stravaExpires = load("lk_strava_expires", 0);
 let stravaActivities = load("lk_strava_activities", []);
 window.stravaActivities = stravaActivities; // exposition pour scripts externes (moteur de décision)
+
+// ── Source de vérité unifiée pour l'ACWR (§9.3 doc intégration moteur) ──────
+// Remplace calculerACWR()/kmParJour() (plan-generator.classic.js, retirées
+// le 17/07/2026) : un seul calcul de charge dans toute l'app, partagé avec
+// le moteur de décision (RunnerStateCalculator), pour que le graphique
+// dashboard et les décisions du moteur ne puissent jamais diverger.
+// Options communes (fcMaxReference/fcReposReference/sexe) : mêmes valeurs
+// que celles passées au moteur ligne ~2244, cf. TODO fcRepos/sexe réels
+// dans profilCoureur (pas encore de champs dédiés au 17/07/2026).
+function optionsRunnerStateActuel() {
+  return {
+    fcMaxReference: window.profilCoureur ? window.profilCoureur.fcMax : undefined,
+    fcReposReference: 55, // valeur d'exemple tant que le vrai champ n'existe pas, cf. inventaire §26.4
+    sexe: window.profilCoureur && window.profilCoureur.sexe ? window.profilCoureur.sexe : 'autre',
+  };
+}
+function obtenirRatioACWRActuel() {
+  if (typeof DecisionEngineAdapter === 'undefined' || typeof DecisionEngineRunnerState === 'undefined') return null;
+  if (!stravaActivities || !stravaActivities.length) return null;
+  try {
+    const samples = DecisionEngineAdapter.adapterHistoriqueComplet(stravaActivities, {}, "strava_gratuit");
+    const runnerState = DecisionEngineRunnerState.calculerRunnerState(samples, optionsRunnerStateActuel());
+    return runnerState.charge.ratio;
+  } catch (err) {
+    console.warn("ACWR (consigne coach) : erreur de calcul.", err.message);
+    return null;
+  }
+}
+function obtenirHistoriqueACWR() {
+  if (typeof DecisionEngineAdapter === 'undefined' || typeof DecisionEngineRunnerState === 'undefined') return null;
+  if (!stravaActivities || !stravaActivities.length) return null;
+  try {
+    const samples = DecisionEngineAdapter.adapterHistoriqueComplet(stravaActivities, {}, "strava_gratuit");
+    return DecisionEngineRunnerState.calculerHistoriqueCharge(samples, optionsRunnerStateActuel());
+  } catch (err) {
+    console.warn("ACWR (graphique) : erreur de calcul.", err.message);
+    return null;
+  }
+}
 let syncing = false;
 let syncMsg = "";
 let stravaAuthInvalide = false; // 16 juillet 2026 : détecte un access_token
@@ -1096,9 +1135,10 @@ async function fetchCoachMsg() {
   // de coaching quotidien) — demandé par Laurent le 14 juillet 2026 pour
   // le mode Forme, mais s'applique en pratique à tous les modes puisque
   // l'ACWR lui-même est déjà indépendant de la notion de course.
-  const acwrActuel = (typeof stravaActivities !== "undefined" && stravaActivities.length)
-    ? calculerACWR(stravaActivities) : null;
-  const ratioActuel = acwrActuel?.dernierRatio ?? null;
+  // Source de vérité unifiée (§9.3 doc intégration moteur) : RunnerStateCalculator,
+  // même calcul que celui utilisé par le moteur de décision — remplace
+  // calculerACWR() (plan-generator.classic.js), retirée le 17/07/2026.
+  const ratioActuel = obtenirRatioACWRActuel();
   let consigneChargeInterne = '';
   if (ratioActuel !== null) {
     if (ratioActuel > ACWR_SEUIL_RISQUE) consigneChargeInterne = "Charge d'entraînement récente élevée par rapport aux dernières semaines — ton ton doit être prudent, valorise la récupération, n'encourage pas à en faire plus.";
@@ -4207,12 +4247,12 @@ function renderStats() {
   // ── ACWR (Acute:Chronic Workload Ratio) ─────────────────────────────────
   // Chantier lancé le 13 juillet 2026, validé historiquement sur les données
   // réelles de Laurent avant codage (doc convergence-v1-v2.md / mémoires).
-  // v1 volontairement simple : volume brut (km courus), pas de pondération
-  // FC/allure. Calcul via calculerACWR() (v2/engine/plan-generator.js,
-  // section 33bis), sur stravaActivities réelles (jamais le plan théorique).
+  // Source de vérité unifiée avec le moteur de décision (§9.3 doc intégration,
+  // 17/07/2026) : RunnerStateCalculator (TRIMP/sRPE pondéré), plus le simple
+  // volume brut en km de l'ancien calculerACWR() (retirée). Sur stravaActivities
+  // réelles (jamais le plan théorique).
   const acwrEl = (() => {
-    const acwr = (typeof stravaActivities !== "undefined" && stravaActivities.length)
-      ? calculerACWR(stravaActivities) : null;
+    const acwr = obtenirHistoriqueACWR();
     if (!acwr) {
       return el("div",{style:{marginBottom:"16px"}},
         el("div",{class:"label"},"⚖️ Charge d'entraînement (ACWR)"),
