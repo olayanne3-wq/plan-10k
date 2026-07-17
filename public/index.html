@@ -4572,10 +4572,16 @@ function renderStats() {
     const analyse = analyserSeanceQualite(seanceChoisie);
 
     const select = el("select",{style:{width:"100%",padding:"8px",borderRadius:"8px",border:"1px solid var(--border)",background:"var(--bg)",color:"var(--text)",fontSize:"14px",marginBottom:"10px"}},
-      ...seancesQualitePassees.map(s => el("option",{value:s.uid,selected:s.uid===window.__moduleTestSeanceUid},
+      ...seancesQualitePassees.map(s => el("option",{value:s.uid},
         s.date+" · "+s.type+" · "+statuses[s.uid]
       ))
     );
+    // Forcer select.value explicitement plutôt que compter sur l'attribut
+    // selected des <option> — el() pose bien l'attribut HTML "selected" mais
+    // ça ne suffit pas toujours à faire refléter la sélection par le <select>
+    // parent une fois construit dynamiquement (bug trouvé le 17/07/2026,
+    // premier test du bloc : le menu ne montrait jamais la séance choisie).
+    select.value = window.__moduleTestSeanceUid;
     select.addEventListener("change",(e)=>{ window.__moduleTestSeanceUid = e.target.value; render(); });
 
     let resultatEl;
