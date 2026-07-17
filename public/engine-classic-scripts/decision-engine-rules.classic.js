@@ -21,9 +21,10 @@
 // Décision actée avec Laurent le 16/07/2026 : "on avance vite, on itère" —
 // ce RuleEngine sera enrichi une fois les modules 2/3/4 codés, pas avant.
 //
-// Catalogue de démarrage (§7.2 doc intégration), 3 règles seulement :
+// Catalogue (ajout R-050 le 17/07/2026, cf. note ci-dessous) :
 //   R-006  Pic de séance unique          (sécurité)
 //   R-024s Fatigue élevée basique        (sécurité, version simplifiée)
+//   R-050  ACWR élevé                    (sécurité, nouvelle règle 17/07)
 //   R-040  Désengagement précoce         (engagement)
 //
 // Ce module ne modifie AUCUNE donnée. Il retourne au maximum UNE décision
@@ -138,6 +139,50 @@
   }
 
   // --------------------------------------------------------------------------
+  // R-050 — ACWR élevé (sécurité) — ajoutée le 17/07/2026
+  // cf. §5.2 doc archi : ratio charge aiguë/chronique > 1.3 = risque "élevé",
+  // > 1.5 = risque "critique" (mêmes seuils déjà utilisés par
+  // calculerRunnerState() pour dériver runnerState.risque). Cette règle lit
+  // directement runnerState.charge.ratio plutôt que de recalculer quoi que ce
+  // soit — le calcul existe déjà dans le Module 1 (RunnerStateCalculator).
+  //
+  // Recoupement volontaire avec R-024s : la fatigue (Module 1) dérive déjà du
+  // ratio ACWR via un mapping linéaire simple (cf. calculerFatigue()), mais ce
+  // mapping n'aligne pas exactement fatigue>=75 sur ratio>1.3 (à ratio=1.3,
+  // fatigue≈80 ; à ratio=1.25, fatigue≈75). R-050 sert de filet pour les cas où
+  // le ratio dépasse le seuil "élevé" du doc archi sans que la fatigue linéaire
+  // ait franchi 75. Priorité placée juste sous R-024s (qui reste la référence
+  // "fatigue" principale) pour qu'en cas de double déclenchement le message le
+  // plus englobant (fatigue) prime — mais R-050 se déclenche seule dans les cas
+  // où R-024s ne matche pas.
+  // --------------------------------------------------------------------------
+  function evaluerACWRElevee(runnerState) {
+    if (!runnerState || !runnerState.charge || runnerState.charge.ratio === null || runnerState.charge.ratio === undefined) {
+      return null; // pas de ratio calculable (historique insuffisant, cf. calculerCharge)
+    }
+    const ratio = runnerState.charge.ratio;
+    if (ratio <= 1.3) return null; // sous le seuil "élevé" du doc archi, rien à signaler
+
+    // Ampleur function du niveau de dépassement : -15% entre 1.3 et 1.5 (seuil
+    // "élevé"), -25% au-delà de 1.5 (seuil "critique"), cf. §5.2 doc archi.
+    const ampleurPourcent = ratio > 1.5 ? -25 : -15;
+    const niveauRisque = ratio > 1.5 ? 'critique' : 'élevé';
+
+    return {
+      id: 'R-050',
+      libelle: 'ACWR élevé',
+      categorie: 'securite',
+      priorite: 85, // sécurité, sous R-024s (90) pour laisser primer le message fatigue en cas de double match
+      type: 'reduire_charge',
+      ampleurPourcent,
+      cible: 'volume',
+      justification: `Ratio de charge aiguë/chronique de ${ratio} (risque ${niveauRisque}, seuil de vigilance à 1.3). Réduction du volume de la prochaine séance recommandée.`,
+      confianceMax: Math.min(runnerState.confiance || 0, 65), // cf. §5.5 doc archi : plafond ACWR isolé
+      donnees: { chargeRatio: ratio, chargeAigue: runnerState.charge.aigue, chargeChronique: runnerState.charge.chronique, niveauRisque },
+    };
+  }
+
+  // --------------------------------------------------------------------------
   // R-040 — Désengagement précoce (engagement)
   // cf. §7.2 doc intégration : seule règle hors sécurité retenue au démarrage.
   // Ne modifie jamais la charge d'entraînement — c'est un signal produit/UI
@@ -153,7 +198,7 @@
         id: 'R-040',
         libelle: 'Désengagement précoce',
         categorie: 'engagement',
-        priorite: 50, // hors sécurité, priorité plus basse que R-006/R-024s
+        priorite: 50, // hors sécurité, priorité plus basse que R-006/R-024s/R-050
         type: 'alerter_risque_decrochage',
         justification: signal.description,
         confianceMax: Math.min(engagementState.confiance || 0, 70),
@@ -164,9 +209,9 @@
   }
 
   // --------------------------------------------------------------------------
-  // Point d'entrée principal du Module 5 — évalue les 3 règles du catalogue de
-  // démarrage, retourne la décision de la règle gagnante (priorité la plus
-  // haute parmi celles qui matchent), ou null si aucune règle ne se déclenche.
+  // Point d'entrée principal du Module 5 — évalue les règles du catalogue,
+  // retourne la décision de la règle gagnante (priorité la plus haute parmi
+  // celles qui matchent), ou null si aucune règle ne se déclenche.
   //
   // input attendu : { runnerState, engagementState, activitySamples, dateReference }
   // --------------------------------------------------------------------------
@@ -177,6 +222,7 @@
     const candidats = [
       evaluerPicDeSeance(opts.activitySamples, dateReference),
       evaluerFatigueElevee(opts.runnerState),
+      evaluerACWRElevee(opts.runnerState),
       evaluerDesengagementPrecoce(opts.engagementState),
     ].filter(Boolean);
 
@@ -238,6 +284,7 @@
     evaluerRegles,
     evaluerPicDeSeance,          // exposées pour tests unitaires isolés
     evaluerFatigueElevee,
+    evaluerACWRElevee,
     evaluerDesengagementPrecoce,
     BORNE_AMPLEUR_MAX_POURCENT,  // référence partagée avec le garde-fou cumulé (decision-engine-apply.classic.js)
   };
