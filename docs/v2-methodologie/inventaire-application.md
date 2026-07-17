@@ -3421,3 +3421,40 @@ Chantier 29.1-29.4 : `public/v2/engine/gist-sync.js`, `public/v2/engine/sync-sto
 Chantier 29.5 : `public/v2/engine/plan-generator.js`, `public/engine-classic-scripts/plan-generator.classic.js`.
 
 Tous validés syntaxiquement (`node --check`) avant push. Push effectué via API GitHub REST directe (curl/Python, token PAT) — le connecteur MCP GitHub a renvoyé une 403 à l'écriture sur ce repo, confirmant qu'il reste lecture seule ici (cf. §Outils & principes déjà connus).
+
+### 29.7 Renommage statut "Adaptée" → "Partiel" + réactivation du bloc "Bilan semaine" (session ultérieure, 17/07/2026)
+
+**Renommage effectué** : le libellé du statut coureur ⚠️ passe de "Adaptée" à
+"Partiel", conformément à la décision actée le 16/07/2026 (cf. doc
+intégration §7.3/9.2) mais jamais appliquée en code jusqu'ici. Deux endroits
+modifiés dans `public/index.html` : le badge affiché sur une carte de séance
+validée (`✅ Validée`/`⚠️ Partiel`/`❌ Ratée`) et le libellé du compteur dans
+le bilan de fin de semaine (`⚠️ partielles`). Le bouton de sélection du
+statut lui-même (`SOPTS`, `renderStatusRow`) n'affiche que le symbole ⚠️
+sans texte, donc rien à y changer.
+
+**Idée notée en parallèle, pas codée** : cochage automatique du statut
+"Partiel" basé sur le `scoreReussite` du Module 2 (SessionAnalyzer) —
+documenté en §27.4, questions ouvertes à trancher avant conception.
+
+**Découverte en marge du renommage** : le bloc "Bilan semaine" (compteurs
+faites/partielles/manquées + % de complétion + stats additionnelles km/min
+réels vs prévus, allure et FC moyennes EF avec comparaison à la semaine
+précédente, température moyenne des séances) était entièrement calculé dans
+`renderDashboard()` (variable `bilanEl`, cf. le calcul juste après la boucle
+des cartes de séance) mais **jamais inséré dans le DOM retourné par la
+fonction** — code mort, probablement laissé de côté au profit du "Bilan de
+phase" qui le suit dans le fichier, sans nettoyage. Confirmé en discutant
+avec Laurent (qui voyait bien le bilan de phase mais cherchait en vain le
+bilan de semaine).
+
+**Corrigé** : `bilanEl` est désormais branché dans le `return` final de
+`renderDashboard()`, entre `todayEl` et `phaseEl` — ordre logique
+(aujourd'hui → bilan de la semaine en cours → bilan de la phase en cours).
+Le bloc ne s'affiche que si au moins une séance de la semaine a un statut
+renseigné (`report.done+report.adapted+report.missed > 0`), sinon reste
+`null` comme avant.
+
+**Fichiers modifiés** : `public/index.html` uniquement (pas de fichier
+`.classic.js` équivalent pour cette partie du dashboard v1).
+
