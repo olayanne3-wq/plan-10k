@@ -3659,3 +3659,37 @@ reparsing de texte libre. Sur la semaine 2 de Laurent, `plannedMin` passe
 de 192 min (sous-compté) à 269 min (cohérent avec le volume réel du plan).
 
 **Fichier modifié** : `public/index.html` uniquement.
+
+### 30.10 Test manuel (non codé) : fenêtre glissante 7j vs semaine calendaire
+
+Laurent a demandé si le Module 3 ne devrait pas raisonner en fenêtre
+glissante de 7 jours plutôt qu'en semaine calendaire du plan (lundi-
+dimanche) — l'ACWR existant (`calculerACWR()`) utilise déjà ce principe
+pour charge aiguë/chronique, contrairement au Module 3.
+
+**Décision de fond avant tout test** : le contrat `WeekAnalyzer` (doc
+archi) est explicitement pensé comme "semaine N du plan" (`semaine:
+number` en sortie, alignée sur les phases développement/spécifique/
+affûtage) — passer en fenêtre glissante casserait cet alignement et
+`progressionVsPrecedente` (comparaison semaine N vs N-1 du plan). Demande
+traitée comme un test ponctuel de comparaison, pas un chantier de
+modification.
+
+**Test effectué** (calcul manuel, aucun code modifié) : sur les 7 derniers
+jours réels de Laurent (11 au 17/07/2026, chevauchant les semaines 1 et 2
+du plan, 6 séances) :
+
+| | Semaine calendaire (4 séances) | Fenêtre glissante 7j (6 séances) |
+|---|---|---|
+| Charge réalisée | ~271 | ~451 |
+| Charge prévue | ~195.5 | ~309 |
+| Ratio | 1.39 | 1.46 |
+| Score récupération | 75 | 77 |
+
+**Conclusion** : le score reste quasi identique entre les deux approches
+(75 vs 77) — la fenêtre glissante ne corrige pas la limite de calibration
+identifiée en §30.8 (coefficients d'intensité trop bas vs charge TRIMP
+réelle sur séances de qualité). Le problème est bien la calibration des
+coefficients, pas le découpage temporel. Confirme la décision déjà actée en
+§30.8 : pas de changement de code pour l'instant, ni sur les coefficients
+ni sur le découpage semaine calendaire/fenêtre glissante.
