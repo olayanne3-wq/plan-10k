@@ -428,3 +428,71 @@ Par ordre de dépendance, pas nécessairement de priorité :
 4. **Champs profil manquants** : `fcRepos` et `sexe` n'existent pas encore dans `profilCoureur` — actuellement contournés (valeur d'exemple 55 pour `fcRepos`, repli sur `'autre'` — moyenne des constantes — pour `sexe`). Ajout formel du champ profil + saisie utilisateur, pas urgent mais nécessaire avant toute mise en avant publique du moteur.
 5. **§11.4 — algorithme de réduction d'intervalles** pour les séances de qualité, à concevoir à part.
 6. Modules non commencés du catalogue complet (§7 doc archi) : surentraînement combiné, progression, taper irrégulier, objectif à risque — à reprendre seulement une fois les 3 règles actuelles éprouvées sur un usage réel prolongé (cf. §7.2).
+
+## 12. État d'implémentation réel (17 juillet 2026)
+
+Suite directe du §11 — cette section documente ce qui a été codé, testé et déployé lors de la session du 17 juillet 2026, qui traite les points 1 à 4 de la liste "prochaines étapes logiques" du §11.7.
+
+### 12.1 §9.3 — Unification de la source de vérité sur la charge
+
+`calculerACWR(stravaActivities)` et `kmParJour()` (`plan-generator.classic.js` et son pendant ES module `plan-generator.js`) sont **retirées**, conformément à la décision actée en §9.3. Remplacées par une nouvelle fonction `calculerHistoriqueCharge()` ajoutée à `decision-engine-runner-state.classic.js`, qui reproduit la boucle jour-par-jour de l'ancien `calculerACWR()` mais en appelant `calculerCharge()` (TRIMP/sRPE pondéré) pour chaque jour de la fenêtre, au lieu de sommer des kilomètres bruts.
+
+**Différence d'échelle assumée** : l'ancien calcul (volume brut en km) et le nouveau (charge pondérée TRIMP/sRPE) ne sont pas sur la même échelle numérique — le graphique dashboard affiche désormais des valeurs plus grandes (ex. 777/389 au lieu de 45/22). C'est un changement volontaire, pas un bug : le doc archi (§5.1) documente déjà que le TRIMP/sRPE est une mesure plus fine que le volume brut. Le ratio ACWR lui-même (sans unité, seuils 0.8/1.3/1.5) reste inchangé et comparable dans le temps.
+
+Deux nouveaux helpers dans `index.html` (`optionsRunnerStateActuel()`, retournant les options communes `fcMaxReference`/`fcReposReference`/`sexe`, et `obtenirRatioACWRActuel()`/`obtenirHistoriqueACWR()`) centralisent l'appel au moteur, utilisés à la fois par la consigne de ton du coach et par le graphique dashboard — un seul point de calcul.
+
+### 12.2 §9.1 — Coach IA branché sur le moteur
+
+Nouveau helper commun `calculerEtatMoteurDecision()` dans `index.html`, qui appelle `DecisionEngineAdapter` → `DecisionEngineRunnerState.calculerRunnerState()` → `DecisionEngineEngagement.calculerEngagementState()` → `DecisionEngineRules.evaluerRegles()` en une seule fois, et retourne `{ runnerState, engagementState, decision }`. Ce helper est maintenant le point d'entrée unique du moteur côté dashboard, réutilisé par :
+- `moteurDecisionEl` (carte de proposition, §8.2) — refactorisée pour appeler ce helper au lieu de dupliquer le calcul complet qu'elle faisait seule jusqu'ici.
+- `fetchCoachMsg()` — nouveau, cf. ci-dessous.
+
+`consigneChargeInterne` (bloc du prompt du coach qui module son ton) ne recalcule plus de ratio ACWR informel séparé. Elle lit directement `runnerState.fatigue`/`.risque`, avec le même mapping de seuils que celui déjà utilisé pour le graphique (`risque === 'eleve'/'critique'` → ton prudent, `fatigue > 55` → nuance légère hausse, `risque === 'modere'` → encouragement sous-charge). Si `etatMoteurCoach.decision` existe pour le jour et que son type est `reduire_charge`, `alerter_blessure_potentielle`, ou `alerter_risque_decrochage`, une phrase est ajoutée à la consigne pour informer le coach de la décision en cours — sans jamais donner de chiffre ni de pourcentage (l'instruction "ne mentionne jamais ACWR" du prompt reste valable et s'étend implicitement à toute donnée technique du moteur).
+
+**Ce qui n'est pas encore géré** : les types `repos_complet` et `demarrer_taper` (mentionnés en exemple au §9.1) ne sont pas produits par le catalogue actuel de 3 règles — seuls les 3 types réellement produits par `evaluerRegles()` ont une branche dans `consigneChargeInterne`. À étendre quand le catalogue grossira (§11.7 point 6 de la session précédente).
+
+### 12.3 §10.2 — Les deux garde-fous, codés
+
+**Cause 2 (borne dure individuelle)**, codée dans `decision-engine-rules.classic.js` : nouvelle constante `BORNE_AMPLEUR_MAX_POURCENT = 30` (valeur proposée dans ce document, pas encore validée par un regard coach professionnel — cf. avertissement déjà présent au §10.2). Dans `evaluerRegles()`, juste avant de construire l'objet `decision` final, `gagnante.ampleurPourcent` est comparé à cette borne ; s'il la dépasse, il est plafonné à `-30` et un `console.warn` signale l'événement. La constante est exposée globalement (`DecisionEngineRules.BORNE_AMPLEUR_MAX_POURCENT`) pour rester une référence unique, y compris pour le garde-fou cumulé ci-dessous.
+
+**Cause 1 (plafond cumulé sur fenêtre glissante)**, codée dans `decision-engine-apply.classic.js` : deux nouvelles constantes `PLAFOND_REDUCTION_CUMULEE_POURCENT = 25` et `FENETRE_CUMUL_JOURS = 14` (valeurs proposées dans ce document). Un nouveau journal `planBrut.historiqueReductionsMoteur` (tableau d'entrées `{regleId, ampleurPourcent, appliqueLe}`) est alimenté à chaque application réussie d'une décision `reduire_charge` — distinct de `semaine.origineModification` (§11.3), qui ne garde qu'une seule entrée par semaine et ne suffisait donc pas à calculer un cumul sur plusieurs applications.
+
+Nouvelle fonction `calculerReductionCumulee(planBrut, dateReference)` : filtre le journal sur la fenêtre glissante (14 jours avant `dateReference`), somme les valeurs absolues des `ampleurPourcent`. `appliquerDecisionAuPlan()` calcule ce cumul existant, l'additionne à l'ampleur de la nouvelle décision, et **refuse d'appliquer** (retourne `{succes: false, raison: '...'}`, ne touche jamais `planBrut`) si le total dépasserait le plafond.
+
+**Persistance** : le journal est stocké directement sur `planBrut`, donc persisté automatiquement par le même appel `sauvegarderPlan(window.__PLAN_BRUT__)` déjà déclenché après chaque application réussie — aucun mécanisme de sauvegarde séparé à écrire.
+
+**Bug UX corrigé au passage** : avant ce correctif, un refus d'application (garde-fou déclenché, ou toute autre raison d'échec) n'était logué qu'en `console.warn`, sans aucun retour visible pour le coureur — un clic sur "Appliquer" semblait silencieusement ne rien faire. Un `alert()` explique désormais la raison du refus (cohérent avec le pattern déjà utilisé ailleurs dans l'app pour ce type de message ponctuel, cf. inventaire §26.3).
+
+**Non testé en conditions réelles** : comme au 16/07, le catalogue actuel n'a produit aucune décision `reduire_charge` sur les données de Laurent (fatigue/régularité dans les normes) — les deux garde-fous sont donc codés et validés par lecture de code, pas encore observés en train de refuser une vraie application.
+
+### 12.4 §11.7 point 4 — Champs profil `fcRepos` et `sexe`
+
+Les deux champs qui manquaient à `profilCoureur` (contournés depuis le 16/07 par une valeur d'exemple `55` et un repli `'autre'` codés en dur dans le moteur) existent maintenant réellement :
+
+- **Réglages** (`index.html`) : `fcRepos` ajouté au tableau du formulaire profil (à côté de FC max) ; `sexe` en section dédiée (boutons toggle "Homme"/"Femme"/"Autre", même pattern visuel que le sélecteur de niveau).
+- **Onboarding** (`auth.classic.js`, `monterEcranOnboarding()`) : les deux champs ajoutés à la demande explicite de Laurent après un premier passage où ils n'étaient qu'en Réglages — un input FC repos (comme FC max) et trois boutons sexe en une ligne (flex, largeur égale).
+
+**Garde appliquée explicitement** (rappel du bug de redéclenchement infini corrigé le 15/07/2026, documenté en inventaire §17) : ces deux champs sont strictement optionnels et ne touchent jamais `validerBtn.disabled` — seul `niveauChoisi` contrôle la validation de l'écran d'onboarding, vérifié ligne par ligne avant livraison (aucune nouvelle condition sur `disabled` ajoutée en dehors du bloc `niveauChoisi` déjà existant).
+
+`optionsRunnerStateActuel()` (§12.1) lit désormais les vraies valeurs `profilCoureur.fcRepos`/`.sexe` — `undefined` si non renseignés (comportement identique au repli déjà géré nativement par `calculerChargeSeance()`, cf. doc archi §5.1 : bascule sur sRPE si pas de FC repos, moyenne des deux jeux de constantes TRIMP si sexe non renseigné). Purement additif — aucune régression pour un profil qui ne remplit jamais ces champs.
+
+### 12.5 Bug corrigé (signalé par Laurent) : message coach figé après validation d'une séance
+
+**Symptôme** : le coach continuait de commenter la séance de qualité du lendemain (calculée au premier chargement du dashboard, avant que le coureur ait validé sa séance du jour) même après que le coureur ait marqué sa séance du jour comme faite plus tard dans la journée — par exemple encore centré sur "demain, VMA" un jeudi après avoir déjà validé l'EF du jeudi.
+
+**Cause** : `fetchCoachMsg()` ne régénère le message qu'une fois par jour civil (`coachDate === today() && coachMsg` empêche tout nouvel appel), et rien ne réinitialisait ce cache quand un statut de séance changeait en cours de journée.
+
+**Corrigé** : dans la fonction générique `statusRow` (utilisée pour tous les boutons ✅/⚠️/❌ de toutes les séances, passées et futures), si la séance dont le statut vient de changer a pour date **aujourd'hui précisément** (`dateSeance === today()`), le cache coach (`coachMsg`/`coachDate`, en mémoire et en localStorage) est invalidé et `fetchCoachMsg()` relancé immédiatement (ou après le délai d'affichage de 2.5s pour les statuts ✅/⚠️, cohérent avec le comportement de repli de carte déjà en place). Une correction de statut sur une séance **passée** ne redéclenche jamais d'appel coach — seule la séance du jour est concernée.
+
+### 12.6 Régression détectée, non corrigée : barre navigateur TWA Android
+
+Sans lien avec le moteur de décision, mais découverte pendant cette même session : le symptôme déjà diagnostiqué et corrigé le 16/07/2026 (inventaire §22.2 — barre Partager/⋮ visible sur la TWA installée au lieu du plein écran habituel) est réapparu. Confirmé le 17/07 que rien n'a changé côté serveur (`yoria.run/.well-known/assetlinks.json` répond toujours `200`, la redirection `308` de `yoria-running.vercel.app` vers `yoria.run` est le comportement normal documenté en §22.1) — la cause est donc côté build/vérification Android installée, pas côté code de ce repo. Détail complet et prochaine étape en inventaire §26.6.
+
+### 12.7 Prochaines étapes logiques (mise à jour)
+
+Par ordre de dépendance, ce qui reste du §11.7 initial :
+
+1. **§11.4 — algorithme de réduction d'intervalles** pour les séances de qualité (VMA/SEUIL/SPEC/TEST), à concevoir à part. `reduire_charge` continue de ne cibler que EF/LONGUE.
+2. **Modules non commencés** du catalogue complet (§7 doc archi) : surentraînement combiné, progression, taper irrégulier, objectif à risque — à reprendre une fois les 3 règles actuelles éprouvées sur un usage réel prolongé (cf. §7.2), et une fois les modules 2/3/4 (SessionAnalysis/WeekAnalysis/TrendAnalysis) codés pour les règles qui en dépendraient.
+
+Hors périmètre moteur de décision, mais lié à ce jour de session : réinstaller le build TWA déjà signé et validé le 16/07/2026 pour corriger la régression du §12.6 (procédure complète en inventaire §22.2, pas besoin de repartir de zéro).
