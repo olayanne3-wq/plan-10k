@@ -3764,7 +3764,8 @@ async function changerPalierGrandDebutant(nouveauPalierId) {
 // dashboard (Laurent signale qu'il fallait aller dans le détail de semaine
 // juste pour valider la séance du jour, pourtant déjà affichée).
 function renderStatusRow(uid, dateSeance) {
-  const statusRow=el("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap",marginTop:"4px"}});
+  const wrapper = el("div",{style:{display:"flex",flexDirection:"column",gap:"8px",marginTop:"4px",width:"100%"}});
+  const statusRow=el("div",{style:{display:"flex",gap:"6px",flexWrap:"nowrap",width:"100%"}});
   // Blocage séances futures (17.4, 15/07/2026) — un statut (fait/raté/adapté)
   // n'a de sens que pour une séance déjà passée ou en cours (aujourd'hui).
   // "—" (annuler) reste toujours cliquable : si une séance a été validée par
@@ -3785,7 +3786,7 @@ function renderStatusRow(uid, dateSeance) {
   SOPTS.forEach(opt=>{
     const cur=statuses[uid]||"—";
     const desactive = estFuture && opt!=="—";
-    const b=el("button",{style:{background:cur===opt?SCOLORS[opt]+"33":"var(--border-soft)",border:`1px solid ${cur===opt?SCOLORS[opt]:"var(--border)"}`,borderRadius:"6px",padding:"5px 10px",cursor:desactive?"not-allowed":"pointer",color:cur===opt?SCOLORS[opt]:"var(--text-muted)",fontSize:"15px",fontWeight:cur===opt?"700":"400",opacity:desactive?"0.35":"1"}},opt==="—"?"–":opt);
+    const b=el("button",{style:{flex:"1",background:cur===opt?SCOLORS[opt]+"33":"var(--border-soft)",border:`1px solid ${cur===opt?SCOLORS[opt]:"var(--border)"}`,borderRadius:"8px",padding:"10px 0",cursor:desactive?"not-allowed":"pointer",color:cur===opt?SCOLORS[opt]:"var(--text-muted)",fontSize:"18px",fontWeight:cur===opt?"700":"400",opacity:desactive?"0.35":"1"}},opt==="—"?"–":opt);
     if (desactive) b.disabled = true;
     boutons.push({ b, opt });
     b.addEventListener("click",avecRetourTactile(()=>{
@@ -3818,25 +3819,26 @@ function renderStatusRow(uid, dateSeance) {
     }));
     statusRow.appendChild(b);
   });
+  wrapper.appendChild(statusRow);
   if (estFuture) {
-    statusRow.appendChild(el("div",{style:{width:"100%",fontSize:"12px",color:"var(--text-muted)",marginTop:"2px"}},"📅 Séance à venir — disponible le jour J"));
+    wrapper.appendChild(el("div",{style:{fontSize:"12px",color:"var(--text-muted)"}},"📅 Séance à venir — disponible le jour J"));
   }
   // Sélecteur RPE unifié — 17/07/2026, cf. déclaration de sessionRpe et
   // RPE_OPTIONS plus haut. Visible uniquement si un statut "la séance a eu
   // lieu" est déjà posé (✅/⚠️/❌) — noter un ressenti n'a pas de sens sur
   // "—" (non renseigné) ni "😴" (repos/sauté, aucun effort à ressentir).
   const statutActuel = statuses[uid] || "—";
+  let rpeWrapperStatut = null;
   if (["✅", "⚠️", "❌"].indexOf(statutActuel) !== -1) {
     let rpeValStatut = sessionRpe[uid] || null;
-    const rpeRowStatut = el("div",{style:{display:"flex",gap:"4px",width:"100%",marginTop:"6px",flexWrap:"wrap"}});
+    const rpeRowStatut = el("div",{style:{display:"flex",gap:"6px",width:"100%",flexWrap:"nowrap"}});
     const rebuildRpeStatut = () => {
       rpeRowStatut.innerHTML = "";
-      rpeRowStatut.appendChild(el("div",{style:{fontSize:"11px",color:"var(--text-muted)",display:"flex",alignItems:"center",marginRight:"2px",width:"100%"}},"Ressenti"));
       RPE_OPTIONS.forEach(o=>{
         const rb = el("button",{title:o.label,style:{
-          padding:"4px 8px",fontSize:"15px",cursor:"pointer",
+          flex:"1",padding:"10px 0",fontSize:"18px",cursor:"pointer",
           background:rpeValStatut===o.v?"rgba(var(--warn-rgb),0.13)":"var(--border-soft)",
-          border:`1px solid ${rpeValStatut===o.v?"var(--warn)":"var(--border)"}`,borderRadius:"6px"
+          border:`1px solid ${rpeValStatut===o.v?"var(--warn)":"var(--border)"}`,borderRadius:"8px"
         }}, o.e);
         rb.addEventListener("click", avecRetourTactile((e)=>{
           e.stopPropagation();
@@ -3849,9 +3851,13 @@ function renderStatusRow(uid, dateSeance) {
       });
     };
     rebuildRpeStatut();
-    statusRow.appendChild(rpeRowStatut);
+    rpeWrapperStatut = el("div",{style:{width:"100%"}},
+      el("div",{style:{fontSize:"11px",color:"var(--text-muted)",marginBottom:"4px"}},"Ressenti"),
+      rpeRowStatut
+    );
+    wrapper.appendChild(rpeWrapperStatut);
   }
-  return statusRow;
+  return wrapper;
 }
 
 // Saisie/correction manuelle de performance pour une séance SPEC/VMA
@@ -3926,31 +3932,6 @@ function renderManualPerfRow(uid, s, stravaRun) {
 
     const hrInput = el("input",{type:"number",placeholder:"165",value:cur.average_heartrate||"",
       style:{width:"100%",background:"var(--bg)",boxShadow:"0 1px 3px var(--shadow1), 0 1px 2px var(--shadow2)",borderRadius:"6px",padding:"6px 8px",color:"var(--text)",fontSize:"14px",textAlign:"center"}});
-    // RPE_OPTIONS (5 niveaux, échelle CR-10) — 17/07/2026, cf. déclaration
-    // en tête de fichier. Écrit désormais dans sessionRpe (source unifiée,
-    // partagée avec renderStatusRow), plus dans manualPerf[uid].rpe — mais
-    // repli en lecture sur manualPerf[uid].rpe pour une saisie antérieure à
-    // ce chantier (cur.rpe) au premier rendu du formulaire.
-    let rpeVal = sessionRpe[uid] || cur.rpe || null;
-    const rpeRow = el("div",{style:{display:"flex",gap:"4px",flexWrap:"wrap"}});
-    const rebuildRpe = () => {
-      rpeRow.innerHTML = "";
-      RPE_OPTIONS.forEach(o=>{
-        const b = el("button",{type:"button",title:o.label,style:{
-          flex:"1",padding:"6px 0",fontSize:"16px",minWidth:"38px",
-          background:rpeVal===o.v?"rgba(var(--warn-rgb),0.13)":"var(--bg)",
-          border:`1px solid ${rpeVal===o.v?"var(--warn)":"var(--border)"}`,borderRadius:"6px",cursor:"pointer"
-        }}, o.e);
-        b.addEventListener("click",()=>{
-          rpeVal = rpeVal===o.v?null:o.v;
-          sessionRpe[uid] = rpeVal;
-          save(clePourPlan("lk_session_rpe"), sessionRpe);
-          rebuildRpe();
-        });
-        rpeRow.appendChild(b);
-      });
-    };
-    rebuildRpe();
 
     formWrap.appendChild(el("div",{style:{fontSize:"12px",color:"var(--text-muted)",marginBottom:"10px"}},
       stravaRun ? "Strava a une activité ce jour-là — ta saisie primera dessus si tu valides." :
@@ -3961,8 +3942,10 @@ function renderManualPerfRow(uid, s, stravaRun) {
     formWrap.appendChild(el("div",{style:{marginTop:"12px"}},
       el("div",{style:{fontSize:"11px",color:"var(--text-muted)",marginBottom:"4px"}},"FC moyenne (optionnel)"),hrInput
     ));
-    formWrap.appendChild(el("div",{style:{fontSize:"11px",color:"var(--text-muted)",marginTop:"10px",marginBottom:"6px"}},"Ressenti"));
-    formWrap.appendChild(rpeRow);
+    // Sélecteur RPE retiré d'ici le 17/07/2026 (chantier RPE unifié,
+    // remarque de Laurent : doublon avec le sélecteur déjà présent dans
+    // renderStatusRow, visible dès qu'un statut ✅/⚠️/❌ est posé — le
+    // ressenti se saisit désormais à un seul endroit, jamais deux).
 
     const btnRow = el("div",{style:{display:"flex",gap:"8px",marginTop:"10px"}});
     const saveBtn = el("button",{type:"button",style:{flex:"1",background:"rgba(var(--accent-rgb),0.13)",border:"1px solid rgba(var(--accent-rgb),0.33)",borderRadius:"8px",padding:"8px",color:"var(--accent)",fontWeight:"700",fontSize:"14px",cursor:"pointer"}},"✓ Enregistrer");
@@ -3970,9 +3953,6 @@ function renderManualPerfRow(uid, s, stravaRun) {
       const speed = 1000/paceSec;
       const hr = hrInput.value ? parseFloat(hrInput.value) : null;
       const distance = s.structureIntervalles ? distanceEffortStructure(s.structureIntervalles) : null;
-      // rpe retiré d'ici (17/07/2026) : déjà écrit dans sessionRpe à chaque
-      // clic sur RPE_OPTIONS ci-dessus, plus besoin de le dupliquer dans
-      // manualPerf — évite une seconde source qui pourrait diverger.
       manualPerf[uid] = { average_speed: speed, distance: distance||null, average_heartrate: hr };
       save(clePourPlan("lk_manual_perf"), manualPerf);
       rebuildPredHistory();
