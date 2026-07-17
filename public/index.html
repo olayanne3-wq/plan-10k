@@ -1091,15 +1091,17 @@ function weeklyReport(weekNum) {
   const done    = sessions.filter(s=>statuses[`${weekNum}-${week.sessions.indexOf(s)}`]==="✅").length;
   const adapted = sessions.filter(s=>statuses[`${weekNum}-${week.sessions.indexOf(s)}`]==="⚠️").length;
   const missed  = sessions.filter(s=>statuses[`${weekNum}-${week.sessions.indexOf(s)}`]==="❌").length;
-  let plannedMin = 0;
-  sessions.forEach(s => {
-    const m1 = s.session.match(/(\d+)(?:[\u2013-](\d+))?\s*min/);
-    if (m1) plannedMin += m1[2] ? (parseInt(m1[1])+parseInt(m1[2]))/2 : parseInt(m1[1]);
-    const m2 = s.warmup.match(/(\d+)'/);
-    if (m2) plannedMin += parseInt(m2[1]);
-    const m3 = s.cooldown.match(/(\d+)'/);
-    if (m3) plannedMin += parseInt(m3[1]);
-  });
+  // plannedMin via kmEstime x allure EF de référence — même calcul que
+  // weekStats() (déjà corrigé le 7 juillet 2026, cf. inventaire §7bis/
+  // 7quater). Avant ce correctif (17/07/2026), plannedMin reparsait le
+  // texte libre de chaque séance par regex (/\d+\s*min/, warmup, cooldown)
+  // — ne matchait RIEN sur les formats en secondes des séances de qualité
+  // (ex. "5×30s-30s" pour une VMA), sous-comptant fortement ces séances
+  // dans le Bilan semaine (0 minute comptée sur une VMA de 30 min réelles).
+  // Remonté par Laurent le 17/07/2026 en observant un total hebdomadaire
+  // anormalement bas (192min) sur une semaine avec 2 séances de qualité.
+  const EF_PACE = 6.33; // min/km (6:20/km), même constante que weekStats()
+  const plannedMin = Math.round(sessions.reduce((s,ses) => s + (ses.kmEstime || 0), 0) * EF_PACE);
   const weekDates = week.sessions.map(s=>s.date);
   const weekRuns = stravaActivities.filter(a=>a.type==="Run"&&weekDates.includes(a.start_date_local?.slice(0,10)));
   const realMin = Math.round(weekRuns.reduce((s,r)=>s+r.moving_time,0)/60);
@@ -1129,7 +1131,7 @@ function weeklyReport(weekNum) {
     }
   }
 
-  return { done, adapted, missed, total:sessions.length, plannedMin:Math.round(plannedMin), realMin, avgEfPace, avgEfHr, prevEfPace, prevEfHr };
+  return { done, adapted, missed, total:sessions.length, plannedMin, realMin, avgEfPace, avgEfHr, prevEfPace, prevEfHr };
 }
 
 // ── Branchement Module 3 (WeekAnalyzer) — 17/07/2026 ───────────────────────
