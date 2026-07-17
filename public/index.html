@@ -6225,14 +6225,27 @@ if ('serviceWorker' in navigator) {
       setInterval(() => reg.update(), 60 * 60 * 1000); // toutes les heures
     }).catch(() => {});
 
-    // Dès qu'un nouveau service worker prend le contrôle de la page (une
-    // mise à jour vient de s'activer), recharge automatiquement — sans ça,
-    // l'utilisateur resterait sur l'ancienne version de la page déjà
-    // chargée même si le nouveau service worker est bien actif en arrière-
-    // plan, jusqu'à sa prochaine vraie fermeture/réouverture de l'app.
+    // BUG CORRIGÉ (17/07/2026, signalé par Laurent — régression cf. inventaire
+    // §22.2/§26.6) : location.reload() automatique sur controllerchange
+    // faisait réapparaître la barre navigateur (Partager/⋮) sur la TWA
+    // Android installée, parfois même sans aucune action de l'utilisateur
+    // (juste le temps que reg.update() détecte un nouveau service worker
+    // après un déploiement). Un rechargement JS programmatique peut faire
+    // sortir Chrome du contexte "Trusted Web Activity" vérifié pour cette
+    // navigation précise, contrairement à une vraie fermeture/réouverture
+    // depuis l'icône. Corrigé : le reload automatique ne se déclenche plus
+    // en mode standalone/TWA (détecté via matchMedia) — sur ce mode, le
+    // nouveau service worker prend simplement le relai silencieusement, la
+    // nouvelle version s'affichera à la prochaine vraie réouverture de
+    // l'app. En navigateur classique (PC, onglet Chrome), le comportement
+    // du 8/07/2026 reste inchangé — c'est là que le bug initial a été
+    // observé, pas en TWA installée.
+    const estStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.matchMedia('(display-mode: fullscreen)').matches
+      || window.navigator.standalone === true; // repli iOS, cf. meta apple-mobile-web-app-capable
     let dejaRecharge = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (dejaRecharge) return;
+      if (dejaRecharge || estStandalone) return;
       dejaRecharge = true;
       location.reload();
     });
