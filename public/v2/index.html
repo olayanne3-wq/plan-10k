@@ -1694,6 +1694,19 @@
     Engine.setStravaTokens(tokens);
     window.history.replaceState({}, document.title, window.location.pathname);
 
+    // Marque explicitement ce reload comme provenant du retour Strava
+    // (17/07/2026) — nécessaire pour que le code de restauration d'étape
+    // (v2_wizard_step, plus bas) sache distinguer CE cas précis d'un simple
+    // retour normal à la page (ex: l'utilisateur a quitté le wizard en
+    // cours de route puis reclique "Configurer plan" plus tard). Sans ce
+    // signal séparé, un v2_wizard_step resté en sessionStorage forçait
+    // TOUJOURS la reprise de l'étape en cours, empêchant l'écran d'accueil
+    // (Consulter un plan / Créer un nouveau plan) de s'afficher — bug
+    // remonté explicitement par Laurent ("on est forcé à continuer ce
+    // plan"). Retiré juste après lecture (plus bas) pour ne jamais
+    // persister au-delà de ce rechargement précis.
+    sessionStorage.setItem('v2_reload_retour_strava', '1');
+
     // Sur certains Android/Chrome, revenir d'une navigation externe (Strava)
     // vers une PWA standalone laisse le rendu visuel corrompu (zoom hérité,
     // éléments mal dimensionnés) jusqu'à un rechargement manuel — confirmé
@@ -2188,8 +2201,23 @@
     // mécanisme de restauration existant (etapeSauvegardee, plus bas) n'est
     // en réalité lu que dans validerChoixMode(), jamais automatiquement au
     // chargement de la page.
+    //
+    // CORRECTIF (17/07/2026, bug remonté par Laurent) : la condition
+    // ci-dessous ne vérifiait QUE la présence de v2_wizard_step, qui reste
+    // en sessionStorage indéfiniment tant que l'onglet reste ouvert — même
+    // après avoir quitté le wizard normalement pour retourner à l'app.
+    // Résultat : rouvrir le wizard plus tard (même sans lien avec Strava)
+    // forçait TOUJOURS la reprise de l'ancienne étape, sans jamais afficher
+    // l'écran d'accueil ("on est forcé à continuer ce plan"). Exige
+    // maintenant EN PLUS le signal v2_reload_retour_strava, posé
+    // exclusivement par capterRetourStravaOAuth() juste avant son
+    // window.location.reload() — consommé (retiré) immédiatement après
+    // lecture pour ne jamais s'appliquer à un rechargement ultérieur non lié
+    // à Strava.
+    const rechargementVientDeStrava = sessionStorage.getItem('v2_reload_retour_strava') === '1';
+    sessionStorage.removeItem('v2_reload_retour_strava');
     const etapeWizardCourseAuReload = parseInt(sessionStorage.getItem('v2_wizard_step') || '0', 10);
-    if (etapeWizardCourseAuReload >= 1 && etapeWizardCourseAuReload <= totalSteps
+    if (rechargementVientDeStrava && etapeWizardCourseAuReload >= 1 && etapeWizardCourseAuReload <= totalSteps
         && document.getElementById('accueil-wizard-contenu')?.style.display === 'block') {
       document.getElementById('accueil-wizard-contenu').style.display = 'none';
       document.getElementById('choix-mode-contenu').style.display = 'none';
@@ -2198,6 +2226,15 @@
       showStep(current);
       return;
     }
+    // Si ce n'est PAS un retour Strava, l'étape persistée est périmée (issue
+    // d'une session wizard antérieure quittée sans la terminer) — nettoyée
+    // ici pour que etapeSauvegardee (plus bas, utilisée par
+    // validerChoixMode() lors d'un choix de mode volontaire) ne la retrouve
+    // jamais et ne force plus jamais une reprise non désirée (17/07/2026).
+    if (!rechargementVientDeStrava) {
+      sessionStorage.removeItem('v2_wizard_step');
+      sessionStorage.removeItem('v2_wizard_step_forme');
+    }
 
     // 16 juillet 2026 : même correctif que ci-dessus, pour le wizard Mode
     // Forme (v2_wizard_step_forme, posée par showStepForme()). Le mode
@@ -2205,8 +2242,9 @@
     // volontairement plus court, cf. commentaire historique plus haut dans
     // ce fichier), mais un retour Strava en pleine étape 2/3/4 doit quand
     // même éviter de renvoyer l'utilisateur à l'écran d'accueil.
+    // Même exigence de rechargementVientDeStrava que ci-dessus (17/07/2026).
     const etapeWizardFormeAuReload = parseInt(sessionStorage.getItem('v2_wizard_step_forme') || '0', 10);
-    if (etapeWizardFormeAuReload >= 1 && etapeWizardFormeAuReload <= totalStepsForme
+    if (rechargementVientDeStrava && etapeWizardFormeAuReload >= 1 && etapeWizardFormeAuReload <= totalStepsForme
         && document.getElementById('accueil-wizard-contenu')?.style.display === 'block') {
       document.getElementById('accueil-wizard-contenu').style.display = 'none';
       document.getElementById('choix-mode-contenu').style.display = 'none';
