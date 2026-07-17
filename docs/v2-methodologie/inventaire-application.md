@@ -3458,3 +3458,140 @@ renseigné (`report.done+report.adapted+report.missed > 0`), sinon reste
 **Fichiers modifiés** : `public/index.html` uniquement (pas de fichier
 `.classic.js` équivalent pour cette partie du dashboard v1).
 
+## 30. Moteur de décision — Module 3 (WeekAnalyzer) livré (17/07/2026, session ultérieure)
+
+### 30.1 Décisions actées avant codage
+
+- **Fonction pure, sans dépendance au Module 2** (SessionAnalyzer) — le
+  Module 2 ne couvre que les séances de qualité (VMA/SPEC/SEUIL/TEST), un
+  WeekAnalyzer qui en dépendrait perdrait la vue sur EF/LONGUE/repos, la
+  majorité d'une semaine type. Diverge d'une anticipation notée dans
+  l'en-tête de `decision-engine-session-analysis.classic.js` ("doit être
+  chargé AVANT tout futur Module 3") — anticipation qui ne s'est pas
+  vérifiée, assumé.
+- **Pas de gestion de stockage/historique** dans le module — `semainePrecedente`
+  est un paramètre fourni par l'appelant, jamais récupéré par le module
+  lui-même. Même philosophie que les Modules 1/2/5 (fonctions pures, aucun
+  effet de bord).
+- **Entrées en interfaces abstraites** (`SeanceRealisee[]`/`SeancePrevue[]`
+  du doc archi), jamais `assignment`/`statuses` bruts d'`index.html` — la
+  transformation depuis le format réel de stockage est la responsabilité de
+  l'appelant (le wrapper `analyserSemaineActuelle()`, cf. §30.3), pas du
+  module de calcul. Cohérent avec le style déjà choisi pour les Modules 1/2/5.
+
+### 30.2 Comblement d'un vide du contrat théorique
+
+`SeanceRealisee[]` (doc archi) ne représente que les séances réellement
+faites — aucun moyen d'y exprimer une séance manquée. Le module prend donc
+aussi `seancesPrevues: SeancePrevue[]` (toute la semaine prévue) et déduit
+`seancesManquees` par différence (`seancesTotal - seancesReussies`), repos
+exclu du calcul (`estSeanceARealiser`).
+
+### 30.3 Fichier créé : `decision-engine-week-analysis.classic.js`
+
+Expose `DecisionEngineWeekAnalysis.analyser(semaine, seances, seancesPrevues,
+planSemaine, semainePrecedente, fcMaxReference, fcReposReference, sexe)`,
+conforme à l'interface `WeekAnalysis` du doc archi (volume réalisé/prévu,
+écart %, séances manquées/réussies/total, charge totale semaine,
+récupération estimée, tendance vs semaine précédente).
+
+`chargeTotaleSemaine` réutilise exactement la même formule que le Module 1
+(TRIMP de Banister si FC dispo, sRPE de Foster sinon, proxy durée en dernier
+recours), dupliquée volontairement dans ce fichier — même pattern que le
+Module 2 vis-à-vis de `parseAllure` (aucun module du moteur ne dépend d'un
+autre script du moteur).
+
+`progressionVsPrecedente` : seuil ±10% de variation de charge pour basculer
+hors de `'stable'` — évite de qualifier de hausse/baisse une fluctuation
+normale d'une semaine à l'autre.
+
+### 30.4 Chargé dans `index.html`, wrapper `analyserSemaineActuelle()`
+
+Script chargé juste après le Module 2 (avant Module 5/RuleEngine). Wrapper
+`analyserSemaineActuelle(weekNum, semainePrecedenteAnalyse)` ajouté dans
+`index.html` (juste après `weeklyReport()`) : adapte `week.sessions`
+(`PLAN`), `statuses`, `stravaActivities`, `sessionNotes` vers le format
+attendu par le module — réutilise `fmtPace()`/`phaseOf()` déjà existantes,
+ne duplique aucun calcul déjà fait par `weeklyReport()`/`weekStats()`.
+
+**Bug trouvé et corrigé en testant avec Laurent (17/07/2026)** : sans
+filtre de date, les séances futures de la semaine en cours (demain,
+après-demain) étaient comptées comme "manquées" — `seancesPrevues` ne
+contenait aucune notion de date passée/future avant correction. Corrigé :
+`week.sessions` filtrée sur `s.date <= today()` avant d'être transformée en
+`SeancePrevue[]`. Une séance future n'est ni manquée ni réussie, elle n'a
+simplement pas encore eu lieu.
+
+**Bloc de test ajouté** dans l'onglet Stats (`renderStats()`), même pattern
+que "🧪 Test Module 2" (§27.2) : analyse la semaine en cours
+(`currentWeek()`), affiche volume/séances/charge/récupération/tendance.
+Pas de sélecteur de semaine (contrairement au test Module 2) — les données
+Strava/statuts n'existent que pour la semaine réelle en cours, pas de sens
+à tester une semaine future.
+
+**Bug de crash trouvé et corrigé en testant (écran blanc sur l'onglet
+Stats)** : `el(tag, attrs, ...children)` (fonction DOM maison,
+`index.html`) n'accepte que des enfants `string` ou de vrais `Node` — un
+`children.forEach` fait `appendChild(typeof c==="string" ?
+document.createTextNode(c) : c)`, donc un `number` brut (ex.
+`analyseSemaine.chargeTotaleSemaine`, un `Math.round(...)`) provoque
+`TypeError: Failed to execute 'appendChild' on 'Node'`. Corrigé en forçant
+la conversion en chaîne (`+ ""`). Point de vigilance à généraliser : tout
+affichage d'une valeur numérique brute via `el()` dans ce fichier doit
+passer par une concaténation de chaîne, jamais le nombre tel quel.
+
+**Erreur de ma part trouvée en relisant** : le wrapper utilisait
+`window.__PROFIL_COUREUR__` (variable inventée, n'existe nulle part dans le
+code) au lieu de la vraie variable `profilCoureur` (déclarée ligne ~710).
+Sans conséquence grâce à l'optional chaining (`?.`), mais corrigé pour que
+`sexe` soit réellement lu depuis le profil plutôt que de toujours retomber
+sur `'autre'`.
+
+### 30.5 Chantier complémentaire : charge PRÉVUE par séance (même session)
+
+`recuperationEstimee` restait bloqué à sa valeur neutre (50) tant
+qu'aucune notion de "charge prévue" n'existait dans l'app — seul le volume
+(`kmEstime`) était disponible, pas une estimation pondérée par intensité.
+Décision actée avec Laurent : calculer `chargePrevue` par séance via
+`coefficientIntensite(type) x dureeEstimeeMin` plutôt que reprendre
+`kmEstime` tel quel comme proxy — un simple volume ne distinguerait pas une
+séance de qualité d'une EF de même distance, alors que `chargeTotaleSemaine`
+(réalisée) fait déjà cette distinction via TRIMP/sRPE. Sans pondération
+côté prévu, `recuperationEstimee` comparerait des choses non comparables.
+
+**Coefficients retenus** (base 1.0 = EF, référence) : `EF: 1.0`,
+`LONGUE: 1.15`, `VMA: 1.5`, `SEUIL: 1.45`, `SPEC: 1.5`, `TEST: 1.4`,
+`REPOS: 0`. Calibrés à dire d'expert (pas de données réelles pour les
+calibrer autrement à ce stade) — même limite déjà assumée pour la
+constante de normalisation TRIMP/sRPE du Module 1 (§5.1 doc archi), à
+ajuster une fois croisés avec l'historique réel de Laurent.
+
+`dureeEstimeeMin` : à défaut d'une vraie durée prévue par séance (le
+générateur ne produit que `kmEstime`), estimée depuis `kmEstime` via
+l'allure EF de référence (6.33 min/km) — même repli que
+`weekStats()`/`EF_PACE` dans `index.html`, pour rester cohérent avec
+l'estimation déjà utilisée ailleurs plutôt que d'inventer une deuxième
+conversion km→min incompatible.
+
+Nouvelle fonction `calculerChargePrevueSeance(seancePrevue)` dans le module,
+exposée pour tests unitaires. `analyser()` calcule désormais
+`chargePrevueSemaine` en sommant cette fonction sur `seancesPrevues` si
+`planSemaine.chargePrevue` n'est pas explicitement fourni par l'appelant
+(rétrocompatible avec un futur calcul différent côté appelant).
+`recuperationEstimee` n'est donc plus bloqué à 50 dans l'usage réel de
+l'app.
+
+### 30.6 Non testé en conditions réelles au-delà du bloc de test manuel
+
+Le Module 3 n'est pour l'instant appelé que par le bloc "🧪 Test Module 3"
+de l'onglet Stats — aucun branchement dans `EngineInput` (Module 5/
+RuleEngine) ni dans une future règle qui en dépendrait. Modules 4
+(TrendAnalyzer) toujours non codé, cf. §26 (limite déjà documentée).
+
+### 30.7 Fichiers modifiés/créés
+
+Créé : `public/engine-classic-scripts/decision-engine-week-analysis.classic.js`.
+
+Modifié : `public/index.html` (chargement du script, wrapper
+`analyserSemaineActuelle()`, bloc de test Stats, 2 corrections de bugs
+trouvés en testant).
