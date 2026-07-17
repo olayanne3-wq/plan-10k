@@ -2859,7 +2859,7 @@ function renderDashboard() {
               background:statusColor+"22",color:statusColor,
               border:`1px solid ${statusColor}44`,
               borderRadius:"6px",padding:"3px 8px",fontSize:"14px",fontWeight:"700"
-            }},status2==="✅"?"✅ Validée":status2==="⚠️"?"⚠️ Adaptée":"❌ Ratée"):null
+            }},status2==="✅"?"✅ Validée":status2==="⚠️"?"⚠️ Partiel":"❌ Ratée"):null
           ),
           !isRest && (s.warmup||s.cooldown) ? el("div",{style:{background:"var(--border-soft)",borderRadius:"8px",padding:"8px 10px",marginBottom:"8px"}},
             s.warmup ? el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:s.cooldown?"6px":"0"}},
@@ -3000,7 +3000,7 @@ function renderDashboard() {
         el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}},
           el("div",{style:{display:"flex",gap:"16px"}},
             el("div",{},el("div",{style:{color:"var(--accent2)",fontSize:"20px",fontWeight:"800"}},report.done+""),el("div",{class:"muted",style:{fontSize:"13px"}},"✅ faites")),
-            el("div",{},el("div",{style:{color:"var(--warn)",fontSize:"20px",fontWeight:"800"}},report.adapted+""),el("div",{class:"muted",style:{fontSize:"13px"}},"⚠️ adaptées")),
+            el("div",{},el("div",{style:{color:"var(--warn)",fontSize:"20px",fontWeight:"800"}},report.adapted+""),el("div",{class:"muted",style:{fontSize:"13px"}},"⚠️ partielles")),
             el("div",{},el("div",{style:{color:"var(--warn)",fontSize:"20px",fontWeight:"800"}},report.missed+""),el("div",{class:"muted",style:{fontSize:"13px"}},"❌ manquées"))
           ),
           el("div",{style:{textAlign:"right"}},
