@@ -1404,31 +1404,43 @@ function fcStatus(type, avgHr) {
   return "🟡";
 }
 
-// ── Branchement Module 2 (SessionAnalyzer) — 17/07/2026, corrigé le 17/07 ──
+// ── Branchement Module 2 (SessionAnalyzer) — 17/07/2026, révisé le 17/07 ───
 // Pour une séance qualité (VMA/SPEC/SEUIL/TEST) prévue à une date donnée,
 // retrouve l'activité Strava du même jour et produit un SessionAnalysis via
 // DecisionEngineSessionAnalysis. Périmètre restreint aux séances qualité,
 // cf. en-tête de decision-engine-session-analysis.classic.js (décision
 // Laurent 17/07/2026).
 //
-// CORRECTIF (même jour, avant toute mise en usage réelle) : la première
-// version comparait activite.average_speed, la vitesse MOYENNE DE TOUTE
-// L'ACTIVITÉ (échauffement + intervalles + récup + retour au calme confondus)
-// — non représentative d'une séance fractionnée. Utilise maintenant
-// getLapsAffichage(activite, seance.structureIntervalles), la fonction déjà
-// validée ailleurs dans l'app (carte "Aujourd'hui", stats SPEC/VMA §3084/1764/
-// 1772) qui isole précisément les laps d'EFFORT — jamais l'échauffement, la
-// récupération courte/longue entre répétitions, ni le retour au calme.
-// L'allure et la FC transmises au module sont la MOYENNE DES SEULS LAPS
-// D'EFFORT, pondérée par leur distance respective (un lap de 1000m compte
-// plus qu'un lap de 200m dans la moyenne — sinon un protocole à distances
-// inégales serait faussé par une simple moyenne arithmétique des allures).
+// RÉVISION (17/07/2026, discussion complète avec Laurent) : la dimension
+// "volume" (distance totale des laps d'effort) a été retirée du module et
+// remplacée par un vrai comptage de répétitions dans la zone d'allure
+// (analyserRepetitions), pour la raison suivante : la montre continue
+// d'enregistrer les créneaux prévus (30s effort/30s récup) même en cas
+// d'abandon partiel — une répétition "marchée" reste un lap distinct, donc
+// la distance totale peut rester proche de la cible même avec une
+// répétition complètement ratée au milieu de la séance. Le signal fiable
+// est donc le TAUX DE RÉPÉTITIONS DANS LA ZONE, pas la distance globale.
+// Réutilise EXACTEMENT la même logique que autoValidate()/validateReason()
+// (§6097-6178 index.html) : okPace/repOk/repWarn de SESSION_TARGETS — pour
+// qu'il n'existe qu'UNE seule définition de "séance de qualité réussie"
+// dans toute l'app (cf. discussion : "ça reste 2 sources" — corrigé ici).
+//
+// FC basse : ne pénalise plus (cf. analyserEcartFC révisée) — seule une FC
+// trop haute reste un signal négatif.
+//
+// Allure : reste symétrique (trop rapide et trop lent pénalisent pareil) —
+// asymétrie envisagée mais reportée faute de données réelles pour la
+// calibrer (décision Laurent 17/07/2026 : "on verra l'asymétrique des
+// allures si nécessaire plus tard").
+//
+// Utilise getLapsAffichage(activite, seance.structureIntervalles) (déjà
+// validée ailleurs dans l'app) pour isoler précisément les laps d'EFFORT —
+// jamais l'échauffement, la récupération courte/longue, ni le retour au
+// calme.
 //
 // Retourne null si le module n'est pas chargé, si la séance n'est pas une
 // séance qualité, si aucune activité Strava ne correspond à cette date, ou
-// si aucun lap d'effort n'a pu être isolé (structure non reconnue, laps
-// insuffisants, etc. — cf. getLapsAffichage/getEffortLaps, jamais d'exception
-// remontée, juste un tableau vide dans ce cas).
+// si aucun lap d'effort n'a pu être isolé.
 function analyserSeanceQualite(seance) {
   if (typeof DecisionEngineSessionAnalysis === 'undefined') return null;
   if (!seance || !seance.date || !seance.type) return null;
@@ -1437,16 +1449,22 @@ function analyserSeanceQualite(seance) {
   const activite = (stravaActivities || []).find(a => a.start_date_local?.slice(0, 10) === seance.date);
   if (!activite) return null;
 
-  const lapsEffort = getLapsAffichage(activite, seance.structureIntervalles);
-  if (!lapsEffort.length) return null; // pas de laps d'effort isolables, rien à analyser
+  const lapsBruts = getLapsAffichage(activite, seance.structureIntervalles);
+  if (!lapsBruts.length) return null; // pas de laps d'effort isolables, rien à analyser
 
-  // Moyennes pondérées par la distance de chaque lap (cf. note ci-dessus) —
-  // repli sur une moyenne simple si la distance des laps est absente.
+  // lapsEffort au format attendu par analyserRepetitions : { allureSec }
+  const lapsEffort = lapsBruts
+    .filter(l => l.average_speed > 0)
+    .map(l => ({ allureSec: Math.round(1000 / l.average_speed) }));
+
+  // Moyennes pondérées par la distance de chaque lap — pour allure/FC
+  // globales (toujours utiles pour analyserEcartAllure/analyserEcartFC),
+  // même calcul que la version précédente.
   let distanceTotaleEffortM = 0;
   let sommeVitesseXDistance = 0;
   let sommeFcXDistance = 0;
   let distanceAvecFcM = 0;
-  lapsEffort.forEach(l => {
+  lapsBruts.forEach(l => {
     const d = l.distance || 0;
     if (l.average_speed > 0 && d > 0) {
       sommeVitesseXDistance += l.average_speed * d;
@@ -1461,37 +1479,21 @@ function analyserSeanceQualite(seance) {
   const vitesseMoyEffort = distanceTotaleEffortM > 0 ? sommeVitesseXDistance / distanceTotaleEffortM : null;
   const allureMoyenneSec = vitesseMoyEffort ? Math.round(1000 / vitesseMoyEffort) : null;
   const fcMoyenneEffort = distanceAvecFcM > 0 ? Math.round(sommeFcXDistance / distanceAvecFcM) : undefined;
-  const distanceEffortKm = distanceTotaleEffortM > 0 ? Math.round(distanceTotaleEffortM / 100) / 10 : null;
+
+  const targetReps = parseTargetReps(seance.session || '');
 
   const seanceRealisee = {
     seanceId: seance.uid,
-    distanceKm: distanceEffortKm, // distance des SEULS laps d'effort, pas la distance totale de l'activité
     allureMoyenneSec,
     fcMoyenne: fcMoyenneEffort,
     ressentiRPE: (sessionNotes && sessionNotes[seance.uid + '_rpe']) || undefined, // repli propre si jamais saisi
+    lapsEffort,
+    targetReps,
   };
-
-  // distancePrevueKm : distance d'effort attendue par la structure du plan
-  // (distanceEffortStructure, déjà utilisée ailleurs §3575/3613), pas le
-  // volume total de la séance (qui inclut échauffement/récup/retour au calme).
-  // CORRECTIF (17/07/2026, trouvé en testant le bloc Stats avec Laurent) :
-  // distanceEffortStructure() retourne des MÈTRES (bloc.distanceM * reps,
-  // jamais divisé), alors que ciblesSeance.distancePrevueKm attend des KM —
-  // sans la division par 1000, le volume prévu était ~1000x trop grand,
-  // rendant analyserEcartVolume() systématiquement hors zone (dansLaZone
-  // toujours false), quel que soit le volume réellement couru. Explique
-  // pourquoi "Volume : ..." semblait ne jamais s'extraire correctement.
-  const distancePrevueEffortM = seance.structureIntervalles
-    ? distanceEffortStructure(seance.structureIntervalles)
-    : null;
-  const distancePrevueEffortKm = distancePrevueEffortM
-    ? Math.round(distancePrevueEffortM) / 1000
-    : (seance.km || seance.distanceKm || undefined);
 
   const ciblesSeance = {
     type: seance.type,
-    distancePrevueKm: distancePrevueEffortKm,
-    allureCible: SESSION_TARGETS[seance.type],
+    allureCible: SESSION_TARGETS[seance.type], // contient targetMin/targetMax/okPace/warnPace/repOk/repWarn
     zoneFC: FC_ZONES[seance.type],
   };
 
@@ -4631,7 +4633,7 @@ function renderStats() {
         ),
         el("div",{style:{fontSize:"13px",color:"var(--text2)",marginBottom:"6px"}},"Allure : "+analyse.derive.allure.commentaire),
         el("div",{style:{fontSize:"13px",color:"var(--text2)",marginBottom:"6px"}},"FC : "+analyse.derive.frequenceCardiaque.commentaire),
-        el("div",{style:{fontSize:"13px",color:"var(--text2)",marginBottom:"6px"}},"Volume : "+analyse.derive.volume.commentaire),
+        el("div",{style:{fontSize:"13px",color:"var(--text2)",marginBottom:"6px"}},"Répétitions : "+analyse.derive.repetitions.commentaire),
         el("div",{style:{fontSize:"13px",color:"var(--text2)",marginBottom:"6px"}},"Difficulté ressentie : "+analyse.difficulteRessentie),
         analyse.alertes.length
           ? el("div",{style:{fontSize:"13px",color:"var(--warn)"}},"⚠ Alertes : "+analyse.alertes.map(a=>a.code+" ("+a.gravite+")").join(", "))
