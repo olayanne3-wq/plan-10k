@@ -21,7 +21,14 @@
  */
 
 const VERSIONS = [
-      { ver:"v2.9", title:"Navigation du wizard, sécurité des comptes & Strava réparé", current:true, notes:[
+      { ver:"v2.10", title:"Moteur de décision — unification ACWR, coach connecté, garde-fous", current:true, notes:[
+        "🧠 Le coach IA du dashboard lit maintenant l'état réel du moteur de décision (fatigue, risque, dernière proposition) au lieu d'un calcul de charge séparé — le message ne peut plus contredire la carte de proposition affichée au même moment",
+        "📊 Le graphique de charge d'entraînement (ACWR) utilise désormais le même calcul que le moteur de décision — plus de risque d'affichage incohérent entre le graphique et une proposition d'ajustement",
+        "🛡️ Deux garde-fous ajoutés au moteur : une réduction de charge individuelle ne peut jamais dépasser -30%, et le cumul de réductions sur 14 jours glissants est plafonné à 25% — le moteur refuse d'appliquer une décision qui dépasserait ces limites",
+        "⚕️ Nouveaux champs de profil (Réglages et onboarding) : FC repos et sexe, tous deux optionnels — affinent le calcul de charge d'entraînement sans jamais bloquer la création d'un compte",
+        "🐛 Le message du coach ne reste plus figé sur la séance du matin après avoir validé sa séance du jour plus tard dans la journée",
+      ]},
+      { ver:"v2.9", title:"Navigation du wizard, sécurité des comptes & Strava réparé", current:false, notes:[
         "🧭 Navigation par flèches en haut du wizard (course et Mode Forme), à la place du bouton \"Continuer\" en bas",
         "🎯 Prochain palier marche-course affiché en permanence sur le dashboard, avec bouton pour passer au palier suivant dès qu'il est débloqué",
         "🏃 Paliers marche-course revus en durée de course continue (5 à 30 min), validation manuelle par le coureur",
