@@ -3665,6 +3665,14 @@ function renderManualPerfRow(uid, s, stravaRun) {
 // Distance totale d'effort (hors récups/échauffement) déduite d'une
 // structureIntervalles, utilisée quand l'utilisateur ne précise que
 // l'allure en saisie manuelle (docs/source-donnees-seances.md, section 4).
+// CORRECTIF (17/07/2026, trouvé en testant le Module 2 avec Laurent) : cette
+// fonction ne lisait QUE bloc.distanceM, ignorant silencieusement tout bloc
+// défini en DURÉE (bloc.dureeEffortSec + bloc.allure, ex. "5×30s-30s @
+// 4:18/km" — protocole courant en VMA, type 30-30). Résultat : total restait
+// à 0 pour toute séance en durée, la fonction retournait null, et
+// analyserSeanceQualite() (Module 2) affichait systématiquement "Volume non
+// disponible" pour ces séances. Ajout du calcul distance = (durée/allure)
+// quand distanceM est absent mais dureeEffortSec + allure sont présents.
 function distanceEffortStructure(structureIntervalles) {
   if (!structureIntervalles?.blocs?.length) return null;
   const nbSeries = structureIntervalles.nbSeries || 1;
@@ -3672,7 +3680,23 @@ function distanceEffortStructure(structureIntervalles) {
   for (let serie=0; serie<nbSeries; serie++) {
     structureIntervalles.blocs.forEach(bloc=>{
       const reps = bloc.repetitions || 1;
-      if (bloc.distanceM) total += bloc.distanceM * reps;
+      if (bloc.distanceM) {
+        total += bloc.distanceM * reps;
+      } else if (bloc.dureeEffortSec && bloc.allure) {
+        // Bloc défini en durée (ex. 30-30) : distance déduite de l'allure
+        // cible du bloc. allure au format "M:SS/km" ou "M:SS", même parsing
+        // que paceStringVersSecondes (DecisionEngineSessionAnalysis) — dupliqué
+        // ici car cette fonction vit côté index.html, pas dans le module.
+        const nettoye = bloc.allure.replace('/km', '').trim();
+        const parts = nettoye.split(':').map(Number);
+        if (parts.length === 2 && !parts.some(isNaN)) {
+          const allureSec = parts[0] * 60 + parts[1];
+          if (allureSec > 0) {
+            const distanceBlocM = (bloc.dureeEffortSec / allureSec) * 1000;
+            total += distanceBlocM * reps;
+          }
+        }
+      }
     });
   }
   return total || null;
