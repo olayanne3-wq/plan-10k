@@ -3961,19 +3961,28 @@ function renderManualPerfRow(uid, s, stravaRun) {
       rebuildSummary();
     }));
     btnRow.appendChild(saveBtn);
-    if (hasManualNow()) {
-      const delBtn = el("button",{type:"button",style:{background:"none",boxShadow:"0 1px 3px var(--shadow1), 0 1px 2px var(--shadow2)",borderRadius:"8px",padding:"8px 12px",color:"var(--text-muted)",fontSize:"14px",cursor:"pointer"}},"🗑️");
-      delBtn.addEventListener("click", avecRetourTactile(()=>{
-        const avaitAllure = !!manualPerf[uid]?.average_speed;
-        delete manualPerf[uid];
-        save(clePourPlan("lk_manual_perf"), manualPerf);
-        if (avaitAllure) rebuildPredHistory(); // ré-agréger sans cette saisie (Strava reprend la main s'il existe)
-        expanded = false;
-        formWrap.style.display = "none";
-        rebuildSummary();
-      }));
-      btnRow.appendChild(delBtn);
-    }
+    // Annuler (17/07/2026, remarque de Laurent) : supprime toute saisie
+    // manuelle existante pour cette séance ET décoche le statut posé
+    // (✅/⚠️/❌ → —), pour que le coureur reparte d'une page blanche et
+    // relance lui-même une synchro Strava plutôt que de garder un statut
+    // qui referait référence à une donnée qui vient d'être effacée.
+    // Toujours affiché (pas seulement si hasManualNow()) : utile aussi pour
+    // fermer le formulaire sans rien enregistrer.
+    const cancelBtn = el("button",{type:"button",style:{flex:"1",background:"none",boxShadow:"0 1px 3px var(--shadow1), 0 1px 2px var(--shadow2)",borderRadius:"8px",padding:"8px",color:"var(--text-muted)",fontWeight:"700",fontSize:"14px",cursor:"pointer"}},"✕ Annuler");
+    cancelBtn.addEventListener("click", avecRetourTactile(()=>{
+      const avaitAllure = !!manualPerf[uid]?.average_speed;
+      delete manualPerf[uid];
+      save(clePourPlan("lk_manual_perf"), manualPerf);
+      delete statuses[uid];
+      save(clePourPlan("lk_statuses"), statuses);
+      if (avaitAllure) rebuildPredHistory(); // ré-agréger sans cette saisie (Strava reprend la main s'il existe)
+      expanded = false;
+      formWrap.style.display = "none";
+      rebuildSummary();
+      render(); // reflète immédiatement le statut décoché (—) dans la carte du jour / détail semaine
+      syncStrava(); // relance une synchro pour retrouver l'activité Strava du jour si elle existe
+    }));
+    btnRow.appendChild(cancelBtn);
     formWrap.appendChild(btnRow);
   };
 
