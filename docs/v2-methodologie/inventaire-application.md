@@ -3288,3 +3288,28 @@ future fonctionnalité qui modifierait le contenu d'un plan déjà en place
 (ex. futur "adapter mon plan suite à une blessure") devra implémenter le
 même principe explicitement — ce n'est pas un garde-fou générique/transverse
 appliqué automatiquement à toute écriture sur `plan.semaines`.
+
+## 28. Wizard — deux bugs de navigation trouvés et corrigés (17/07/2026, suite de session)
+
+### 28.1 Bug corrigé : la flèche retour depuis une consultation menait à une régénération non désirée
+
+**Symptôme identifié en creusant une remarque de Laurent** ("je trouve dangereux d'avoir 2 plans qui peuvent être modifiés chacun à leur niveau") : depuis l'écran de consultation d'un plan existant (`chargerPlanExistant()`, atteint via "Consulter un plan existant" → clic sur un plan), cliquer la flèche retour ramenait au formulaire du wizard (étape 9, récap) avec les champs pré-remplis de la dernière session de création — pas nécessairement synchronisés avec le plan réellement consulté. Poursuivre jusqu'au bout depuis cet écran déclenchait `generateAndShowResults()`, qui génère un **plan entièrement nouveau avec un nouvel id** (`crypto.randomUUID()`), sauvegardé en plus (pas à la place) du plan consulté.
+
+**Vérifié, pas aussi grave qu'initialement craint** : ce n'est jamais un écrasement silencieux du plan consulté (id différent à chaque génération), mais le vrai risque reste réel — se retrouver avec deux plans distincts qui se chevauchent en dates (bloqué par le garde-fou `trouverPlanEnConflit()` existant, avec message d'erreur) ou un plan fantôme créé sans intention claire, simplement en naviguant par curiosité.
+
+**Corrigé** (`public/v2/index.html`, wizard) : nouveau flag `consultationSeule`, positionné à `true` uniquement dans `chargerPlanExistant()` (jamais dans les 3 autres points de génération fraîche — course, Mode Forme, grand-débutant, qui le remettent explicitement à `false`). `prevStep()` vérifie ce flag en priorité : si vrai, la flèche retour appelle `retourAccueilWizard()` (retour direct à "Consulter / Créer un nouveau plan") au lieu de rouvrir le formulaire vers un chemin de régénération.
+
+### 28.2 Bug corrigé : rouvrir le wizard forçait la reprise d'un plan abandonné, sans accès à l'écran d'accueil
+
+**Symptôme remonté par Laurent** : après avoir initié un plan sans le terminer (retour à l'app en cours de route), rouvrir le wizard ("Configurer plan") ne proposait plus l'écran d'accueil (Consulter/Créer) — il forçait la reprise directe de l'étape où le wizard avait été quitté, sans échappatoire pour consulter un plan existant ou en créer un autre.
+
+**Cause** : un mécanisme de restauration d'étape (`v2_wizard_step` en `sessionStorage`, écrit à chaque changement d'étape via `showStep()`) avait été conçu spécifiquement pour un cas précis — un retour après `window.location.reload()` forcé par `capterRetourStravaOAuth()` (nécessaire pour corriger un bug de rendu visuel sur Android/Chrome au retour d'une navigation externe, cf. commentaire historique dans le code). Le code de restauration (au chargement de la page) ne vérifiait que la présence de cette clé — jamais si on était réellement dans ce contexte précis. `sessionStorage` survit tant que l'onglet reste ouvert, donc la clé restait active bien après avoir quitté le wizard normalement, forçant indéfiniment la reprise à la prochaine ouverture.
+
+**Corrigé** : nouveau signal dédié `v2_reload_retour_strava`, posé exclusivement dans `capterRetourStravaOAuth()` juste avant son `reload()` forcé, lu et **consommé** (retiré) une seule fois au chargement suivant. La restauration automatique d'étape (mode course ET Mode Forme) n'a désormais lieu que si ce signal est présent. Si ce n'est pas le cas, `v2_wizard_step`/`v2_wizard_step_forme` sont nettoyées explicitement — pour que le mécanisme `etapeSauvegardee` (utilisé plus loin dans `validerChoixMode()` lors d'un choix de mode volontaire depuis l'accueil) ne retrouve jamais une étape périmée non plus.
+
+### 28.3 Contexte découvert en creusant ces bugs : lien réel entre wizard et dashboard
+
+Clarification utile pour la suite (question de Laurent : "le plan du wizard et le plan dans l'application sont-ils complètement liés ?") — **non**, ils ne communiquent que via la liste de plans persistée (Supabase/Gist), jamais en mémoire vive partagée :
+- Le wizard sauvegarde un plan (`sauvegarderPlan()`/`assurerPlanExiste()`) puis redirige (`location.href = '/'`) vers `index.html`, qui recharge indépendamment cette liste à son propre démarrage.
+- Certaines données de suivi du dashboard (`swappedSessions`, `statuses`, notes, etc. — 19 clés recensées, préfixées `lk_*`) vivent en **localStorage**, séparément du plan réellement persisté (`plan.semaines`) — un swap de séance dans le dashboard n'est donc jamais visible si on rouvre le wizard sur ce même plan (il n'a jamais été écrit dans le plan lui-même).
+- Vérifié : le wizard ne permet pas de rééditer/régénérer le contenu d'un plan existant en place (seul `changerPalierGrandDebutant()`, déjà sécurisé en §27.3, le fait) — la génération produit toujours un plan à nouvel id, jamais un écrasement du plan consulté.
