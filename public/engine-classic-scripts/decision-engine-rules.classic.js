@@ -21,11 +21,12 @@
 // Décision actée avec Laurent le 16/07/2026 : "on avance vite, on itère" —
 // ce RuleEngine sera enrichi une fois les modules 2/3/4 codés, pas avant.
 //
-// Catalogue (ajouts R-050 et R-060 le 17/07/2026, cf. notes ci-dessous) :
+// Catalogue (ajouts R-050/R-060/R-070 le 17/07/2026, cf. notes ci-dessous) :
 //   R-006  Pic de séance unique          (sécurité)
 //   R-024s Fatigue élevée basique        (sécurité, version simplifiée)
 //   R-050  ACWR élevé                    (sécurité, ajoutée 17/07)
 //   R-060  Tendance fatigue en hausse    (sécurité, ajoutée 17/07)
+//   R-070  Séances planifiées manquées   (engagement, ajoutée 17/07)
 //   R-040  Désengagement précoce         (engagement)
 //
 // Ce module ne modifie AUCUNE donnée. Il retourne au maximum UNE décision
@@ -254,6 +255,34 @@
   }
 
   // --------------------------------------------------------------------------
+  // R-070 — Séances planifiées ratées consécutives (engagement) — ajoutée le
+  // 17/07/2026. Contrairement à R-040 (régularité globale sur 14j vs
+  // habitude), signal plus précis et plus réactif : 2 séances PRÉVUES au plan
+  // marquées ❌ d'affilée. Calculé en dehors du RuleEngine (dans index.html,
+  // via obtenirSeancesPlanifieesManquees()) car ce module n'a jamais accès au
+  // plan (__PLAN_BRUT__/ALL_SESSIONS/statuses) — reçoit juste le résultat
+  // déjà calculé en input, cf. §"Ce module ne modifie AUCUNE donnée" en tête
+  // de fichier.
+  // --------------------------------------------------------------------------
+  function evaluerSeancesManqueesConsecutives(seancesPlanifieesManquees) {
+    if (!seancesPlanifieesManquees || seancesPlanifieesManquees.nbConsecutivesRatees < 2) {
+      return null;
+    }
+    const seances = seancesPlanifieesManquees.dernieresSeances || [];
+    const description = seances.map(s => `${s.date} (${s.type})`).join(', ');
+    return {
+      id: 'R-070',
+      libelle: 'Séances planifiées ratées consécutives',
+      categorie: 'engagement',
+      priorite: 55, // engagement, mais signal plus précis que R-040 → priorité légèrement au-dessus
+      type: 'alerter_risque_decrochage',
+      justification: `2 séances prévues au plan ratées d'affilée : ${description}. Un ajustement du plan ou un point avec le coach peut aider avant que ça ne s'installe.`,
+      confianceMax: 75, // signal direct sur le plan, pas une inférence statistique — confiance plus haute que R-040
+      donnees: { dernieresSeances: seances },
+    };
+  }
+
+  // --------------------------------------------------------------------------
   // R-040 — Désengagement précoce (engagement)
   // cf. §7.2 doc intégration : seule règle hors sécurité retenue au démarrage.
   // Ne modifie jamais la charge d'entraînement — c'est un signal produit/UI
@@ -295,6 +324,7 @@
       evaluerFatigueElevee(opts.runnerState),
       evaluerACWRElevee(opts.runnerState),
       evaluerTendanceFatigue(opts.activitySamples, dateReference, opts.coureurOptions),
+      evaluerSeancesManqueesConsecutives(opts.seancesPlanifieesManquees),
       evaluerDesengagementPrecoce(opts.engagementState),
     ].filter(Boolean);
 
@@ -358,6 +388,7 @@
     evaluerFatigueElevee,
     evaluerACWRElevee,
     evaluerTendanceFatigue,
+    evaluerSeancesManqueesConsecutives,
     evaluerDesengagementPrecoce,
     BORNE_AMPLEUR_MAX_POURCENT,  // référence partagée avec le garde-fou cumulé (decision-engine-apply.classic.js)
   };
