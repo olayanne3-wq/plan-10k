@@ -376,7 +376,7 @@
     if (!userId) return [];
     try {
       const res = await supabase
-        .from('plans')
+        .from('plans_actif')
         .select('id, nom, plan_brut, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
@@ -400,7 +400,7 @@
     try {
       const payload = { plan_brut: planBrutComplet };
       if (planBrutComplet && planBrutComplet.nom) payload.nom = planBrutComplet.nom;
-      const res = await supabase.from('plans').update(payload).eq('id', planId);
+      const res = await supabase.from('plans_actif').update(payload).eq('id', planId);
       if (res.error) {
         console.warn('Mise à jour du plan échouée :', res.error.message);
       }
@@ -414,13 +414,13 @@
     const supabase = window.LkAuth.supabase;
     if (!estUuidValide(planId)) return;
     try {
-      const lecture = await supabase.from('plans').select('plan_brut').eq('id', planId).maybeSingle();
+      const lecture = await supabase.from('plans_actif').select('plan_brut').eq('id', planId).maybeSingle();
       if (lecture.error || !lecture.data) {
         console.warn('Clôture du plan échouée (lecture) :', (lecture.error && lecture.error.message) || 'plan introuvable');
         return;
       }
       const planBrutMisAJour = Object.assign({}, lecture.data.plan_brut, { dateCloture: dateCloture });
-      const update = await supabase.from('plans').update({ plan_brut: planBrutMisAJour }).eq('id', planId);
+      const update = await supabase.from('plans_actif').update({ plan_brut: planBrutMisAJour }).eq('id', planId);
       if (update.error) {
         console.warn('Clôture du plan échouée (update) :', update.error.message);
       }
@@ -435,7 +435,7 @@
     const supabase = window.LkAuth.supabase;
 
     try {
-      const lecture = await supabase.from('plans').select('id').eq('id', planId).maybeSingle();
+      const lecture = await supabase.from('plans_actif').select('id').eq('id', planId).maybeSingle();
       if (lecture.error) {
         console.warn('Vérification existence du plan échouée :', lecture.error.message);
         return;
@@ -457,14 +457,19 @@
       const nom = (planBrut && planBrut.nom) ||
         (((planBrut && planBrut.distance) || '') + ' — ' + ((planBrut && planBrut.objectif) || '')).trim() ||
         'Plan';
-      const insertion = await supabase.from('plans').insert({
+      const ligne = {
         id: planId,
         user_id: userId,
         nom: nom,
         plan_brut: planBrut || {},
-      });
+      };
+      const insertionOriginal = await supabase.from('plans_original').insert(ligne);
+      if (insertionOriginal.error) {
+        console.warn('Création de la ligne plans_original échouée :', insertionOriginal.error.message);
+      }
+      const insertion = await supabase.from('plans_actif').insert(ligne);
       if (insertion.error) {
-        console.warn('Création de la ligne plans échouée :', insertion.error.message);
+        console.warn('Création de la ligne plans_actif échouée :', insertion.error.message);
       }
     } catch (err) {
       if (err.message && err.message.indexOf('chevauche un plan déjà actif') !== -1) throw err;
