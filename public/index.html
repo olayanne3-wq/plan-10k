@@ -86,6 +86,7 @@ input[type=text], input[type=number], input[type=password] {
 <script src="/engine-classic-scripts/decision-engine-runner-state.classic.js"></script>
 <script src="/engine-classic-scripts/decision-engine-engagement.classic.js"></script>
 <script src="/engine-classic-scripts/decision-engine-session-analysis.classic.js"></script>
+<script src="/engine-classic-scripts/decision-engine-week-analysis.classic.js"></script>
 <script src="/engine-classic-scripts/decision-engine-rules.classic.js"></script>
 <script src="/engine-classic-scripts/decision-engine-apply.classic.js"></script>
 <script>
@@ -1129,6 +1130,61 @@ function weeklyReport(weekNum) {
   }
 
   return { done, adapted, missed, total:sessions.length, plannedMin:Math.round(plannedMin), realMin, avgEfPace, avgEfHr, prevEfPace, prevEfHr };
+}
+
+// ── Branchement Module 3 (WeekAnalyzer) — 17/07/2026 ───────────────────────
+// Adapte les données déjà disponibles (week.sessions, statuses,
+// stravaActivities) vers le format attendu par DecisionEngineWeekAnalysis
+// (SeanceRealisee[]/SeancePrevue[]) — décision actée avec Laurent le
+// 17/07/2026 : ce module ne connaît jamais assignment/statuses bruts, la
+// transformation est la responsabilité de l'appelant (cf. §29.8 inventaire).
+//
+// Ne recalcule rien que weeklyReport()/weekStats() ne fassent déjà pour
+// l'affichage classique — ce wrapper existe uniquement pour nourrir le
+// Module 3, qui a besoin d'objets structurés (SeanceRealisee/SeancePrevue),
+// pas des agrégats déjà réduits (plannedMin, realKm...).
+//
+// Retourne null si le module n'est pas chargé ou si la semaine n'existe pas.
+function analyserSemaineActuelle(weekNum, semainePrecedenteAnalyse) {
+  if (typeof DecisionEngineWeekAnalysis === 'undefined') return null;
+  const week = PLAN.find(w => w.week === weekNum);
+  if (!week) return null;
+
+  const seancesPrevues = week.sessions.map(s => ({
+    id: s.uid,
+    type: s.type === "REPOS" ? "repos" : (s.type === "RACE" ? "endurance" : s.type.toLowerCase()),
+    volumePrevuKm: s.kmEstime || 0,
+  }));
+
+  const seancesRealisees = week.sessions
+    .filter(s => s.type !== "REPOS" && s.type !== "RACE")
+    .map(s => {
+      const activite = (stravaActivities || []).find(a => a.type === "Run" && a.start_date_local?.slice(0, 10) === s.date);
+      if (!activite) return null;
+      return {
+        seanceId: s.uid,
+        date: s.date,
+        distanceKm: Math.round(activite.distance / 100) / 10,
+        dureeMin: Math.round(activite.moving_time / 60),
+        allureMoyenneMinKm: fmtPace(activite.average_speed),
+        fcMoyenne: activite.average_heartrate || undefined,
+        ressentiRPE: (sessionNotes && sessionNotes[s.uid + '_rpe']) || undefined,
+      };
+    })
+    .filter(Boolean);
+
+  const planContext = {
+    semaine: weekNum,
+    phase: phaseOf(weekNum).label || 'developpement',
+    volumeHebdoPrevu: week.volumeCibleKm != null ? week.volumeCibleKm : seancesPrevues.reduce((s, p) => s + p.volumePrevuKm, 0),
+    chargePrevue: null, // pas de notion de "charge prévue" calculée ailleurs dans l'app aujourd'hui — recuperationEstimee retombe sur sa valeur neutre (50)
+  };
+
+  const fcMax = runnerFcMax || null;
+  const fcRepos = 55; // valeur d'exemple temporaire, cf. fcReposReference Module 1 (§26.3 inventaire) — même limite ici
+  const sexe = window.__PROFIL_COUREUR__?.sexe || 'autre';
+
+  return DecisionEngineWeekAnalysis.analyser(weekNum, seancesRealisees, seancesPrevues, planContext, semainePrecedenteAnalyse || null, fcMax, fcRepos, sexe);
 }
 
 
@@ -4699,6 +4755,46 @@ function renderStats() {
     );
   }
 
+  // ── Bloc de test Module 3 (WeekAnalyzer) — 17/07/2026 ──────────────────
+  // Analyse la semaine en cours (currentWeek()), avec la semaine précédente
+  // fournie pour permettre progressionVsPrecedente. Pas de sélecteur (pas
+  // vraiment de sens de tester une semaine future ou trop ancienne — les
+  // données Strava/statuts n'existent que pour la semaine réelle en cours).
+  const semaineActuelleNum = currentWeek();
+  const analysePrecedente = semaineActuelleNum > 1 ? analyserSemaineActuelle(semaineActuelleNum - 1) : null;
+  const analyseSemaine = analyserSemaineActuelle(semaineActuelleNum, analysePrecedente);
+
+  let moduleTest3El = null;
+  if (analyseSemaine) {
+    const fleche = analyseSemaine.progressionVsPrecedente === 'hausse' ? '📈'
+      : analyseSemaine.progressionVsPrecedente === 'baisse' ? '📉' : '➡️';
+    moduleTest3El = el("div",{},
+      el("div",{class:"label"},"🧪 Test Module 3 · WeekAnalyzer (semaine "+semaineActuelleNum+")"),
+      el("div",{class:"card"},
+        el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"6px"}},
+          el("span",{class:"muted",style:{fontSize:"13px"}},"Volume"),
+          el("span",{style:{fontSize:"14px",fontWeight:"700"}},analyseSemaine.volumeRealiseKm+" / "+analyseSemaine.volumePrevuKm+" km ("+(analyseSemaine.ecartVolumePourcent>0?"+":"")+analyseSemaine.ecartVolumePourcent+"%)")
+        ),
+        el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"6px"}},
+          el("span",{class:"muted",style:{fontSize:"13px"}},"Séances"),
+          el("span",{style:{fontSize:"14px"}},analyseSemaine.seancesReussies+" réussies / "+analyseSemaine.seancesManquees+" manquées / "+analyseSemaine.seancesTotal+" total")
+        ),
+        el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"6px"}},
+          el("span",{class:"muted",style:{fontSize:"13px"}},"Charge totale semaine"),
+          el("span",{style:{fontSize:"14px"}},analyseSemaine.chargeTotaleSemaine)
+        ),
+        el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"6px"}},
+          el("span",{class:"muted",style:{fontSize:"13px"}},"Récupération estimée"),
+          el("span",{style:{fontSize:"14px"}},analyseSemaine.recuperationEstimee+"/100")
+        ),
+        el("div",{style:{display:"flex",justifyContent:"space-between"}},
+          el("span",{class:"muted",style:{fontSize:"13px"}},"Vs semaine précédente"),
+          el("span",{style:{fontSize:"14px"}},fleche+" "+analyseSemaine.progressionVsPrecedente)
+        )
+      )
+    );
+  }
+
   return el("div",{style:{padding:"0 16px 100px"}},
     el("div",{style:{marginTop:"8px"}}),
     graphEl||el("div",{class:"muted",style:{textAlign:"center",padding:"24px 0",fontSize:"14px",fontStyle:"italic"}},"📊 Le graphique apparaîtra après quelques jours de données"),
@@ -4710,7 +4806,8 @@ function renderStats() {
     projEl,
     paceEl,
     infoEl,
-    moduleTestEl
+    moduleTestEl,
+    moduleTest3El
   );
 }
 
