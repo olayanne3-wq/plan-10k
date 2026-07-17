@@ -1150,11 +1150,19 @@ function analyserSemaineActuelle(weekNum, semainePrecedenteAnalyse) {
   const week = PLAN.find(w => w.week === weekNum);
   if (!week) return null;
 
-  const seancesPrevues = week.sessions.map(s => ({
-    id: s.uid,
-    type: s.type === "REPOS" ? "repos" : (s.type === "RACE" ? "endurance" : s.type.toLowerCase()),
-    volumePrevuKm: s.kmEstime || 0,
-  }));
+  // Ne compte que les séances dont la date est déjà passée (ou aujourd'hui)
+  // dans seancesPrevues — une séance future n'est ni "manquée" ni "réussie",
+  // elle n'a simplement pas encore eu lieu. Bug trouvé le 17/07/2026 en
+  // testant avec Laurent : sans ce filtre, les séances de demain/après-
+  // demain de la semaine en cours étaient comptées comme manquées.
+  const jourReference = today();
+  const seancesPrevues = week.sessions
+    .filter(s => s.date <= jourReference)
+    .map(s => ({
+      id: s.uid,
+      type: s.type === "REPOS" ? "repos" : (s.type === "RACE" ? "endurance" : s.type.toLowerCase()),
+      volumePrevuKm: s.kmEstime || 0,
+    }));
 
   const seancesRealisees = week.sessions
     .filter(s => s.type !== "REPOS" && s.type !== "RACE")
