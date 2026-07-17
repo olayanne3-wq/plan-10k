@@ -3968,3 +3968,62 @@ conforme.
 `public/engine-classic-scripts/decision-engine-week-analysis.classic.js`.
 Aucun fichier `.classic.js` équivalent pour la partie UI d'`index.html`
 (dashboard v1 uniquement).
+
+### 33.6 Suite immédiate : suppression du doublon + agrandissement des boutons
+
+**Remarque de Laurent après le chantier initial** : le RPE apparaissait
+encore dans le formulaire de saisie manuelle d'allure — doublon avec le
+nouveau sélecteur de `renderStatusRow()` (§33.4). Demande également
+d'agrandir les boutons de statut (`SOPTS`, `—✅❌⚠️😴`) et RPE
+(`RPE_OPTIONS`) pour qu'ils prennent toute la largeur de ligne.
+
+**Doublon supprimé** : le bloc RPE du formulaire de saisie manuelle
+(déclaration `rpeVal`/`rpeRow`/`rebuildRpe`, insertion dans `formWrap`,
+écriture dans `sessionRpe` au clic) entièrement retiré. Le ressenti se
+saisit désormais à un seul endroit : `renderStatusRow()`, quel que soit
+comment la séance a été validée (Strava trouvé ou saisie manuelle).
+
+**Boutons agrandis** : `SOPTS` et `RPE_OPTIONS` passent de
+`padding:"5px 10px"`/`fontSize:"15px"` (ou `"4px 8px"`/`"15px"` pour RPE) à
+`flex:"1"`, `padding:"10px 0"`, `fontSize:"18px"`, `borderRadius:"8px"` —
+chaque bouton occupe une part égale de la largeur disponible plutôt qu'une
+taille fixe. Nécessite une restructuration de `renderStatusRow()` : la
+fonction retournait un seul `<div>` flex-row contenant boutons de statut +
+message "séance à venir" + bloc RPE, tous enfants du même conteneur
+`nowrap` — avec `flex:1` sur les boutons, un enfant `width:100%` au milieu
+(le message futur ou le bloc RPE) aurait cassé la mise en page. Corrigé :
+`wrapper` (colonne verticale) contient désormais `statusRow` (ligne des 5
+boutons statut, `nowrap`) puis, empilés en dessous, le message futur
+éventuel et le bloc RPE éventuel (lui-même : label + ligne de 5 boutons
+`nowrap`). Les deux appelants de `renderStatusRow()` (`uid2` dans la carte
+du jour, `statusRow` dans le détail de semaine) traitent la valeur de
+retour comme un simple bloc à insérer — aucun ne manipule sa structure
+interne, changement de forme sans impact sur eux.
+
+### 33.7 Non vérifié visuellement — bloqué par le quota de déploiement Vercel
+
+Poussé sur GitHub (vérifié présent dans le code source réel via
+`raw.githubusercontent.com`), mais **jamais confirmé visuellement** :
+Laurent rapporte "aucun changement sur la taille des boutons" après un
+rafraîchissement forcé. Diagnostic en cours au moment de la pause :
+- Code source confirmé correct sur GitHub (`flex:"1"` bien présent).
+- Aucun style CSS global (`button {...}`) trouvé dans `index.html` qui
+  pourrait écraser le style inline.
+- Tentative de vérifier la version réellement servie par Vercel
+  (`fetch('/index.html')` depuis la console) — non aboutie : en essayant de
+  forcer un nouveau déploiement pour éliminer l'hypothèse d'un déploiement
+  qui n'a pas suivi le dernier push, Laurent a atteint le **quota Vercel de
+  déploiements gratuits** (`api-deployments-free-per-day`, "more than 100"
+  en une journée — cohérent avec le volume de push de cette session
+  particulièrement chargée).
+- **Diagnostic suspendu** : impossible de forcer un nouveau déploiement
+  avant reset du quota (~24h). Le code source reste correct dans le repo ;
+  reste à confirmer si le prochain déploiement (automatique ou forcé une
+  fois le quota reset) résout l'affichage, ou si un vrai bug plus profond
+  existe (à investiguer alors avec les outils navigateur : `getComputedStyle`
+  sur un vrai bouton, comparaison avant/après un déploiement confirmé à
+  jour).
+
+**Prochaine étape** : vérifier l'affichage une fois un nouveau déploiement
+confirmé passé (attendre le reset du quota, ou un déploiement automatique
+déclenché par un futur push).
