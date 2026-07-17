@@ -508,13 +508,15 @@ window.stravaActivities = stravaActivities; // exposition pour scripts externes 
 // le 17/07/2026) : un seul calcul de charge dans toute l'app, partagé avec
 // le moteur de décision (RunnerStateCalculator), pour que le graphique
 // dashboard et les décisions du moteur ne puissent jamais diverger.
-// Options communes (fcMaxReference/fcReposReference/sexe) : mêmes valeurs
-// que celles passées au moteur ligne ~2244, cf. TODO fcRepos/sexe réels
-// dans profilCoureur (pas encore de champs dédiés au 17/07/2026).
+// fcRepos/sexe (17/07/2026, §11.7 point 4) : lus depuis profilCoureur
+// (Paramètres, champs ajoutés le 17/07/2026) avec repli si non renseignés —
+// fcReposReference undefined fait basculer calculerChargeSeance() sur le
+// sRPE (moins précis mais jamais bloquant, cf. §5.1 doc archi) ; sexe
+// 'autre' fait basculer le TRIMP sur la moyenne des deux jeux de constantes.
 function optionsRunnerStateActuel() {
   return {
     fcMaxReference: window.profilCoureur ? window.profilCoureur.fcMax : undefined,
-    fcReposReference: 55, // valeur d'exemple tant que le vrai champ n'existe pas, cf. inventaire §26.4
+    fcReposReference: window.profilCoureur && window.profilCoureur.fcRepos ? window.profilCoureur.fcRepos : undefined,
     sexe: window.profilCoureur && window.profilCoureur.sexe ? window.profilCoureur.sexe : 'autre',
   };
 }
@@ -5251,6 +5253,7 @@ function renderSettings() {
         {label:"Poids", id:"inp-poids", type:"number", unit:"kg", val:runnerWeight||""},
         {label:"Taille", id:"inp-taille", type:"number", unit:"cm", val:runnerHeight||""},
         {label:"FC max", id:"inp-fcmax", type:"number", unit:"bpm", val:runnerFcMax||181},
+        {label:"FC repos", id:"inp-fcrepos", type:"number", unit:"bpm", val:profilCoureur.fcRepos||""},
         {label:"separator"},
         {label:"Objectif", id:"inp-goal", type:"text", unit:fmtPace(DISTANCE_M_REFERENCE/raceGoalTime)+"/km", val: raceGoalTime >= 3600
           ? Math.floor(raceGoalTime/3600)+":"+Math.floor((raceGoalTime%3600)/60).toString().padStart(2,"0")+":"+(raceGoalTime%60).toString().padStart(2,"0")
@@ -5313,6 +5316,36 @@ function renderSettings() {
             color: actif ? "var(--accent)" : "var(--text-muted)"
           }, onClick: ()=>{
             profilCoureur.niveau = val;
+            sauvegarderProfilCoureur();
+            render();
+          }}, lbl);
+        })
+      )
+    )
+  );
+
+  // ── Sexe (17/07/2026, moteur de décision §11.7 point 4) ──────────────────
+  // Utilisé uniquement pour le calcul TRIMP (RunnerStateCalculator, cf. §5.1
+  // doc archi — constantes de Banister différentes homme/femme). Optionnel :
+  // tant que non renseigné, le moteur applique déjà un repli sur la moyenne
+  // des deux jeux de constantes (valeur 'autre'), donc ce champ n'est jamais
+  // bloquant — juste plus précis une fois renseigné. Pas dans le tableau
+  // profil (au-dessus) car ce n'est pas un champ texte/nombre libre.
+  const SEXE_LABELS = { homme: "Homme", femme: "Femme", autre: "Autre / préfère ne pas dire" };
+  const sexeSection = el("div", {style:{marginBottom:"16px"}},
+    el("div",{class:"label"},"⚕️ Sexe (calcul de charge)"),
+    card(
+      el("div",{class:"muted",style:{fontSize:"12px",marginBottom:"8px"}},"Utilisé uniquement pour affiner le calcul de charge d'entraînement (TRIMP). Optionnel."),
+      el("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px"}},
+        ...Object.entries(SEXE_LABELS).map(([val, lbl]) => {
+          const actif = profilCoureur.sexe === val;
+          return el("button",{id:"sexe-btn-"+val, style:{
+            padding:"10px 6px",borderRadius:"8px",cursor:"pointer",fontSize:"13px",fontWeight:"700",
+            border: actif ? "1px solid var(--accent)" : "1px solid var(--border)",
+            background: actif ? "rgba(var(--accent-rgb),0.13)" : "transparent",
+            color: actif ? "var(--accent)" : "var(--text-muted)"
+          }, onClick: ()=>{
+            profilCoureur.sexe = val;
             sauvegarderProfilCoureur();
             render();
           }}, lbl);
@@ -5519,6 +5552,7 @@ function renderSettings() {
     const poids = document.getElementById("inp-poids"); if(poids) { runnerWeight=parseInt(poids.value)||null; profilCoureur.poids=runnerWeight; }
     const taille = document.getElementById("inp-taille"); if(taille) { runnerHeight=parseInt(taille.value)||null; profilCoureur.taille=runnerHeight; }
     const fcmax = document.getElementById("inp-fcmax"); if(fcmax) { runnerFcMax=parseInt(fcmax.value)||181; profilCoureur.fcMax=runnerFcMax; }
+    const fcrepos = document.getElementById("inp-fcrepos"); if(fcrepos) { profilCoureur.fcRepos=parseInt(fcrepos.value)||null; }
     const pps = document.getElementById("pps-input"); if(pps) { runnerPps=pps.value.trim(); profilCoureur.pps=runnerPps; }
     sauvegarderProfilCoureur();
     const goal = document.getElementById("inp-goal"); if(goal) {
@@ -5665,7 +5699,7 @@ function renderSettings() {
     accountSection,
     themeSection,
     formeClotureSection,
-    profileSection, niveauSection, recordsSection, saveBtn, pdfSection, dataSourceSection, stravaSection,
+    profileSection, niveauSection, sexeSection, recordsSection, saveBtn, pdfSection, dataSourceSection, stravaSection,
     el("div",{style:{marginBottom:"24px"}}, stravaSection),
     githubToken ? qrSection : null,
     versionSection
