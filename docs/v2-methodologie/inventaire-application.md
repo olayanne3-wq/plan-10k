@@ -3313,3 +3313,73 @@ Clarification utile pour la suite (question de Laurent : "le plan du wizard et l
 - Le wizard sauvegarde un plan (`sauvegarderPlan()`/`assurerPlanExiste()`) puis redirige (`location.href = '/'`) vers `index.html`, qui recharge indépendamment cette liste à son propre démarrage.
 - Certaines données de suivi du dashboard (`swappedSessions`, `statuses`, notes, etc. — 19 clés recensées, préfixées `lk_*`) vivent en **localStorage**, séparément du plan réellement persisté (`plan.semaines`) — un swap de séance dans le dashboard n'est donc jamais visible si on rouvre le wizard sur ce même plan (il n'a jamais été écrit dans le plan lui-même).
 - Vérifié : le wizard ne permet pas de rééditer/régénérer le contenu d'un plan existant en place (seul `changerPalierGrandDebutant()`, déjà sécurisé en §27.3, le fait) — la génération produit toujours un plan à nouvel id, jamais un écrasement du plan consulté.
+## 29. Séparation plans_original / plans_actif + correctif date de course (17/07/2026, session ultérieure)
+
+### 29.1 Chantier : historique figé vs plan vivant
+
+**Objectif posé par Laurent** : garder une trace figée du plan tel que généré par le wizard (audit/comparaison), séparée de la version que le moteur de décision et les futurs décalages de date modifient au fil du temps.
+
+**Décisions actées avec Laurent** :
+- Deux tables Supabase distinctes plutôt qu'une colonne `type` sur la table existante — plus sûr et plus clair.
+- `plans_original` : jamais modifiée après création, sert uniquement à l'audit/comparaison (pas de reset depuis cette copie en V1).
+- `plans_actif` : version vivante, seule modifiée par le moteur/wizard/décalage de date.
+- Migration des données existantes : renommage `plans` → `plans_original` (aucune donnée déplacée), puis `plans_actif` créée par copie complète (structure + contenu).
+- Le backup Gist (sync multi-appareils, fallback si Supabase non configuré) contient aussi les deux versions, décision explicite de Laurent (anticiper plutôt que refaire plus tard), malgré le doublement de taille du fichier JSON.
+
+### 29.2 Migration SQL exécutée
+
+```sql
+ALTER TABLE plans RENAME TO plans_original;
+CREATE TABLE plans_actif (LIKE plans_original INCLUDING ALL);
+INSERT INTO plans_actif SELECT * FROM plans_original;
+```
+
+**Point de vigilance confirmé en pratique** : `LIKE ... INCLUDING ALL` ne copie **pas** les policies RLS (vérifié via `SELECT * FROM pg_policies WHERE tablename = 'plans_actif'` → aucune ligne après la création). Recréées manuellement à l'identique de `plans_original` (4 policies : INSERT/SELECT/UPDATE/DELETE, toutes `auth.uid() = user_id`).
+
+**Deuxième point trouvé après coup** : la contrainte de clé étrangère `plan_donnees.plan_id` a suivi le `RENAME` et pointait donc vers `plans_original` au lieu de `plans_actif` — repointée explicitement :
+```sql
+ALTER TABLE plan_donnees DROP CONSTRAINT plan_donnees_plan_id_fkey;
+ALTER TABLE plan_donnees ADD CONSTRAINT plan_donnees_plan_id_fkey
+  FOREIGN KEY (plan_id) REFERENCES plans_actif(id) ON DELETE CASCADE;
+```
+
+### 29.3 Code adapté — routage des tables
+
+**`sync-storage.js` / `.classic.js`** :
+- `chargerPlansSupabase()`, `mettreAJourPlanSupabase()`, `cloturerPlanSupabase()` → lisent/écrivent `plans_actif` uniquement.
+- `assurerPlanExiste()` (appelée par le wizard à la création, et à chaque chargement de `index.html` v1 en garde-fou) → vérifie l'existence dans `plans_actif`, puis insère la **même ligne** dans `plans_original` ET `plans_actif` si absente. Best-effort sur chaque insert séparément (un échec sur l'une n'empêche pas l'autre).
+
+**`v2/index.html`** (`supprimerPlanUI`) : la suppression touche désormais les deux tables Supabase (`plans_original` puis `plans_actif`), plus le Gist. Toujours best-effort, jamais bloquant.
+
+### 29.4 Gist — format étendu, rétrocompatible
+
+**`gist-sync.js` / `.classic.js`** : le fichier `plan10k_v2_plans.json` passe de `{ plans }` à `{ plans, plansOriginal }`.
+- `ecrireListePlans()` (sauvegarde/suppression/renommage du plan actif) relit désormais `plansOriginal` avant chaque écriture et le réinjecte tel quel — sans ça, la copie figée serait perdue à la prochaine écriture du plan actif, le body PATCH remplaçant tout le contenu du fichier Gist.
+- Nouvelles fonctions `chargerPlansOriginal()` et `ajouterPlanOriginal()` (miroir de `assurerPlanExiste` côté Supabase) : n'écrit qu'une fois, à la création par le wizard ; ne fait rien si un plan avec cet id existe déjà dans `plansOriginal`.
+- Appelée dans `v2/index.html`, juste après `sauvegarderPlan()`, au seul vrai point de création du wizard (juste avant la redirection vers le dashboard).
+- `public/index.html` (v1) : pas de modification nécessaire — `assurerPlanExiste()` (Supabase) y gère déjà la création "si absent" à chaque chargement de page, sans équivalent Gist de création séparé à ce niveau.
+
+### 29.5 Bug découvert en testant : date de course décalée jusqu'à plusieurs jours
+
+**Symptôme remonté par Laurent** en testant la création d'un nouveau plan : dateCourse saisie 04/04/2027, mais le calendrier généré plaçait le jour de course au 28/03/2027 (-7 jours).
+
+**Cause, dans `plan-generator.js`/`​.classic.js`** — deux problèmes cumulés, indépendants du chantier 29.1-29.4 (bug préexistant, découvert par hasard en testant) :
+
+1. `computePhases()` calculait `totalSemaines = Math.round(totalJours / 7)` — un arrondi classique, qui peut arrondir **vers le bas** si `totalJours` n'est pas un multiple exact de 7. Le plan généré peut alors être une semaine trop court par rapport à la vraie durée jusqu'à `dateCourse`.
+2. `placerSeanceCourse()` plaçait systématiquement la séance de course sur "le dernier jour généré" (dernière clé de `assignment` de la dernière semaine), en supposant que `dateCourse` tombait toujours exactement sur ce jour — vrai uniquement si `totalJours` est un multiple de 7 depuis `dateDebut`.
+
+**Corrigé** :
+1. `computePhases()` : `Math.round` → `Math.ceil` — le plan ne se termine plus jamais avant `dateCourse`, seulement pile ou légèrement après (semaines entières).
+2. `placerSeanceCourse()` : calcule désormais le jour ISO exact de `dateCourse` (`new Date(dateCourse).getDay()`, converti de 0=dimanche...6=samedi vers 0=lundi...6=dimanche pour matcher les clés `assignment`), et cible cette clé précise dans la dernière semaine plutôt que systématiquement la dernière entrée de l'objet. Garde-fou ajouté pour le cas où `dateCourse` tombe un lundi (clé 0 absente de `assignment`, repos implicite) : repli sur l'ancien comportement (dernier jour généré) plutôt que ne rien faire silencieusement.
+
+**Non traité, décision explicite** : refonte du moteur en vrai calendrier jour-par-jour (au lieu du modèle actuel en semaines entières par phase) — écartée après discussion. Le modèle "semaines entières" structure toute la génération (phases, séances qualité, longue, affûtage), pas seulement le calcul final ; une vraie refonte serait un chantier à part, plus risqué, non nécessaire pour corriger ce bug précis.
+
+**Non re-testé** : le plan "Semi — 1:47:00" créé pendant les tests du chantier 29.1-29.4 a été généré **avant** ce correctif — il garde l'ancien calendrier décalé. Le fix ne s'applique qu'aux plans générés après le push. Pas régénéré par Laurent en fin de session (pas bloquant, juste à garder en tête si ce plan précis est réutilisé).
+
+### 29.6 Fichiers modifiés (7 au total, 2 commits séparés)
+
+Chantier 29.1-29.4 : `public/v2/engine/gist-sync.js`, `public/v2/engine/sync-storage.js`, `public/engine-classic-scripts/gist-sync.classic.js`, `public/engine-classic-scripts/sync-storage.classic.js`, `public/v2/index.html`.
+
+Chantier 29.5 : `public/v2/engine/plan-generator.js`, `public/engine-classic-scripts/plan-generator.classic.js`.
+
+Tous validés syntaxiquement (`node --check`) avant push. Push effectué via API GitHub REST directe (curl/Python, token PAT) — le connecteur MCP GitHub a renvoyé une 403 à l'écriture sur ce repo, confirmant qu'il reste lecture seule ici (cf. §Outils & principes déjà connus).
