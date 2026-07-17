@@ -580,6 +580,19 @@ Cette sous-section précède volontairement l'ACWR (§5.2) : l'ACWR n'est qu'un 
 - Le RPE déclaré est une donnée de bonne qualité **si le coureur est suffisamment expérimenté et rigoureux dans sa saisie** — ce qui justifie de ne pas plafonner sa confiance aussi bas qu'on pourrait le penser pour une donnée "purement déclarative" (cf. §4.4), mais de la pondérer par le niveau d'expérience du profil coureur.
 - La sRPE (`ressentiRPE × dureeMin`) est une bonne candidate de proxy de charge quand la FC est indisponible (cf. règle `R-024` en §4.3) — c'est un calcul déjà standard dans la littérature, pas une improvisation.
 
+**Implémenté le 17/07/2026** (session ultérieure, cf. inventaire §33) :
+plutôt que de pondérer la confiance par le niveau d'expérience du coureur
+(non fait), la difficulté de fiabilité chez un coureur non entraîné a été
+traitée en amont, côté UI — l'échelle CR-10 (1-10) n'est jamais montrée
+directement au coureur, qui choisit parmi 5 niveaux visuels simples (🙂
+Facile → 🥵 Maximal), mappés vers CR-10 (2/4/6/8/10) uniquement pour le
+calcul interne. Compromis pragmatique entre le 1-3 initialement en place
+(trop grossier) et le 1-10 théorique (peu fiable sans ancrages verbaux
+précis pour un public non expert). Quand une FC est disponible, le RPE
+n'est pas utilisé en remplacement (le TRIMP reste la mesure principale)
+mais en ajustement : RPE ≥ 8 amplifie légèrement la charge calculée (+12%),
+jamais ne l'abaisse.
+
 ### 5.4 Surentraînement (Overtraining Syndrome) et marqueurs de détection précoce
 
 **Ce que dit la littérature** : le consensus conjoint ECSS/ACSM (Meeusen et al., 2013) reste la référence sur le sujet. Il distingue le surmenage fonctionnel (Functional Overreaching, FOR — bénéfique, suivi d'une amélioration après récupération), le surmenage non fonctionnel (Non-Functional Overreaching, NFOR) et le syndrome de surentraînement (Overtraining Syndrome, OTS) proprement dit, la distinction entre ces états étant en pratique difficile et reposant surtout sur l'évolution clinique. Un marqueur précoce identifié comme relativement fiable est une fréquence cardiaque de repos élevée de 10 à 30 battements par minute au-dessus de la valeur normale du sportif. Plus largement, aucun marqueur biochimique ou fonctionnel isolé n'est identifié comme fiable à lui seul pour détecter précocement l'OTS ; le suivi du ressenti subjectif de bien-être reste, historiquement, l'un des outils les plus efficaces (une étude ancienne mais toujours citée montre que des indices de bien-être auto-déclarés expliquent jusqu'à 76-85% de la variance des scores de "staleness").
