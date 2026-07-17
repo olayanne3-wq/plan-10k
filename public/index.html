@@ -87,6 +87,7 @@ input[type=text], input[type=number], input[type=password] {
 <script src="/engine-classic-scripts/decision-engine-engagement.classic.js"></script>
 <script src="/engine-classic-scripts/decision-engine-session-analysis.classic.js"></script>
 <script src="/engine-classic-scripts/decision-engine-week-analysis.classic.js"></script>
+<script src="/engine-classic-scripts/decision-engine-trend-analysis.classic.js"></script>
 <script src="/engine-classic-scripts/decision-engine-rules.classic.js"></script>
 <script src="/engine-classic-scripts/decision-engine-apply.classic.js"></script>
 <script>
@@ -1192,11 +1193,82 @@ function analyserSemaineActuelle(weekNum, semainePrecedenteAnalyse) {
     // 17/07/2026, cf. en-tête decision-engine-week-analysis.classic.js).
   };
 
-  const fcMax = runnerFcMax || null;
-  const fcRepos = 55; // valeur d'exemple temporaire, cf. fcReposReference Module 1 (§26.3 inventaire) — même limite ici
-  const sexe = profilCoureur?.sexe || 'autre';
+  // fcMax/fcRepos/sexe lus depuis optionsRunnerStateActuel(), même source que
+  // le reste du moteur (ACWR, RunnerState) — corrigé le 17/07/2026 : ce
+  // wrapper utilisait encore fcRepos=55 en dur (valeur d'exemple), alors que
+  // profilCoureur.fcRepos existe réellement depuis l'ajout du champ
+  // Paramètres le même jour (§11.7 point 4). Erreur de ma part, basée sur
+  // une mémoire de session qui ne reflétait plus l'état réel du code.
+  const optsRunnerState = optionsRunnerStateActuel();
+  const fcMax = optsRunnerState.fcMaxReference || null;
+  const fcRepos = optsRunnerState.fcReposReference || null;
+  const sexe = optsRunnerState.sexe;
 
   return DecisionEngineWeekAnalysis.analyser(weekNum, seancesRealisees, seancesPrevues, planContext, semainePrecedenteAnalyse || null, fcMax, fcRepos, sexe);
+}
+
+// ── Branchement Module 4 (TrendAnalyzer) — 17/07/2026 ──────────────────────
+// Boucle sur les fenetreSemaines dernières semaines DÉJÀ COMMENCÉES du plan
+// (semaine courante incluse, semaines futures exclues — pas de sens
+// d'analyser une tendance sur des semaines qui n'ont pas encore eu lieu) :
+// - historiqueSemaines[] : via analyserSemaineActuelle() (Module 3),
+//   chaînées pour que chaque WeekAnalysis reçoive la précédente
+//   (progressionVsPrecedente correct sur toute la fenêtre, pas seulement la
+//   dernière semaine).
+// - historiqueRunnerStates[] : via DecisionEngineRunnerState.calculerRunnerState(),
+//   avec dateReference calée sur le DERNIER jour de chaque semaine (dimanche,
+//   ou aujourd'hui si la semaine est en cours) — samples Strava complets à
+//   chaque appel (adapterHistoriqueComplet ne filtre rien, c'est
+//   calculerRunnerState() qui ne regarde que les 7j/28j avant dateReference).
+//
+// Les deux tableaux sont construits dans le même ordre (plus ancien en
+// premier) et donc alignés par index — condition nécessaire pour
+// DecisionEngineTrendAnalysis.analyserAvecEtatCoureur(), cf. en-tête de
+// decision-engine-trend-analysis.classic.js.
+//
+// Retourne null si le module n'est pas chargé, ou si moins de 3 semaines
+// exploitables (les détecteurs de signaux ont tous un minimum de 3 semaines,
+// cf. decision-engine-trend-analysis.classic.js).
+function analyserTendance(fenetreSemaines) {
+  if (typeof DecisionEngineTrendAnalysis === 'undefined') return null;
+  const semaineActuelleNum = currentWeek();
+  const premiereSemaineNum = Math.max(1, semaineActuelleNum - fenetreSemaines + 1);
+
+  const historiqueSemaines = [];
+  let precedente = null;
+  for (let w = premiereSemaineNum; w <= semaineActuelleNum; w++) {
+    const analyse = analyserSemaineActuelle(w, precedente);
+    if (!analyse) continue;
+    historiqueSemaines.push(analyse);
+    precedente = analyse;
+  }
+  if (historiqueSemaines.length < 3) return null; // pas assez de semaines pour un signal, cf. détecteurs
+
+  const historiqueRunnerStates = [];
+  if (typeof DecisionEngineAdapter !== 'undefined' && typeof DecisionEngineRunnerState !== 'undefined' && stravaActivities && stravaActivities.length) {
+    const samples = DecisionEngineAdapter.adapterHistoriqueComplet(stravaActivities, {}, "strava_gratuit");
+    const opts = optionsRunnerStateActuel();
+    historiqueSemaines.forEach(analyse => {
+      const week = PLAN.find(w => w.week === analyse.semaine);
+      if (!week) { historiqueRunnerStates.push(null); return; }
+      // Dernier jour de la semaine (dimanche, indice 6) ; si la semaine est
+      // en cours, ce jour est dans le futur — calculerRunnerState() avec une
+      // dateReference future reste valide (regarde juste les 7j/28j avant
+      // cette date, qui peuvent inclure des jours pas encore écoulés sans
+      // erreur, simplement moins de séances trouvées).
+      const dernierJour = week.sessions[week.sessions.length - 1];
+      const dateReference = dernierJour ? dernierJour.date : today();
+      try {
+        const runnerState = DecisionEngineRunnerState.calculerRunnerState(samples, { ...opts, dateReference });
+        historiqueRunnerStates.push(runnerState);
+      } catch (err) {
+        console.warn("analyserTendance : calcul RunnerState échoué pour semaine " + analyse.semaine, err.message);
+        historiqueRunnerStates.push(null);
+      }
+    });
+  }
+
+  return DecisionEngineTrendAnalysis.analyserAvecEtatCoureur(historiqueSemaines, historiqueRunnerStates, fenetreSemaines);
 }
 
 
@@ -4807,6 +4879,44 @@ function renderStats() {
     );
   }
 
+  // ── Bloc de test Module 4 (TrendAnalyzer) — 17/07/2026 ──────────────────
+  // Fenêtre fixe à 6 semaines pour ce test (pas de sélecteur — cohérent avec
+  // le test Module 3, pas de sens de faire varier ce paramètre avant d'avoir
+  // une vraie règle du Module 5 qui en dépendrait).
+  const analyseTendance = analyserTendance(6);
+  let moduleTest4El = null;
+  if (analyseTendance) {
+    const emojiTendance = {
+      progression: '📈', amelioration: '📈', stagnation: '➡️',
+      fatigue_accumulee: '⚠️', baisse_de_forme: '📉',
+    }[analyseTendance.tendanceGenerale] || '➡️';
+    moduleTest4El = el("div",{},
+      el("div",{class:"label"},"🧪 Test Module 4 · TrendAnalyzer ("+analyseTendance.fenetreSemaines+" semaines)"),
+      el("div",{class:"card"},
+        el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"10px"}},
+          el("span",{class:"muted",style:{fontSize:"13px"}},"Tendance générale"),
+          el("span",{style:{fontSize:"14px",fontWeight:"700"}},emojiTendance+" "+analyseTendance.tendanceGenerale)
+        ),
+        analyseTendance.signauxDetectes.length
+          ? el("div",{style:{marginBottom:"10px"}},
+              el("div",{class:"muted",style:{fontSize:"13px",marginBottom:"4px"}},"Signaux détectés"),
+              ...analyseTendance.signauxDetectes.map(sig => el("div",{style:{fontSize:"13px",color:"var(--warn)",marginBottom:"2px"}},"• "+sig.description))
+            )
+          : el("div",{class:"muted",style:{fontSize:"13px",fontStyle:"italic",marginBottom:"10px"}},"Aucun signal particulier détecté."),
+        el("div",{class:"muted",style:{fontSize:"13px",marginBottom:"4px"}},"Points de suivi"),
+        ...analyseTendance.pointsDeSuivi.map(p => el("div",{style:{display:"flex",justifyContent:"space-between",fontSize:"13px",marginBottom:"2px"}},
+          el("span",{},"S"+p.semaine),
+          el("span",{},(p.fatigue!=null?"fatigue "+p.fatigue:"fatigue —")+" · "+p.volumeKm+"km · "+Math.round(p.tauxReussite*100)+"%")
+        ))
+      )
+    );
+  } else {
+    moduleTest4El = el("div",{},
+      el("div",{class:"label"},"🧪 Test Module 4 · TrendAnalyzer"),
+      el("div",{class:"card"}, el("div",{class:"muted",style:{fontSize:"13px",fontStyle:"italic"}},"Pas assez de semaines exploitables pour une analyse de tendance (minimum 3)."))
+    );
+  }
+
   return el("div",{style:{padding:"0 16px 100px"}},
     el("div",{style:{marginTop:"8px"}}),
     graphEl||el("div",{class:"muted",style:{textAlign:"center",padding:"24px 0",fontSize:"14px",fontStyle:"italic"}},"📊 Le graphique apparaîtra après quelques jours de données"),
@@ -4819,7 +4929,8 @@ function renderStats() {
     paceEl,
     infoEl,
     moduleTestEl,
-    moduleTest3El
+    moduleTest3El,
+    moduleTest4El
   );
 }
 
