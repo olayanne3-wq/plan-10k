@@ -40,6 +40,15 @@
 (function (global) {
   'use strict';
 
+  // Garde-fou §10.2 doc intégration (cause 2, 17/07/2026) : borne dure sur
+  // l'ampleur d'UNE décision individuelle, jamais dépassée quelle que soit la
+  // règle qui la produit. Valeur proposée dans le doc (jamais plus de -30%
+  // sur une seule décision) — chiffre à valider avec un regard coach, pas
+  // arbitraire mais pas définitif non plus. Exposée globalement pour être
+  // réutilisée comme référence par decision-engine-apply.classic.js (garde-fou
+  // cumulé, cause 1), même si les deux mécanismes restent indépendants.
+  const BORNE_AMPLEUR_MAX_POURCENT = 30;
+
   // --------------------------------------------------------------------------
   // R-006 — Pic de séance unique (sécurité)
   // cf. §5.5 doc archi : dépasser 110% de la plus longue sortie des 30
@@ -186,6 +195,23 @@
     candidats.sort((a, b) => b.priorite - a.priorite);
     const gagnante = candidats[0];
 
+    // Garde-fou §10.2 cause 2 (doc intégration, 17/07/2026) : borne dure sur
+    // l'ampleur d'UNE décision individuelle, indépendante de la règle qui l'a
+    // produite. Protège contre un seuil mal calibré ou une erreur de frappe
+    // dans une constante (ex: -80% au lieu de -8%) qui produirait un résultat
+    // absurde même si la règle avait raison de se déclencher. Plafonne plutôt
+    // que rejette : le signal de la règle reste valide, seule l'ampleur est
+    // bornée — jamais de silence total sur une vraie alerte.
+    // BORNE_AMPLEUR_MAX_POURCENT défini en tête de fichier (constante partagée
+    // avec le garde-fou cumulé de decision-engine-apply.classic.js, §10.2
+    // cause 1 — les deux gardes-fous restent indépendants dans leur
+    // déclenchement mais partagent la même limite unitaire de référence).
+    let ampleurBornee = gagnante.ampleurPourcent;
+    if (typeof ampleurBornee === 'number' && ampleurBornee < -BORNE_AMPLEUR_MAX_POURCENT) {
+      console.warn('Moteur de décision : ampleurPourcent (' + ampleurBornee + '%) dépasse la borne dure, plafonné à -' + BORNE_AMPLEUR_MAX_POURCENT + '%.');
+      ampleurBornee = -BORNE_AMPLEUR_MAX_POURCENT;
+    }
+
     // La confiance finale de la décision est plafonnée par confianceMax de la
     // règle gagnante — jamais une confiance inventée plus haute que ce que la
     // règle elle-même autorise (cf. §6 doc archi, point de vigilance repris
@@ -196,7 +222,7 @@
         libelle: gagnante.libelle,
         categorie: gagnante.categorie,
         type: gagnante.type,
-        ampleurPourcent: gagnante.ampleurPourcent, // undefined si non pertinent (ex: R-040)
+        ampleurPourcent: ampleurBornee, // undefined si non pertinent (ex: R-040), sinon borné cf. ci-dessus
         cible: gagnante.cible,                     // idem
         justification: gagnante.justification,
         confiance: gagnante.confianceMax,
@@ -213,6 +239,7 @@
     evaluerPicDeSeance,          // exposées pour tests unitaires isolés
     evaluerFatigueElevee,
     evaluerDesengagementPrecoce,
+    BORNE_AMPLEUR_MAX_POURCENT,  // référence partagée avec le garde-fou cumulé (decision-engine-apply.classic.js)
   };
 
 })(window);
