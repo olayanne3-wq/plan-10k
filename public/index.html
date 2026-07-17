@@ -559,7 +559,7 @@ function calculerEtatMoteurDecision() {
     const samples = DecisionEngineAdapter.adapterHistoriqueComplet(window.stravaActivities || [], {}, "strava_gratuit");
     const runnerState = DecisionEngineRunnerState.calculerRunnerState(samples, optionsRunnerStateActuel());
     const engagementState = DecisionEngineEngagement.calculerEngagementState(samples, {});
-    const resultatMoteur = DecisionEngineRules.evaluerRegles({ runnerState, engagementState, activitySamples: samples });
+    const resultatMoteur = DecisionEngineRules.evaluerRegles({ runnerState, engagementState, activitySamples: samples, coureurOptions: optionsRunnerStateActuel() });
     return { runnerState, engagementState, decision: resultatMoteur ? resultatMoteur.decision : null };
   } catch (err) {
     console.warn("Moteur de décision : erreur de calcul.", err.message);
