@@ -15,7 +15,7 @@ Le moteur de décision a été conçu comme un module indépendant (cf. §1 du d
 | Pas de backend, tout dans le navigateur | **Un backend existe : Supabase**, avec authentification (`window.__UTILISATEUR__`), synchronisation temps réel (`LkSync.activerRealtime`), et `localStorage` comme cache local rapide |
 | Code du moteur à structurer depuis zéro | Un dossier `/engine-classic-scripts/` existe déjà, avec des modules séparés chargés en `<script src>` (`plan-generator.classic.js`, `plan-forme.classic.js`, `weather.classic.js`, etc.) — le moteur peut suivre exactement ce pattern |
 | `ActivitySample[]` à définir et remplir | `stravaActivities` existe déjà et contient `moving_time`, `distance`, `average_speed`, `average_heartrate`, `start_date_local` — c'est un `ActivitySample[]` au format Strava brut, pas normalisé mais déjà là |
-| RPE déclaré à faire saisir | Un mécanisme de saisie RPE par séance existe déjà (`{uid: {average_speed, distance, average_heartrate, rpe}}`), référencé dans `seances.md` |
+| RPE déclaré à faire saisir | Un mécanisme de saisie RPE par séance existe déjà (`{uid: {average_speed, distance, average_heartrate, rpe}}`), référencé dans `seances.md` — **note du 17/07/2026 (session ultérieure)** : ce mécanisme (`manualPerf[uid].rpe`, limité au formulaire de saisie manuelle) a été remplacé par `sessionRpe[uid]`, saisi directement au niveau du statut de séance (`renderStatusRow`), échelle repensée à 5 niveaux visuels mappés sur CR-10 plutôt que le 1-3 d'origine — cf. inventaire §33 pour le détail complet |
 | `RunnerProfile` à créer | `lk_profil_coureur` existe déjà en `localStorage`, synchronisé vers Supabase |
 
 Concrètement : la question n'est plus "faut-il un backend pour ce moteur" (réponse : il existe déjà), mais **"le moteur doit-il tourner dans le navigateur (comme les autres scripts `engine-classic-scripts`) ou côté Supabase"**. C'est une question plus simple, et elle a une réponse assez nette (§2).
@@ -69,12 +69,14 @@ function adapterActiviteStrava(activiteStrava, provenanceDeclaree) {
 
 Ce fichier ne fait qu'un travail de traduction — il ne contient aucune règle métier, il rend juste les données existantes lisibles par le moteur tel que conçu.
 
+**Note du 17/07/2026 (session ultérieure)** : le pseudo-code ci-dessus (`recupererRpeSaisi(activiteStrava.id)`, appelé DANS `adapterActiviteStrava`) diffère de l'implémentation réelle — `DecisionEngineAdapter.adapterActiviteStrava()` ne fait jamais cette correspondance elle-même (elle ne reçoit qu'une activité Strava brute, sans notion de séance du plan/uid). La correspondance est faite côté appelant (`adapterHistoriqueAvecRpe()`, `index.html`), qui croise date d'activité → uid de séance du plan → `sessionRpe[uid]` avant d'appeler `adapterActiviteStrava(activite, provenance, rpeSaisi)` avec le RPE déjà résolu. Cf. inventaire §33.4 pour le détail.
+
 ### 3.2 Ce qui manque encore côté données
 
 D'après la lecture du code, deux champs du `RunnerProfile` attendu par le moteur (§3.1 du document d'architecture) ne semblent pas encore capturés dans `lk_profil_coureur` :
 
-- `fcMaxReference` et `fcReposReference` — nécessaires au calcul TRIMP (§5.1 du document d'architecture). Sans eux, le moteur bascule automatiquement sur le sRPE (dégradation déjà prévue, cf. §4.3), donc **ce n'est pas bloquant pour démarrer**, mais les ajouter à l'onboarding améliorerait la précision.
-- Un moyen de déclarer `DataProfile` (`manuel_seul` / `strava_gratuit` / `strava_premium` / `montre_connectee`) — actuellement Yoria semble savoir si Strava est connecté (`stravaToken`), mais pas distinguer gratuit/premium. À voir si c'est même détectable via l'API Strava, ou si ça doit rester une question posée une fois à l'utilisateur.
+- `fcMaxReference` et `fcReposReference` — nécessaires au calcul TRIMP (§5.1 du document d'architecture). Sans eux, le moteur bascule automatiquement sur le sRPE (dégradation déjà prévue, cf. §4.3), donc **ce n'est pas bloquant pour démarrer**, mais les ajouter à l'onboarding améliorerait la précision. **Fait le 17/07/2026** : les deux champs existent désormais dans `profilCoureur` (Paramètres), lus via `optionsRunnerStateActuel()`.
+- Un moyen de déclarer `DataProfile` (`manuel_seul` / `strava_gratuit` / `strava_premium` / `montre_connectee`) — actuellement Yoria semble savoir si Strava est connecté (`stravaToken`), mais pas distinguer gratuit/premium. À voir si c'est même détectable via l'API Strava, ou si ça doit rester une question posée une fois à l'utilisateur. Toujours non fait à ce jour.
 
 Aucun de ces deux manques n'empêche de démarrer une première intégration — le moteur est conçu pour se dégrader proprement (§4 du document d'architecture) quand ces données sont absentes.
 
@@ -542,3 +544,35 @@ Nouveau fichier `decision-engine-session-analysis.classic.js`. Détail de concep
 2. **Modules 3/4** (WeekAnalyzer/TrendAnalyzer) — codés le 17/07/2026 (session ultérieure, cf. inventaire §30/§31), branchés dans l'input du RuleEngine (`weekAnalysis`/`trendAnalysis`, cf. inventaire §32) mais **aucune règle ne les consomme encore** — les données sont disponibles, inertes. R-060 (§13.1) continue de rappeler directement le Module 1 à plusieurs dates plutôt que de consommer `trendAnalysis` — ce chantier n'a pas été fait pendant l'intégration, à faire si une règle basée sur `trendAnalysis` est conçue plus tard (les deux mécanismes coexistent, ne sont pas redondants au sens strict : R-060 regarde la fatigue seule sur 3 points fixes J/J-4/J-7, `TrendAnalyzer` croise plusieurs signaux sur une fenêtre de semaines calendaires).
 3. **§11.4 — algorithme de réduction d'intervalles** pour les séances de qualité — toujours reporté, `reduire_charge` ne cible toujours que EF/LONGUE/RECUP.
 4. **Reste du catalogue théorique** (doc archi §7) — signaux combinés de surentraînement, taper irrégulier, objectif à risque, plaisir déclaré, etc. — nécessitent pour la plupart de nouvelles règles s'appuyant sur `weekAnalysis`/`trendAnalysis` (désormais disponibles, cf. point 2) ou `GoalFeasibility` (non codé).
+
+## 14. Chantier RPE unifié (17/07/2026, session ultérieure)
+
+Remarque de Laurent : le RPE n'était visible que dans le formulaire de
+saisie manuelle d'allure — jamais pour une séance validée normalement
+(cas majoritaire en pratique). En creusant, découverte que le RPE était de
+toute façon **invisible pour le moteur** dans tous les cas : les wrappers
+(Modules 1/2/3) lisaient une clé (`sessionNotes[uid+'_rpe']`) qui n'a
+jamais existé nulle part dans le code — `ressentiRPE` était systématiquement
+`undefined`, y compris pour une saisie manuelle correctement renseignée
+par le coureur.
+
+**Corrigé de bout en bout** :
+- Nouvelle source unique `sessionRpe[uid]`, saisie directement au niveau du
+  statut de séance (`renderStatusRow`), quelle que soit l'origine
+  (Strava/saisie manuelle).
+- Échelle repensée : 5 niveaux visuels (au lieu de 3, trop grossier, ou 10,
+  peu fiable pour un coureur non entraîné selon la littérature citée au
+  doc archi §5.2), mappés directement sur l'échelle CR-10 attendue par le
+  contrat théorique.
+- Module 1 (fatigue/ACWR, affiché partout) branché sur le RPE via
+  `adapterHistoriqueAvecRpe()` — auparavant seul TRIMP/proxy durée, jamais
+  de RPE même si saisi.
+- Pondération légère du TRIMP par RPE élevé (≥8/10, +12%) quand une FC est
+  disponible — signal complémentaire, jamais un remplacement de la FC.
+
+Détail complet, décisions actées, et code exact : inventaire §33.
+
+**Non vérifié visuellement à ce jour** — chantier annexe (agrandissement
+UI des boutons de statut/RPE) poussé mais bloqué par le quota de
+déploiement Vercel gratuit atteint en fin de session (cf. inventaire §33.7)
+— à reprendre au prochain déploiement confirmé.
