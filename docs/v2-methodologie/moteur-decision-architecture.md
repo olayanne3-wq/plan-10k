@@ -266,15 +266,24 @@ interface EngagementSignal {
 }
 
 // --- Module 2 : Analyse de séance ---
+// RÉVISÉ le 17/07/2026 suite à l'implémentation réelle (decision-engine-
+// session-analysis.classic.js) — cf. état d'implémentation détaillé en tête
+// du §6 Module 2 ci-dessous. Le champ `volume` du contrat d'origine a été
+// remplacé par `repetitions` : une comparaison de distance totale ne
+// détecte pas un abandon en cours de séance (la montre continue
+// d'enregistrer les créneaux prévus même en cas de répétition ratée/marchée
+// — la distance totale peut rester proche de la cible malgré une vraie
+// répétition ratée au milieu). Le signal réellement fiable est le taux de
+// répétitions dans la zone d'allure cible, pas le volume brut.
 interface SessionAnalysis {
   seanceId: string;
   reussite: boolean;
-  scoreReussite: ScoreNormalise;     // 0-100, pondère plusieurs critères
+  scoreReussite: ScoreNormalise;     // 0-100, pondère plusieurs critères (implémenté : allure 0.4, FC 0.25, répétitions 0.35)
   difficulteRessentie: 'facile' | 'normale' | 'difficile' | 'tres_difficile' | 'inconnue';
   derive: {
     allure: EcartAnalyse;
     frequenceCardiaque: EcartAnalyse;
-    volume: EcartAnalyse;
+    repetitions: EcartAnalyse;       // ex-"volume" — cf. note ci-dessus. nbDansLaZone/nbTotal/tauxReussite en plus des champs EcartAnalyse standards
   };
   alertes: AlerteSeance[];
 }
@@ -286,7 +295,7 @@ interface EcartAnalyse {
 }
 
 interface AlerteSeance {
-  code: string;              // ex: "FC_TROP_HAUTE", "ALLURE_TROP_RAPIDE"
+  code: string;              // ex: "FC_TROP_HAUTE", "ALLURE_HORS_ZONE" (implémenté : plus de ALLURE_TROP_RAPIDE distinct, cf. note allure symétrique ci-dessous)
   gravite: 'info' | 'attention' | 'alerte';
 }
 
@@ -749,6 +758,43 @@ interface GoalFeasibilityCalculator {
 
 ### Module 2 — Analyse de séance (`SessionAnalyzer`)
 
+> **État d'implémentation réel (livré le 17/07/2026)** —
+> `decision-engine-session-analysis.classic.js`
+> (`DecisionEngineSessionAnalysis.analyser()`), branché côté `index.html` via
+> `analyserSeanceQualite(seance)`. **Périmètre restreint aux séances de
+> qualité** (VMA/SPEC/SEUIL/TEST) — décision explicite : EF/LONGUE/RECUP
+> n'ont pas de cible d'allure resserrée dans Yoria, l'écart n'y a pas le même
+> sens. Utilise `getLapsAffichage()` (déjà existant côté index.html) pour
+> isoler les vrais laps d'effort, jamais l'échauffement/récup/retour au
+> calme. Testable via un bloc dédié dans Stats ("🧪 Test Module 2").
+>
+> Écarts par rapport à la logique décrite ci-dessous, décidés après
+> discussion avec Laurent le 17/07/2026 :
+> - **FC** : une FC trop **basse** ne pénalise plus (`dansLaZone` vrai dès
+>   que `fc <= zoneFC.max`) — seule une FC trop haute reste un signal
+>   négatif. Une FC basse accompagne souvent une allure plus rapide tenue
+>   avec moins d'effort cardiaque que prévu (économie de course), pas un
+>   raté.
+> - **Allure** : reste **symétrique** (trop rapide et trop lent pénalisent à
+>   la même hauteur). Une asymétrie a été discutée et jugée sportivement
+>   justifiée (respect du protocole, risque de dérive sur les répétitions
+>   suivantes) mais **reportée faute de données réelles pour la calibrer**.
+> - **Volume → Répétitions** : le champ `volume` (comparaison de distance
+>   totale) a été remplacé par `repetitions`, qui compte le taux de
+>   répétitions individuelles dans la zone `okPace` avec un ratio de
+>   complétion (`repOk`/`repWarn`) — réutilise exactement la même logique
+>   que `autoValidate()`/`validateReason()`, déjà existants côté index.html,
+>   pour qu'il n'existe qu'une seule définition de "séance de qualité
+>   réussie" dans toute l'app. Raison du changement : la montre continue
+>   d'enregistrer les créneaux prévus même en cas d'abandon partiel (une
+>   répétition "marchée" reste un lap distinct), donc la distance totale
+>   peut rester proche de la cible malgré une vraie répétition ratée au
+>   milieu de la séance — signal peu fiable pour ce cas.
+>
+> Non implémenté à ce jour : les Modules 3 (WeekAnalyzer) et 4
+> (TrendAnalyzer) ci-dessous, qui consommeraient normalement les sorties de
+> ce module.
+
 **Responsabilité** : comparer une séance prévue à sa réalisation.
 
 ```typescript
@@ -757,7 +803,7 @@ interface SessionAnalyzer {
 }
 ```
 
-**Logique** :
+**Logique** (version théorique du contrat — cf. écarts réels ci-dessus) :
 1. Calcul des écarts (`EcartAnalyse`) pour allure, FC, volume — chacun avec une zone de tolérance paramétrable (ex : ±5% sur le volume = "dans la zone").
 2. `scoreReussite` = moyenne pondérée des `dansLaZone` (le volume compte souvent plus que l'allure exacte selon le type de séance : sur une sortie longue, respecter la FC prime sur l'allure).
 3. `difficulteRessentie` déduit du RPE si présent, sinon estimé depuis l'écart FC/allure (proxy imparfait, `'inconnue'` si aucune donnée fiable).
@@ -910,6 +956,40 @@ interface DecisionFormatter {
 ---
 
 ## 7. Catalogue de règles — structure de départ
+
+> **État d'implémentation réel (17/07/2026)** — le catalogue ci-dessous est la
+> feuille de route cible, volontairement large. Ce qui est réellement codé à
+> ce jour dans `decision-engine-rules.classic.js` (catalogue simplifié, cf.
+> en-tête du fichier) :
+> - **R-006** Pic de séance unique (sécurité, priorité 100) — correspond à la
+>   règle 🔬 décrite ci-dessous
+> - **R-024s** Fatigue élevée basique (sécurité, priorité 90) — version
+>   simplifiée de "Fatigue élevée + charge en hausse rapide"
+> - **R-050** ACWR élevé (sécurité, priorité 85, ajoutée 17/07/2026) — lit
+>   directement `runnerState.charge.ratio`, seuils 1.3/1.5 conformes à §5.2 ;
+>   recoupe partiellement "Risque critique (ACWR > 1.5) → repos complet"
+>   ci-dessous mais reste une réduction de charge, pas un repos complet
+> - **R-060** Tendance fatigue en hausse (sécurité, priorité 80, ajoutée
+>   17/07/2026) — compare 3 points de fatigue (J, J-4, J-7) recalculés via
+>   `calculerRunnerState()`, se déclenche uniquement si aucun point n'a
+>   franchi le seuil dur de R-024s ; approche différente de la donnée requise
+>   `EngineInput` du contrat théorique (pas de vrai historique persisté de
+>   `WeekAnalysis`/`TrendAnalysis`, cf. §3.4, Module 4 non codé)
+> - **R-070** Séances planifiées ratées consécutives (engagement, priorité
+>   55, ajoutée 17/07/2026) — 2 séances *prévues au plan* marquées ❌
+>   d'affilée (lit `ALL_SESSIONS`/`statuses` côté index.html, transmis en
+>   input) ; signal plus direct que R-040, pas dans le catalogue théorique
+>   d'origine
+> - **R-040** Désengagement précoce (engagement, priorité 50) — correspond à
+>   la règle documentée plus bas dans cette section
+>
+> **Non codées à ce jour** : Signaux combinés de surentraînement, Taper
+> irrégulier détecté (R-051 ci-dessous), Objectif compromis (les deux
+> variantes), Progression bloquée si engagement en baisse, Progression
+> suspendue en fenêtre critique, Plaisir déclaré en baisse, Routine mais
+> isolement. Nécessitent pour la plupart les Modules 2/3/4
+> (SessionAnalysis/WeekAnalysis/TrendAnalysis) ou GoalFeasibility, non codés
+> — cf. état d'implémentation en tête de §6 Module 2 ci-dessous.
 
 Les règles ne sont pas codées en dur dans le moteur : elles vivent dans un registre chargé au démarrage (fichier(s) séparé(s), ex. `rules/securite.rules.ts`, `rules/progression.rules.ts`, etc.). Cela permet d'ajouter/retirer une règle sans toucher à `RuleEngine`.
 
