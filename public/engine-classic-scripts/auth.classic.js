@@ -271,7 +271,7 @@
       const SEXES = [
         { val: 'homme', label: 'Homme' },
         { val: 'femme', label: 'Femme' },
-        { val: 'autre', label: 'Autre / préfère ne pas dire' },
+        { val: 'autre', label: 'Autre' },
       ];
 
       hote.innerHTML = `
@@ -301,10 +301,11 @@
         #ecran-onboarding .niveau-opt.actif { border-color: var(--accent); background: rgba(var(--accent-rgb),0.08); }
         #ecran-onboarding .niveau-opt .titre { font-weight: 700; font-size: 0.9rem; }
         #ecran-onboarding .niveau-opt .desc { font-size: 0.78rem; color: var(--text-muted); }
+        #ecran-onboarding .sexe-opts { display: flex; gap: 8px; margin-bottom: 16px; }
         #ecran-onboarding .sexe-opt {
-          display: inline-block; padding: 8px 14px; margin: 0 8px 8px 0;
+          flex: 1; text-align: center; padding: 8px 6px;
           border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
-          font-size: 0.85rem; font-weight: 600; transition: border-color 0.15s, background 0.15s;
+          font-size: 0.82rem; font-weight: 600; transition: border-color 0.15s, background 0.15s;
         }
         #ecran-onboarding .sexe-opt.actif { border-color: var(--accent); background: rgba(var(--accent-rgb),0.08); color: var(--accent); }
         #ecran-onboarding .btn-principal {
@@ -332,7 +333,7 @@
             <label for="onb-fcrepos">FC repos (bpm) — optionnel</label>
             <input type="number" id="onb-fcrepos" placeholder="55" value="${profilExistant.fcRepos || ''}">
             <label>Sexe — optionnel, affine le calcul de charge</label>
-            <div id="onb-sexes"></div>
+            <div id="onb-sexes" class="sexe-opts"></div>
             <label>Ton niveau</label>
             <div id="onb-niveaux"></div>
             <button class="btn-principal" id="onb-valider" disabled>Valider</button>
