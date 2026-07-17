@@ -75,8 +75,18 @@
 
   // --------------------------------------------------------------------------
   // Écart de FC : compare la FC moyenne réalisée à la zone cible (FC_ZONES,
-  // bornes en bpm). Même convention de signe que l'allure : positif = FC plus
-  // haute que la zone (au-dessus), négatif = plus basse (en-dessous).
+  // bornes en bpm).
+  //
+  // CORRECTIF (17/07/2026, décision Laurent après discussion) : une FC trop
+  // BASSE ne pénalise PLUS. Contrairement à l'allure (où trop rapide EST un
+  // problème, cf. analyserEcartAllure), une FC plus basse que prévu n'est pas
+  // en soi un signal négatif — elle accompagne souvent une allure plus rapide
+  // tenue avec moins d'effort cardiaque que prévu (économie de course), ce
+  // qui n'a rien d'un raté. Seule une FC trop HAUTE reste pénalisée (signal
+  // réel : fatigue, mauvaise gestion de l'effort, cf. §6 doc archi exemple
+  // "FC_TROP_HAUTE"). dansLaZone est donc désormais true dès que la FC est
+  // ANORMALE MAIS PAS EXCESSIVE (bornée non plus par zoneFC.min < ... < max,
+  // mais par ... <= zoneFC.max seulement).
   // --------------------------------------------------------------------------
   function analyserEcartFC(fcMoyenneRealisee, zoneFC) {
     if (!fcMoyenneRealisee || !zoneFC || !zoneFC.min || !zoneFC.max) {
@@ -84,36 +94,67 @@
     }
     const centreZone = (zoneFC.min + zoneFC.max) / 2;
     const ecartPourcent = Math.round(((fcMoyenneRealisee - centreZone) / centreZone) * 1000) / 10;
-    const dansLaZone = fcMoyenneRealisee >= zoneFC.min && fcMoyenneRealisee <= zoneFC.max;
+    // FC basse : jamais pénalisée. dansLaZone vrai dès que fcMoyenneRealisee <= zoneFC.max.
+    const dansLaZone = fcMoyenneRealisee <= zoneFC.max;
 
     let commentaire;
-    if (dansLaZone) {
-      commentaire = 'FC dans la zone cible.';
-    } else if (fcMoyenneRealisee > zoneFC.max) {
+    if (fcMoyenneRealisee > zoneFC.max) {
       commentaire = `FC au-dessus de la zone cible (${ecartPourcent}%).`;
+    } else if (fcMoyenneRealisee < zoneFC.min) {
+      commentaire = `FC en-dessous de la zone cible (${Math.abs(ecartPourcent)}%) — pas pénalisant.`;
     } else {
-      commentaire = `FC en-dessous de la zone cible (${Math.abs(ecartPourcent)}%).`;
+      commentaire = 'FC dans la zone cible.';
     }
     return { ecartPourcent, dansLaZone, commentaire };
   }
 
+
   // --------------------------------------------------------------------------
-  // Écart de volume : compare la distance réalisée à la distance prévue.
-  // Tolérance ±5% = "dans la zone", cf. §6 doc archi (exemple donné pour le
-  // volume). Moins central pour une séance qualité à structure fixe (allure
-  // et FC priment), mais conservé pour rester fidèle au contrat SessionAnalysis.
+  // Répétitions : remplace l'ancienne analyse "volume" (17/07/2026, décision
+  // Laurent). Une comparaison de distance totale ne capture pas le cas d'un
+  // abandon en cours de séance : la montre enregistre les créneaux prévus
+  // même si une répétition est marchée (récupération forcée), donc la
+  // distance totale peut rester proche de la cible même avec une répétition
+  // ratée en plein milieu — cf. discussion 17/07/2026. Le signal pertinent
+  // est le TAUX DE RÉPÉTITIONS DANS LA ZONE D'ALLURE, pas la distance globale.
+  //
+  // Réutilise exactement la même logique que ailleurs dans l'app (§6106-6139
+  // index.html, validateSuggestion) : okPace comme seuil par répétition,
+  // repOk/repWarn comme ratio minimal de complétion — pour ne PAS avoir deux
+  // définitions différentes de "séance de qualité réussie" dans la même app
+  // (cf. discussion 17/07/2026 : "ça reste 2 sources").
+  //
+  // lapsEffort attendu : tableau de { allureSec } — un élément par répétition
+  // détectée (peut différer de targetReps si abandon ou répétition en trop).
   // --------------------------------------------------------------------------
-  function analyserEcartVolume(distanceRealiseeKm, distancePrevueKm) {
-    if (!distanceRealiseeKm || !distancePrevueKm) {
-      return { ecartPourcent: 0, dansLaZone: false, commentaire: 'Volume non disponible pour comparaison.' };
+  function analyserRepetitions(lapsEffort, targetReps, cible) {
+    if (!Array.isArray(lapsEffort) || lapsEffort.length === 0 || !cible || !cible.okPace) {
+      return { ecartPourcent: 0, dansLaZone: false, commentaire: 'Répétitions non disponibles pour comparaison.' };
     }
-    const ecartPourcent = Math.round(((distanceRealiseeKm - distancePrevueKm) / distancePrevueKm) * 1000) / 10;
-    const dansLaZone = Math.abs(ecartPourcent) <= 5;
-    const commentaire = dansLaZone
-      ? 'Volume dans la zone cible.'
-      : `Volume ${ecartPourcent > 0 ? 'au-dessus' : 'en-dessous'} de la cible (${ecartPourcent}%).`;
-    return { ecartPourcent, dansLaZone, commentaire };
+
+    const nbDansLaZone = lapsEffort.filter(l => l.allureSec && l.allureSec <= cible.okPace).length;
+    const tauxReussite = nbDansLaZone / lapsEffort.length;
+
+    // repRatio de complétion : combien de répétitions ont eu lieu par rapport
+    // à ce qui était prévu — même calcul que repRatio côté index.html.
+    const repRatio = targetReps && cible.repOk ? lapsEffort.length / targetReps : 1;
+
+    // dansLaZone : même critère que le statut ✅ existant (avgPace-like mais
+    // ici au niveau répétition individuelle) — la majorité des répétitions
+    // dans la zone ET la complétion suffisante.
+    const dansLaZone = tauxReussite >= 0.5 && repRatio >= (cible.repOk || 0);
+
+    const ecartPourcent = Math.round((tauxReussite - 1) * 1000) / 10; // négatif si en dessous de 100% de réussite
+
+    let commentaire = `${nbDansLaZone}/${lapsEffort.length} répétitions dans la cible`;
+    if (targetReps && lapsEffort.length !== targetReps) {
+      commentaire += ` (${lapsEffort.length}/${targetReps} répétitions détectées)`;
+    }
+    commentaire += '.';
+
+    return { ecartPourcent, dansLaZone, commentaire, nbDansLaZone, nbTotal: lapsEffort.length, tauxReussite: Math.round(tauxReussite * 100) };
   }
+
 
   // --------------------------------------------------------------------------
   // difficulteRessentie : déduite du RPE si présent (échelle 1-10, cf. doc
@@ -130,29 +171,29 @@
       return 'tres_difficile';
     }
     // Proxy : une FC nettement au-dessus de la zone à allure cible tenue (ou
-    // dépassée) suggère une séance difficile ; une FC basse dans la zone,
-    // allure tenue, suggère une séance facile. Reste 'inconnue' dans le cas
-    // ambigu (données absentes ou signaux contradictoires) plutôt que de
-    // deviner à tort.
+    // dépassée) suggère une séance difficile. FC basse n'est PLUS utilisée
+    // comme signal de facilité (cf. analyserEcartFC, 17/07/2026) — une FC
+    // basse à allure rapide ne veut pas forcément dire "facile", peut aussi
+    // être une mesure peu fiable (capteur, échauffement du capteur FC en
+    // début de séance). Reste 'inconnue' dans ce cas plutôt que de deviner.
     if (!ecartFC || ecartFC.ecartPourcent === 0) return 'inconnue';
     if (ecartFC.ecartPourcent > 8) return 'difficile';
-    if (ecartFC.ecartPourcent < -5 && ecartAllure && ecartAllure.dansLaZone) return 'facile';
     return 'inconnue';
   }
 
   // --------------------------------------------------------------------------
-  // scoreReussite : moyenne pondérée des dansLaZone. Pour une séance qualité,
-  // l'allure prime légèrement sur la FC (poids 0.6/0.4) — à l'inverse d'une
-  // sortie longue où la FC primerait (cf. §6 doc archi), mais ce module ne
-  // traite que les séances qualité (cf. en-tête). Volume pondéré plus léger
-  // (0.2) et normalisé pour que le total reste sur 100.
+  // scoreReussite : moyenne pondérée des dansLaZone. Répétitions (ex-volume)
+  // remonté à 0.35 (17/07/2026) : c'est le signal le plus fiable pour
+  // détecter un abandon en cours de séance (cf. analyserRepetitions), donc
+  // pas un poids mineur comme l'ancien "volume". Allure et FC ajustés en
+  // conséquence pour que le total reste sur 100.
   // --------------------------------------------------------------------------
-  function calculerScoreReussite(ecartAllure, ecartFC, ecartVolume) {
-    const poids = { allure: 0.5, fc: 0.35, volume: 0.15 };
+  function calculerScoreReussite(ecartAllure, ecartFC, ecartRepetitions) {
+    const poids = { allure: 0.4, fc: 0.25, repetitions: 0.35 };
     let score = 0;
     if (ecartAllure.dansLaZone) score += poids.allure;
     if (ecartFC.dansLaZone) score += poids.fc;
-    if (ecartVolume.dansLaZone) score += poids.volume;
+    if (ecartRepetitions.dansLaZone) score += poids.repetitions;
     return Math.round(score * 100);
   }
 
@@ -162,20 +203,19 @@
   // Ce module ne décide de rien (pas d'ampleur de réduction, pas d'action) —
   // il constate et laisse le moteur de règles (Module 5) réagir s'il le juge
   // pertinent, cf. "Point de vigilance" §6 doc archi.
+  //
+  // CORRECTIF (17/07/2026) : allure symétrique décidée avec Laurent — trop
+  // rapide et trop lent pénalisent à la même hauteur (± même seuil), retiré
+  // l'ancienne alerte ALLURE_TROP_RAPIDE distincte à un seuil plus bas que
+  // ALLURE_TROP_LENTE. Un seul seuil ALLURE_HORS_ZONE couvre les deux sens.
   // --------------------------------------------------------------------------
   function detecterAlertes(ecartAllure, ecartFC) {
     const alertes = [];
     if (ecartFC.ecartPourcent > 10) {
       alertes.push({ code: 'FC_TROP_HAUTE', gravite: 'attention' });
     }
-    if (ecartAllure.ecartPourcent < -8) {
-      // Allure nettement plus rapide que la cible sur une séance qualité :
-      // pas forcément un problème, mais mérite un signalement (peut indiquer
-      // un excès d'enthousiasme sur une séance structurée en intervalles).
-      alertes.push({ code: 'ALLURE_TROP_RAPIDE', gravite: 'info' });
-    }
-    if (ecartAllure.ecartPourcent > 12) {
-      alertes.push({ code: 'ALLURE_TROP_LENTE', gravite: 'attention' });
+    if (Math.abs(ecartAllure.ecartPourcent) > 10 && !ecartAllure.dansLaZone) {
+      alertes.push({ code: 'ALLURE_HORS_ZONE', gravite: 'attention' });
     }
     return alertes;
   }
@@ -183,12 +223,15 @@
   // --------------------------------------------------------------------------
   // Point d'entrée principal du Module 2.
   //
-  // seanceRealisee attendu : { seanceId, distanceKm, allureMoyenneSec (nombre,
-  //   secondes/km — PAS une string "M:SS", cf. paceStringVersSecondes si besoin
-  //   de convertir en amont), fcMoyenne, ressentiRPE }
-  // ciblesSeance attendu : { type, distancePrevueKm, allureCible: {targetMin,
-  //   targetMax} (= SESSION_TARGETS[type] côté index.html), zoneFC: {min,max}
-  //   (= FC_ZONES[type] côté index.html) }
+  // seanceRealisee attendu : { seanceId, allureMoyenneSec (nombre, secondes/km
+  //   — PAS une string "M:SS", cf. paceStringVersSecondes si besoin de
+  //   convertir en amont), fcMoyenne, ressentiRPE, lapsEffort (tableau de
+  //   { allureSec }, un élément par répétition détectée, cf. analyserRepetitions),
+  //   targetReps (nombre de répétitions prévues par le plan, pour détecter un
+  //   abandon en cours de séance) }
+  // ciblesSeance attendu : { type, allureCible: {targetMin, targetMax, okPace,
+  //   warnPace, repOk, repWarn} (= SESSION_TARGETS[type] côté index.html),
+  //   zoneFC: {min,max} (= FC_ZONES[type] côté index.html) }
   //
   // Retourne null si le type de séance n'est pas une séance qualité (cf.
   // périmètre restreint en en-tête) — pas une erreur, juste hors scope.
@@ -199,9 +242,9 @@
 
     const ecartAllure = analyserEcartAllure(seanceRealisee.allureMoyenneSec, ciblesSeance.allureCible);
     const ecartFC = analyserEcartFC(seanceRealisee.fcMoyenne, ciblesSeance.zoneFC);
-    const ecartVolume = analyserEcartVolume(seanceRealisee.distanceKm, ciblesSeance.distancePrevueKm);
+    const ecartRepetitions = analyserRepetitions(seanceRealisee.lapsEffort, seanceRealisee.targetReps, ciblesSeance.allureCible);
 
-    const scoreReussite = calculerScoreReussite(ecartAllure, ecartFC, ecartVolume);
+    const scoreReussite = calculerScoreReussite(ecartAllure, ecartFC, ecartRepetitions);
     const difficulteRessentie = deduireDifficulteRessentie(seanceRealisee.ressentiRPE, ecartAllure, ecartFC);
     const alertes = detecterAlertes(ecartAllure, ecartFC);
 
@@ -213,7 +256,7 @@
       derive: {
         allure: ecartAllure,
         frequenceCardiaque: ecartFC,
-        volume: ecartVolume,
+        repetitions: ecartRepetitions,
       },
       alertes,
       calculeLe: new Date().toISOString(),
@@ -225,7 +268,7 @@
     paceStringVersSecondes,        // exposée pour que index.html puisse convertir avant appel
     analyserEcartAllure,           // exposées pour tests unitaires isolés
     analyserEcartFC,
-    analyserEcartVolume,
+    analyserRepetitions,
     calculerScoreReussite,
     deduireDifficulteRessentie,
     detecterAlertes,
