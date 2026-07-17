@@ -1182,7 +1182,7 @@ function analyserSemaineActuelle(weekNum, semainePrecedenteAnalyse) {
 
   const fcMax = runnerFcMax || null;
   const fcRepos = 55; // valeur d'exemple temporaire, cf. fcReposReference Module 1 (§26.3 inventaire) — même limite ici
-  const sexe = window.__PROFIL_COUREUR__?.sexe || 'autre';
+  const sexe = profilCoureur?.sexe || 'autre';
 
   return DecisionEngineWeekAnalysis.analyser(weekNum, seancesRealisees, seancesPrevues, planContext, semainePrecedenteAnalyse || null, fcMax, fcRepos, sexe);
 }
@@ -4781,7 +4781,7 @@ function renderStats() {
         ),
         el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"6px"}},
           el("span",{class:"muted",style:{fontSize:"13px"}},"Charge totale semaine"),
-          el("span",{style:{fontSize:"14px"}},analyseSemaine.chargeTotaleSemaine)
+          el("span",{style:{fontSize:"14px"}},analyseSemaine.chargeTotaleSemaine+"")
         ),
         el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"6px"}},
           el("span",{class:"muted",style:{fontSize:"13px"}},"Récupération estimée"),
