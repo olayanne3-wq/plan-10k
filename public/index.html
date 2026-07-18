@@ -6089,7 +6089,7 @@ function renderHelp() {
     { icon:"🏁", color:"var(--accent2)", title:"Course",
       text:"Toutes les infos du jour J — horaires, checklist équipement, stratégie de course et allures de passage aux km clés." },
     { icon:"⚙️", color:"var(--text2)", title:"Paramètres",
-      text:"Ton profil (poids, taille, FC max), ton objectif de temps, ton PPS, et la connexion Strava. Ta sauvegarde se fait automatiquement dans le cloud." },
+      text:"Ton profil (poids, taille, FC max, records personnels), ton objectif de temps, ton PPS, ta source de données (Strava, import FIT ou saisie manuelle), et la connexion Strava. Ta sauvegarde se fait automatiquement dans le cloud." },
   ];
 
   const sectionCards = sections.map(s => el("div",{style:{marginBottom:"14px"}},
@@ -6109,6 +6109,12 @@ function renderHelp() {
       a:"Tes données sont sauvegardées automatiquement dans le cloud (GitHub Gist). Pour les récupérer sur un nouvel appareil, scanne le QR code généré depuis Paramètres → Options avancées sur ton appareil principal." },
     { q:"À quoi sert la cadence affichée ?",
       a:"La cadence (pas par minute) est un indicateur de technique de course. Idéalement entre 170 et 180 spm — une cadence stable ou en hausse au fil du plan indique une meilleure efficacité de foulée." },
+    { q:"Comment saisir mes records personnels ?",
+      a:"Dans Paramètres, renseigne un temps par distance (5K, 10K, Semi, Marathon) en heures/minutes/secondes — une seule distance suffit, Yoria estime les autres. Ça affine automatiquement tes allures d\'entraînement dans tous tes futurs plans." },
+    { q:"Import FIT, Strava ou saisie manuelle : quelle source choisir ?",
+      a:"Strava reste la plus simple si tu es déjà connecté (synchro automatique). L\'import FIT convient si tu n\'utilises pas Strava — allure, distance et FC sont toujours bien récupérées, mais le découpage précis d\'une séance qualité (effort/récupération) dépend du modèle de montre : certaines n\'enregistrent pas cette structure dans le fichier exporté, même si la séance a été suivie fidèlement. La saisie manuelle reste la plus fiable si tu veux un contrôle total." },
+    { q:"C\'est quoi la carte \"Yoria te propose un ajustement\" ?",
+      a:"C\'est le moteur de décision : il surveille ta fatigue, ta charge d\'entraînement et ta régularité, et propose parfois d\'alléger une prochaine séance EF/longue si les signaux l\'indiquent — jamais une séance de qualité, pour ne pas casser sa structure. Rien n\'est appliqué automatiquement : tu choisis d\'ignorer ou d\'appliquer la proposition." },
   ];
 
   const faqCards = faqItems.map(f => el("div",{style:{marginBottom:"12px",paddingBottom:"12px",borderBottom:"1px solid var(--border)"}},
