@@ -1506,7 +1506,6 @@ async function fetchCoachMsg() {
   // ET de "pas encore fait" — jamais mélangée avec le RPE (cohérent avec la
   // décision déjà actée que 😴 n'a pas de RPE, cf. ligne ~3870).
   const sessionSkipped = todaySessionStatus==="😴";
-  console.log('[DEBUG COACH]', 'today:', t, 'todaySessObj:', todaySessObj?.uid, todaySessObj?.type, 'todaySessionStatus:', JSON.stringify(todaySessionStatus), 'sessionDone:', sessionDone, 'sessionSkipped:', sessionSkipped, 'statuses complet:', JSON.stringify(statuses));
   const tomorrowKeyStr = new Date(new Date().getTime()+86400000).toISOString().slice(0,10);
   const tomorrowKeySess = ALL_SESSIONS.find(s=>s.date===tomorrowKeyStr&&["VMA","SPEC","SEUIL","TEST"].includes(s.type));
   const isEveOfKeySession = !!tomorrowKeySess;
@@ -1595,11 +1594,25 @@ ${isMonday
     ? (sessType==='EF'||sessType==='LONGUE')
       ? 'La séance ci-dessus est DÉJÀ TERMINÉE. Commente brièvement la sortie EF (sensations, récupération). Pas de conseil technique intensif. 2-3 phrases max.'
       : 'La séance ci-dessus est DÉJÀ TERMINÉE. Fais une analyse de la séance terminée (qualité, points positifs, axes d\'amélioration). Mentionne l\'IE ou la cadence si disponibles dans le contexte. 3-4 phrases max.'
-    : isEveOfKeySession
-      ? 'La séance du jour N\'A PAS ENCORE EU LIEU. Donne un conseil pour bien préparer la séance clé de DEMAIN (récupération, sommeil, hydratation) — ne commente pas la séance du jour comme si elle était terminée. 2-3 phrases max.'
-      : (sessType==='EF'||sessType==='LONGUE'||sessType==='REPOS')
-        ? 'La séance du jour N\'A PAS ENCORE EU LIEU (ou c\'est un jour de repos) — ne la commente jamais au passé ni comme si elle était déjà faite. Message court, tourné vers l\'AVANT (préparation, régularité, état d\'esprit pour aujourd\'hui). 2-3 phrases max.'
-        : 'La séance du jour N\'A PAS ENCORE EU LIEU — ne la commente jamais au passé ni comme si elle était déjà faite. Génère UN message de coaching court et motivant, tourné vers l\'AVANT, sur la séance à venir. 2-3 phrases max.'}
+    : sessionSkipped
+      // Bug corrigé le 18/07/2026 (signalé par Laurent, message coach
+      // félicitant une séance en réalité SAUTÉE 😴) : cette instruction ne
+      // testait à l'origine QUE sessionDone, jamais sessionSkipped — pour
+      // une séance sautée elle tombait dans le else "PAS ENCORE EU LIEU"
+      // (ligne plus bas), ce qui poussait le LLM à générer un message
+      // tourné vers une séance à venir, qu'il a ensuite complété/halluciné
+      // comme si elle avait déjà été faite (cohérent avec météo/contexte
+      // disponibles par ailleurs dans le prompt). Distinct du premier fix
+      // du même jour (§35/§36 inventaire) qui ne corrigeait que la
+      // description factuelle du statut plus haut dans le prompt, pas
+      // cette deuxième instruction de ton qui pilote le contenu réel
+      // généré.
+      ? 'La séance du jour a été volontairement SAUTÉE (statut 😴 repos) — ne la commente JAMAIS comme si elle avait eu lieu ou avait été réussie, ne mentionne aucune performance ni allure. Message court et bienveillant sur le repos ou la reprise, sans culpabiliser. 2-3 phrases max.'
+      : isEveOfKeySession
+        ? 'La séance du jour N\'A PAS ENCORE EU LIEU. Donne un conseil pour bien préparer la séance clé de DEMAIN (récupération, sommeil, hydratation) — ne commente pas la séance du jour comme si elle était terminée. 2-3 phrases max.'
+        : (sessType==='EF'||sessType==='LONGUE'||sessType==='REPOS')
+          ? 'La séance du jour N\'A PAS ENCORE EU LIEU (ou c\'est un jour de repos) — ne la commente jamais au passé ni comme si elle était déjà faite. Message court, tourné vers l\'AVANT (préparation, régularité, état d\'esprit pour aujourd\'hui). 2-3 phrases max.'
+          : 'La séance du jour N\'A PAS ENCORE EU LIEU — ne la commente jamais au passé ni comme si elle était déjà faite. Génère UN message de coaching court et motivant, tourné vers l\'AVANT, sur la séance à venir. 2-3 phrases max.'}
 ${!ESTMODEFORME && isLastTwoWeeks ? "Mentionne le compte à rebours." : "Ne mentionne pas le nombre de jours restants."}
 Ne mentionne jamais le terme "ACWR" ou "charge aiguë/chronique" — reste dans un langage naturel de coach, pas technique.
 Tu ne connais jamais l'heure ni le moment de la journée (matin, midi, soir) où une séance a eu lieu ou aura lieu — ne l'invente jamais ("ce soir", "demain matin", "avant de dormir"...) et ne donne aucun conseil qui suppose un horaire précis (petit-déjeuner avant la séance, hydratation la veille au soir...). Reste sur des repères de jour uniquement (aujourd'hui, demain).
