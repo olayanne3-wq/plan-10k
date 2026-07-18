@@ -22,13 +22,15 @@
 // ce RuleEngine sera enrichi une fois les modules 2/3/4 codés, pas avant.
 //
 // Catalogue (ajouts R-050/R-060/R-070 le 17/07/2026, R-062 ajoutée en
-// session ultérieure le 17/07/2026, cf. notes ci-dessous) :
+// session ultérieure le 17/07/2026, R-080 ajoutée le 18/07/2026, cf. notes
+// ci-dessous) :
 //   R-006  Pic de séance unique          (sécurité)
 //   R-024s Fatigue élevée basique        (sécurité, version simplifiée)
 //   R-050  ACWR élevé                    (sécurité, ajoutée 17/07)
 //   R-062  Fatigue installée (3 sem.)    (sécurité, ajoutée 17/07 session ultérieure — Module 4 TrendAnalysis)
 //   R-060  Tendance fatigue en hausse    (sécurité, ajoutée 17/07 — J/J-4/J-7, éclipsée par R-062 si les deux matchent)
 //   R-070  Séances planifiées manquées   (engagement, ajoutée 17/07)
+//   R-080  Déficit de volume durable     (engagement, ajoutée 18/07 — Module 4 TrendAnalysis, moyenne ecartVolumePourcent 3 sem.)
 //   R-040  Désengagement précoce         (engagement)
 //
 // Ce module ne modifie AUCUNE donnée. Il retourne au maximum UNE décision
@@ -340,6 +342,45 @@
   }
 
   // --------------------------------------------------------------------------
+  // R-080 — Déficit de volume durable (engagement) — ajoutée le 18/07/2026.
+  // Consomme le signal DEFICIT_VOLUME_DURABLE du Module 4 (TrendAnalysis) :
+  // moyenne de ecartVolumePourcent sur 3 semaines consécutives, toutes ≤-10%
+  // vs le plan prévu. Distinct de R-070 (2 séances PRÉVUES ratées d'affilée,
+  // lit directement les statuts posés — signal binaire, très réactif) : ce
+  // signal capte une sous-réalisation même sur des séances FAITES mais
+  // raccourcies, invisible pour R-070. Priorité juste au-dessus de R-040
+  // (désengagement global sur 14j, moins précis) mais en dessous de R-070
+  // (signal direct sur le plan, plus fiable qu'une moyenne sur 3 semaines).
+  //
+  // Décision informative (alerter_*), pas actionnable — cf. même prudence
+  // que R-062/R-070 : observer en conditions réelles avant d'envisager un
+  // adapter_plan. Seuil -10% calibré à dire d'expert (pas de littérature
+  // trouvée pour un écart en % au plan individuel, cf. discussion du
+  // 18/07/2026), à recalibrer une fois observé sur l'historique réel.
+  //
+  // trendAnalysis attendu : même paramètre que R-062 (déjà transmis à
+  // evaluerRegles() depuis le 17/07, cf. index.html).
+  // --------------------------------------------------------------------------
+  function evaluerDeficitVolumeDurable(trendAnalysis) {
+    if (!trendAnalysis || !Array.isArray(trendAnalysis.signauxDetectes)) {
+      return null;
+    }
+    const signal = trendAnalysis.signauxDetectes.find(s => s.code === 'DEFICIT_VOLUME_DURABLE');
+    if (!signal) return null;
+    return {
+      id: 'R-080',
+      libelle: 'Déficit de volume durable',
+      categorie: 'engagement',
+      priorite: 52, // entre R-070 (55, plus direct) et R-040 (50, moins précis)
+      type: 'alerter_deficit_volume',
+      justification: signal.description,
+      confianceMax: 60, // moyenne sur 3 semaines, plus incertain qu'un signal direct sur le plan (R-070, confiance 75)
+      donnees: {},
+    };
+  }
+
+
+  // --------------------------------------------------------------------------
   // R-040 — Désengagement précoce (engagement)
   // cf. §7.2 doc intégration : seule règle hors sécurité retenue au démarrage.
   // Ne modifie jamais la charge d'entraînement — c'est un signal produit/UI
@@ -374,6 +415,7 @@
   //   trendAnalysis, seancesPlanifieesManquees }
   // trendAnalysis ajouté le 17/07/2026 (session ultérieure) pour R-062,
   // optionnel — la règle se dégrade proprement (retourne null) si absent.
+  // R-080 (18/07/2026) consomme aussi trendAnalysis, même paramètre.
   // --------------------------------------------------------------------------
   function evaluerRegles(input) {
     const opts = input || {};
@@ -386,6 +428,7 @@
       evaluerFatigueInstalleeTendance(opts.trendAnalysis),
       evaluerTendanceFatigue(opts.activitySamples, dateReference, opts.coureurOptions),
       evaluerSeancesManqueesConsecutives(opts.seancesPlanifieesManquees),
+      evaluerDeficitVolumeDurable(opts.trendAnalysis),
       evaluerDesengagementPrecoce(opts.engagementState),
     ].filter(Boolean);
 
@@ -451,6 +494,7 @@
     evaluerFatigueInstalleeTendance,
     evaluerTendanceFatigue,
     evaluerSeancesManqueesConsecutives,
+    evaluerDeficitVolumeDurable,
     evaluerDesengagementPrecoce,
     BORNE_AMPLEUR_MAX_POURCENT,  // référence partagée avec le garde-fou cumulé (decision-engine-apply.classic.js)
   };
