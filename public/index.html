@@ -6355,7 +6355,21 @@ function renderSettings() {
       ?card(
           el("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"12px"}},
             el("div",{style:{width:"8px",height:"8px",borderRadius:"50%",background:"var(--warn)",flexShrink:"0"}}),
-            el("div",{style:{color:"var(--warn)",fontSize:"15px",fontWeight:"600"}},"Connecté · "+stravaActivities.length+" activité"+(stravaActivities.length!==1?"s":""))
+            // Ajouté le 18/07/2026 (bug signalé par Laurent) : ce bloc
+            // (Réglages) n'affichait jamais la date de dernière synchro,
+            // contrairement au bloc équivalent du dashboard (ligne ~3039,
+            // syncAgo/syncAgoStr) qui l'affiche déjà correctement — deux
+            // blocs distincts et redondants pas maintenus en cohérence.
+            // Réutilise le même calcul que le dashboard plutôt que d'en
+            // écrire un deuxième.
+            el("div",{style:{color:"var(--warn)",fontSize:"15px",fontWeight:"600"}},
+              "Connecté · "+stravaActivities.length+" activité"+(stravaActivities.length!==1?"s":"")
+              +(lastSyncTime > 0 ? (
+                  (()=>{ const m = Math.round((Date.now()-lastSyncTime)/60000);
+                    return m < 1 ? " · synchro à l'instant" : m < 60 ? " · synchro il y a "+m+" min" : " · synchro il y a "+Math.round(m/60)+"h";
+                  })()
+                ) : "")
+            )
           ),
           syncMsg?el("div",{style:{fontSize:"14px",color:syncMsg.startsWith("✅")?"var(--accent2)":"var(--text2)",marginBottom:"10px",padding:"8px 10px",background:"var(--border-soft)",borderRadius:"8px"}},syncMsg):null,
           stravaAuthInvalide
