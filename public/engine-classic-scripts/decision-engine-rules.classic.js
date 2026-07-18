@@ -21,11 +21,13 @@
 // Décision actée avec Laurent le 16/07/2026 : "on avance vite, on itère" —
 // ce RuleEngine sera enrichi une fois les modules 2/3/4 codés, pas avant.
 //
-// Catalogue (ajouts R-050/R-060/R-070 le 17/07/2026, cf. notes ci-dessous) :
+// Catalogue (ajouts R-050/R-060/R-070 le 17/07/2026, R-062 ajoutée en
+// session ultérieure le 17/07/2026, cf. notes ci-dessous) :
 //   R-006  Pic de séance unique          (sécurité)
 //   R-024s Fatigue élevée basique        (sécurité, version simplifiée)
 //   R-050  ACWR élevé                    (sécurité, ajoutée 17/07)
-//   R-060  Tendance fatigue en hausse    (sécurité, ajoutée 17/07)
+//   R-062  Fatigue installée (3 sem.)    (sécurité, ajoutée 17/07 session ultérieure — Module 4 TrendAnalysis)
+//   R-060  Tendance fatigue en hausse    (sécurité, ajoutée 17/07 — J/J-4/J-7, éclipsée par R-062 si les deux matchent)
 //   R-070  Séances planifiées manquées   (engagement, ajoutée 17/07)
 //   R-040  Désengagement précoce         (engagement)
 //
@@ -198,6 +200,61 @@
   // aucun des 3 n'atteint 75 (sinon R-024s aurait déjà matché en priorité, cf.
   // évaluerRegles ci-dessous qui garde la priorité la plus haute).
   // --------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------
+  // R-062 — Fatigue installée sur plusieurs semaines (sécurité) — ajoutée le
+  // 17/07/2026, session ultérieure au catalogue initial R-050/R-060/R-070.
+  //
+  // Consomme le signal FATIGUE_CROISSANTE du Module 4 (TrendAnalysis), qui
+  // regarde 3 points de suivi HEBDOMADAIRES (donc ~3 semaines) — à distinguer
+  // de R-060 ci-dessous, qui regarde les 7 DERNIERS JOURS (J/J-4/J-7).
+  // R-060 est réactif à court terme et se redéclenche chaque semaine sans
+  // mémoire du passé ; R-062 capte la PERSISTANCE d'une fatigue qui ne
+  // redescend jamais d'une semaine à l'autre — c'est le trou identifié le
+  // 17/07/2026 (discussion Laurent) : rien n'ajustait la trajectoire de fond
+  // du plan quand la fatigue reste élevée plusieurs semaines de suite.
+  //
+  // Décision actée (17/07/2026) : les deux règles répétées disent la même
+  // chose de deux façons différentes — pas de sens à les afficher toutes les
+  // deux la même semaine. R-062 reçoit une priorité légèrement AU-DESSUS de
+  // R-060 (82 vs 80) pour l'éclipser naturellement via le tri "une seule
+  // règle gagnante" déjà en place (cf. evaluerRegles ci-dessous) — un signal
+  // de fond avéré sur 3 semaines est plus grave qu'une hausse sur 7 jours.
+  // Reste SOUS R-050 (ACWR élevé, 85) : un ratio déjà critique est plus
+  // urgent et actionnable dans l'instant qu'une tendance de fond.
+  //
+  // Décision informative (alerter_*), pas actionnable (pas de reduire_charge)
+  // — cf. discussion du 17/07/2026 : on démarre prudemment, observation en
+  // conditions réelles avant d'envisager un adapter_plan.
+  //
+  // trendAnalysis attendu : sortie de DecisionEngineTrendAnalysis.
+  // analyserAvecEtatCoureur() (Module 4), calculée en dehors du RuleEngine
+  // (index.html) — ce module ne recalcule jamais rien, cf. "Ce module ne
+  // modifie AUCUNE donnée" en tête de fichier.
+  // --------------------------------------------------------------------------
+  function evaluerFatigueInstalleeTendance(trendAnalysis) {
+    if (!trendAnalysis || !Array.isArray(trendAnalysis.signauxDetectes)) {
+      return null; // pas de TrendAnalysis exploitable (historique <3 semaines, par ex.)
+    }
+    const signal = trendAnalysis.signauxDetectes.find(s => s.code === 'FATIGUE_CROISSANTE');
+    if (!signal) return null;
+
+    const points = (trendAnalysis.pointsDeSuivi || []).filter(p => typeof p.fatigue === 'number');
+    const description = points.map(p => `S${p.semaine}: ${p.fatigue}`).join(', ');
+
+    return {
+      id: 'R-062',
+      libelle: 'Fatigue installée sur plusieurs semaines',
+      categorie: 'securite',
+      priorite: 82, // sous R-050 (85), au-dessus de R-060 (80) — cf. justification ci-dessus
+      type: 'alerter_tendance_fatigue',
+      justification: `La fatigue augmente de façon continue sur les 3 dernières semaines de suivi (${description}). Contrairement à une hausse ponctuelle, ce signal de fond mérite d'ajuster la trajectoire plutôt qu'une seule séance.`,
+      confianceMax: 65, // signal de fond sur peu de points (3 semaines) — prudence, comparable à R-060
+      donnees: { pointsDeSuivi: points, fenetreSemaines: trendAnalysis.fenetreSemaines },
+    };
+  }
+
+  // --------------------------------------------------------------------------
   function evaluerTendanceFatigue(activitySamples, dateReference, coureurOptions) {
     if (!Array.isArray(activitySamples) || activitySamples.length === 0) return null;
     if (!global.DecisionEngineRunnerState || typeof global.DecisionEngineRunnerState.calculerRunnerState !== 'function') {
@@ -313,7 +370,10 @@
   // retourne la décision de la règle gagnante (priorité la plus haute parmi
   // celles qui matchent), ou null si aucune règle ne se déclenche.
   //
-  // input attendu : { runnerState, engagementState, activitySamples, dateReference }
+  // input attendu : { runnerState, engagementState, activitySamples, dateReference,
+  //   trendAnalysis, seancesPlanifieesManquees }
+  // trendAnalysis ajouté le 17/07/2026 (session ultérieure) pour R-062,
+  // optionnel — la règle se dégrade proprement (retourne null) si absent.
   // --------------------------------------------------------------------------
   function evaluerRegles(input) {
     const opts = input || {};
@@ -323,6 +383,7 @@
       evaluerPicDeSeance(opts.activitySamples, dateReference),
       evaluerFatigueElevee(opts.runnerState),
       evaluerACWRElevee(opts.runnerState),
+      evaluerFatigueInstalleeTendance(opts.trendAnalysis),
       evaluerTendanceFatigue(opts.activitySamples, dateReference, opts.coureurOptions),
       evaluerSeancesManqueesConsecutives(opts.seancesPlanifieesManquees),
       evaluerDesengagementPrecoce(opts.engagementState),
@@ -387,6 +448,7 @@
     evaluerPicDeSeance,          // exposées pour tests unitaires isolés
     evaluerFatigueElevee,
     evaluerACWRElevee,
+    evaluerFatigueInstalleeTendance,
     evaluerTendanceFatigue,
     evaluerSeancesManqueesConsecutives,
     evaluerDesengagementPrecoce,
