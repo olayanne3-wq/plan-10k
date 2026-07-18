@@ -3237,7 +3237,17 @@ function renderDashboard() {
           ) : null,
           s.notes ? el("div",{style:{color:"rgba(var(--accent-rgb),0.8)",fontSize:"14px",fontStyle:"italic",marginBottom:"8px"}},"💡 "+s.notes) : null,
           s.structureIntervalles?renderBoutonStructureAProgrammer(s.structureIntervalles):null,
-          !isRest?renderStatusRow(uid2):null,
+          // Bug corrigé le 18/07/2026 (signalé par Laurent, coach ne se
+          // rafraîchissait jamais après un clic manuel de statut) : cet
+          // appel omettait le second argument dateSeance de
+          // renderStatusRow(uid, dateSeance) — dateSeance restait undefined,
+          // donc la comparaison dateSeance===today() (censée détecter un
+          // changement sur la séance DU JOUR pour invalider le cache coach)
+          // échouait systématiquement, quelle que soit la vraie date de la
+          // séance. L'autre appel (ligne ~4401, détail semaine) passait déjà
+          // s.date correctement — seul celui-ci (carte du jour du
+          // dashboard) était incomplet.
+          !isRest?renderStatusRow(uid2, s.date):null,
           // Saisie/correction manuelle de performance (docs/source-donnees-
           // seances.md) : toujours accessible pour SPEC/VMA quel que soit
           // dataSource — pas réservée au mode "manuel". Une saisie existante
@@ -3907,7 +3917,6 @@ function renderStatusRow(uid, dateSeance) {
     b.addEventListener("click",avecRetourTactile(()=>{
       if (estFuture && opt!=="—") return;
       statuses[uid]=opt; save(clePourPlan("lk_statuses"),statuses);
-      console.log('[DEBUG CLIC STATUT]', 'uid:', uid, 'opt:', opt, 'dateSeance:', dateSeance, 'today:', today(), 'egal?', dateSeance===today());
       // Bug corrigé le 8 juillet 2026 : setTimeout(render, 2500) gelait
       // TOUT l'affichage de l'app pendant 2.5s, pas seulement le repli de
       // cette carte (render() reconstruit toute la vue). Corrigé : met à
