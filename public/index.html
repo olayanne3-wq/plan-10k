@@ -1627,6 +1627,7 @@ Réponds uniquement avec le message, sans guillemets.`;
       body: JSON.stringify({ prompt })
     });
     const data = await resp.json();
+    console.log('[DEBUG REPONSE API]', JSON.stringify(data), 'status HTTP:', resp.status);
     const msg = data.text || null;
     if (msg) {
       coachMsg = msg;
