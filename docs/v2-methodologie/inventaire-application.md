@@ -4240,3 +4240,126 @@ chiffre ne porte que sur une partie de la séance. Pas trompeur en soi
 si le LLM la commente sans nuance. À traiter dans une session future.
 
 **Fichier modifié** : `public/index.html` uniquement.
+
+## 36. Monotonie de charge (Foster) + fix bug graphique FC intervalles (18/07/2026, session ultérieure)
+
+Suite directe de la session §35 (même conversation, poursuivie). Deux
+chantiers indépendants : ajout d'une nouvelle donnée calculée (monotonie),
+puis correction d'un bug préexistant découvert en marge.
+
+### 36.1 Monotonie de charge (Foster, 1998)
+
+Reprise du point laissé en suspens en §35 ("on garde la monotonie en
+tête"). Recherche de littérature effectuée avant tout codage.
+
+**Concept vérifié** : la monotonie mesure la similarité des charges
+d'entraînement jour après jour (`moyenne(TRIMP quotidien) /
+écart-type(TRIMP quotidien)` sur 7 jours glissants, Foster 1998). Une
+monotonie élevée n'est pas automatiquement mauvaise en soi — elle peut
+venir d'un entraînement trop dur tous les jours (jamais de vrai repos,
+dangereux) OU d'un entraînement trop facile tous les jours (même petit
+footing systématique, inefficace). D'où le concept de "Training Strain"
+(monotonie × charge totale) pour distinguer les deux cas.
+
+**Décision de ne PAS coder de règle d'alerte, uniquement afficher** :
+aucun seuil consensuel trouvé pour un coureur récréatif dans la
+littérature :
+- Foster original / RYPT (sport co, élite) : seuil >2.0 = "trop élevé"
+- Une étude sur des traileurs (Matos et al. 2020, population plus proche
+  d'un coureur récréatif) donne 0.6-0.9 comme zone de **limitation de
+  performance** — sens et échelle différents, pas transposables tels
+  quels
+- Une revue générale sur les coureurs récréatifs confirme explicitement
+  que la plupart des preuves scientifiques sur la course d'endurance
+  viennent d'études mêlant athlètes récréatifs et professionnels, rendant
+  le transfert direct difficile, et cite même des algorithmes de suivi
+  non validés (dont TrainingPeaks) comme exemple de pratiques anecdotiques
+  sans support scientifique solide
+
+Décision actée : afficher la monotonie (comme l'ACWR déjà visible avant
+d'avoir sa propre règle), sans seuil d'alerte tant qu'il n'est pas calibré
+sur l'historique réel de Laurent plutôt qu'importé d'une étude qui ne le
+concerne pas vraiment — même prudence méthodologique déjà appliquée à
+`COEFFICIENT_INTENSITE_PAR_TYPE` (§35/WeekAnalysis).
+
+**Validation empirique avant codage** : calcul manuel sur la vraie semaine
+3 du plan de Laurent (assignment complet fourni par Laurent) → monotonie
+prévue ≈ 1.72 (formule originale). Confirme que le générateur (garde-fous
+#6/#7 de `plan-generator.js`, espacement des jours durs) espace bien les
+séances **dures** entre elles, mais ne vise aucune cible de monotonie
+globale au sens de Foster — un seul vrai jour de repos par semaine avec
+des jours EF "récupération" non-nuls produit une monotonie en zone haute
+de la fourchette Foster/RYPT.
+
+**Implémentation** (`decision-engine-week-analysis.classic.js`) :
+- Nouvelles fonctions `ecartType()` et `calculerMonotonie(seancesAvecDate,
+  dateDebutSemaine)` — reconstruit les 7 charges journalières (jours sans
+  séance comptés à 0, essentiel pour ne pas fausser l'écart-type),
+  retourne `null` si <2 jours avec charge non-nulle, plafond à 10 si
+  écart-type nul
+- Formule ORIGINALE de Foster retenue (pas la version bornée
+  moyenne/(écart-type+moyenne)) — décision explicite : sans seuil
+  d'alerte à stabiliser visuellement, la formule originale reste
+  comparable aux repères de la littérature
+- `analyser()` retourne désormais `monotonieRealisee` et
+  `monotoniePrevue` (même logique, appliquée respectivement à
+  `seancesRealisees` et `seancesPrevues`)
+
+**Câblage `index.html`** :
+- `seancesPrevues` (dans `analyserSemaineActuelle()`) enrichi avec `date`
+  (absent avant, jamais nécessaire pour les champs déjà consommés)
+- `planContext` enrichi avec `dateDebutSemaine` (toujours
+  `week.sessions[0].date`, le lundi — jamais absent même si repos, cf.
+  `v1-bridge.classic.js`)
+- **Point de vigilance documenté** : pour la semaine EN COURS,
+  `seancesPrevues` ne contient que les jours déjà passés (même filtre que
+  `ecartVolumePourcent`/`seancesManquees`) — `monotoniePrevue` sur la
+  semaine en cours est donc partielle tant qu'elle n'est pas terminée, pas
+  un bug mais une limite à garder en tête
+- Nouvelle fonction `obtenirHistoriqueMonotonie(fenetreSemaines)` :
+  réutilise la même boucle que `analyserTendance()` (chaque semaine via
+  `analyserSemaineActuelle()`) plutôt que d'écrire une deuxième boucle sur
+  `PLAN` — pas de duplication
+
+**Affichage** (`renderStats()`) : nouveau bloc `monotonieEl`, juste après
+l'ACWR déjà existant, même pattern visuel (graphique SVG en ligne sur 8
+semaines, dernier point mis en valeur). Repères de littérature donnés
+dans le texte d'accompagnement, explicitement présentés comme indicatifs
+et non comme un seuil d'alerte actif dans Yoria.
+
+**Fichiers modifiés** : `decision-engine-week-analysis.classic.js` +
+`public/index.html`.
+
+### 36.2 Bug graphique "FC intervalles par type de séance" — corrigé
+
+Découvert par Laurent en marge du reste (graphique invisible malgré des
+données). Diagnostic mené par instrumentation progressive (logs de debug
+temporaires poussés puis retirés, 4 itérations) plutôt qu'en devinant —
+les hypothèses initiales (clé `average_heartrate` manquante, mutation
+d'objet par `economyScore()`, exception silencieuse) ont toutes été
+vérifiées et écartées une à une avant de trouver la vraie cause.
+
+**Cause racine** : ligne dans `fcCurveEl` (`renderStats()`) :
+```js
+const allWeeks = PLAN.flatMap(w=>w.sessions).filter(s=>s.type===type).map(s=>s.week);
+```
+`s.week` **n'existe pas** sur un objet séance individuel
+(`week.sessions[i]` n'a que `day/date/type/warmup/session/cooldown/notes/
+kmEstime/structureIntervalles`, jamais `week` lui-même) — seul l'objet
+SEMAINE (`w`, avant le `.flatMap`) porte le champ `week`. Résultat :
+`uniqueWeeks = [undefined]`, affiché littéralement "Sundefined" à
+l'écran, positionnement X de tous les points cassé.
+
+**Pourquoi IE/Cadence n'avaient pas ce bug** : ces deux graphiques
+utilisent `ieData[type]`, construit depuis `ALL_SESSIONS` (pas
+`PLAN.flatMap(w=>w.sessions)` brut) — `ALL_SESSIONS` ajoute explicitement
+`week:w.week` à chaque séance via `recalculerAllSessions()`
+(`{...s, week:w.week, phase:w.phase, uid:...}`). Seul le bloc `fcCurveEl`
+itérait directement sur le plan brut sans repasser par cet enrichissement.
+
+**Correctif** : `allWeeks` reconstruit en conservant l'association
+séance↔semaine avant le filtre (`PLAN.flatMap(w=>w.sessions.map(s=>({s,
+weekNum:w.week})))`), au lieu de perdre `w.week` dans le flatMap initial.
+
+**Fichier modifié** : `public/index.html` uniquement. Vérifié visuellement
+par Laurent après déploiement — fonctionne.
