@@ -1023,7 +1023,7 @@ setInterval(fetchWeather, 30 * 60 * 1000); // refresh toutes les 30 min
 
 if (sessionStorage.getItem("lk_strava_sync_apres_reload")) {
   sessionStorage.removeItem("lk_strava_sync_apres_reload");
-  setTimeout(syncStrava, 300);
+  setTimeout(() => syncStrava(true), 300);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -4135,7 +4135,7 @@ function renderManualPerfRow(uid, s, stravaRun) {
       formWrap.style.display = "none";
       rebuildSummary();
       render(); // reflète immédiatement le statut décoché (—) dans la carte du jour / détail semaine
-      syncStrava(); // relance une synchro pour retrouver l'activité Strava du jour si elle existe
+      syncStrava(); // relance une synchro pour retrouver l'activité Strava du jour si elle existe — no-op si dataSource !== "strava" (cf. garde-fou dans syncStrava())
     }));
     btnRow.appendChild(cancelBtn);
     formWrap.appendChild(btnRow);
@@ -6446,7 +6446,7 @@ function renderSettings() {
           return row;
         }),
         el("div",{class:"muted",style:{fontSize:"12px",marginTop:"10px",paddingTop:"10px",borderTop:"1px solid var(--border)"}},
-          "Change à tout moment. Le suivi du plan fonctionne dans tous les cas — cette option affine surtout l'estimation 10K."
+          "Change à tout moment. Le suivi du plan fonctionne dans tous les cas — cette option affine surtout l'estimation 10K. La synchro automatique Strava ne se déclenche que si cette source est sélectionnée ici (le bouton \"Synchroniser avec Strava\" ci-dessous reste toujours disponible manuellement)."
         )
       )
     );
@@ -6481,7 +6481,7 @@ function renderSettings() {
           el("button",{
             style:{width:"100%",background:syncing?"var(--bg)":"rgba(var(--warn-rgb),0.13)",border:"1px solid rgba(var(--warn-rgb),0.33)",borderRadius:"10px",padding:"11px",cursor:"pointer",color:"var(--warn)",fontWeight:"700",fontSize:"15px",marginBottom:"8px"},
             feedback:true,
-            onClick:()=>{ if(!syncing) syncStrava(); }
+            onClick:()=>{ if(!syncing) syncStrava(true); }
           },syncing?"⏳ "+syncMsg:"🔄 Synchroniser avec Strava"),
           el("button",{style:{background:"none",border:"none",color:"var(--text2)",fontSize:"14px",cursor:"pointer",padding:"0",marginTop:"12px",paddingTop:"12px",borderTop:"1px solid var(--border)"},
             onClick:()=>{ stravaToken=null;stravaRefresh=null;stravaExpires=0;stravaActivities=[];window.stravaActivities=[];save("lk_strava_token",null);save("lk_strava_refresh",null);save("lk_strava_expires",0);save("lk_strava_activities",[]);render(); }
@@ -6797,7 +6797,7 @@ async function ensureFreshToken() {
   } catch { return false; }
 }
 
-async function syncStrava() {
+async function syncStrava(force = false) {
   // Plan Forme clôturé (13 juillet 2026) : intégralement figé, y compris
   // plus aucune synchro Strava — cohérent avec sauvegarderPlan() côté
   // gist-sync.js, qui rejette toute écriture sur un plan Forme clôturé.
@@ -6806,6 +6806,19 @@ async function syncStrava() {
   if (window.__PLAN_BRUT__?.mode === 'forme' && window.__PLAN_BRUT__?.dateCloture) {
     syncMsg = "Plan clôturé — synchronisation Strava désactivée.";
     render();
+    return;
+  }
+  // Garde-fou source de données (18/07/2026, v2.15) : les synchros
+  // automatiques (auto-synchro périodique, relance après annulation d'une
+  // saisie manuelle) ne doivent se déclencher que si Strava est la source
+  // choisie dans Réglages — prépare l'arrivée d'autres sources (Garmin/
+  // Coros, import GPX) sans qu'elles se fassent silencieusement écraser par
+  // une synchro Strava qui tournerait quand même en arrière-plan.
+  // `force` (reconnexion OAuth juste effectuée, bouton "Synchroniser avec
+  // Strava" cliqué explicitement en Réglages) contourne volontairement ce
+  // garde-fou : un geste explicite de l'utilisateur doit toujours aboutir,
+  // même si sa préférence par défaut est une autre source.
+  if (!force && dataSource !== "strava") {
     return;
   }
   syncing=true; syncMsg="Connexion à Strava..."; stravaAuthInvalide=false; render();
