@@ -4736,7 +4736,9 @@ function renderStats() {
   const cadCurveEl = drawCurve(cadData,"🦶 Cadence par séance","cad","spm",null);
 
   // ── Courbes FC par type de séance ──────────────────────────────────────────
-  const fcCurveEl = (()=>{
+  let fcCurveEl;
+  try {
+  fcCurveEl = (()=>{
     const types = ["VMA","SPEC","SEUIL"].filter(t => ieData[t] && ieData[t].some(p=>p.fc));
     console.log('[DEBUG FC types]', JSON.stringify(types), 'ieData keys:', JSON.stringify(Object.keys(ieData)));
     if (!types.length) return null;
@@ -4875,6 +4877,10 @@ function renderStats() {
       ...cards
     );
   })();
+  } catch(errFc) {
+    console.error('[DEBUG FC EXCEPTION]', errFc.message, errFc.stack);
+    fcCurveEl = null;
+  }
   console.log('[DEBUG FC final]', fcCurveEl ? 'element cree, enfants: '+fcCurveEl.children.length : 'NULL');
 
   const paceEl=el("div",{style:{marginBottom:"16px"}},
