@@ -1480,9 +1480,21 @@ if (coachDate !== today()) { coachMsg = null; } // forcer le fetch si nouveau jo
 // associée — un bouton de rafraîchissement manuel suffit.
 let coachRaceMsg = load(clePourPlan("lk_coach_race_msg"), null);
 
+// Compteur global de requêtes coach — corrige une race condition découverte
+// le 18/07/2026 (Laurent : message affiché contredit le vrai statut malgré
+// un prompt et une réponse API prouvés corrects dans les deux cas). Cause :
+// deux appels fetchCoachMsg() peuvent partir en parallèle (ex. clic manuel
+// sur 🔄 PUIS action de saisie/statut qui relance aussi un fetch) — sans
+// protection, si le PREMIER appel (avec un contexte périmé) répond APRÈS le
+// second (plus récent, contexte à jour), sa réponse écrase la bonne en
+// dernier. Chaque appel prend un ticket ; seule la réponse du ticket le plus
+// récent est appliquée, les autres sont silencieusement ignorées.
+let coachRequestId = 0;
+
 async function fetchCoachMsg() {
   const t = today();
   if (coachDate === t && coachMsg) return; // déjà fetché aujourd'hui
+  const monTicket = ++coachRequestId;
   const cd = countdown();
   const todaySess = ALL_SESSIONS.filter(s=>s.date===t);
   const sessType = todaySess.length ? todaySess[0].type : "REPOS";
@@ -1618,8 +1630,6 @@ Ne mentionne jamais le terme "ACWR" ou "charge aiguë/chronique" — reste dans 
 Tu ne connais jamais l'heure ni le moment de la journée (matin, midi, soir) où une séance a eu lieu ou aura lieu — ne l'invente jamais ("ce soir", "demain matin", "avant de dormir"...) et ne donne aucun conseil qui suppose un horaire précis (petit-déjeuner avant la séance, hydratation la veille au soir...). Reste sur des repères de jour uniquement (aujourd'hui, demain).
 Réponds uniquement avec le message, sans guillemets.`;
 
-  console.log('[DEBUG PROMPT COACH]', prompt);
-
   try {
     const resp = await fetch("/api/coach", {
       method: "POST",
@@ -1627,21 +1637,18 @@ Réponds uniquement avec le message, sans guillemets.`;
       body: JSON.stringify({ prompt })
     });
     const data = await resp.json();
-    console.log('[DEBUG REPONSE API]', JSON.stringify(data), 'status HTTP:', resp.status);
     const msg = data.text || null;
+    if (monTicket !== coachRequestId) return; // réponse obsolète (un appel plus récent a déjà répondu ou est en cours) — ignorée silencieusement, cf. déclaration de coachRequestId plus haut
     if (msg) {
       coachMsg = msg;
       coachDate = t;
       save(clePourPlan("lk_coach_msg"), coachMsg);
       save(clePourPlan("lk_coach_date"), coachDate);
-      console.log('[DEBUG AVANT RENDER]', 'coachMsg mis a jour a:', coachMsg);
       render();
-      console.log('[DEBUG APRES RENDER]', 'coachMsg toujours:', coachMsg);
-    } else {
-      console.log('[DEBUG MSG VIDE]', 'msg etait:', msg, 'data:', JSON.stringify(data));
     }
   } catch(e) {
     console.warn("Coach indisponible:", e.message);
+    if (monTicket !== coachRequestId) return; // idem en cas d'erreur : ne pas écraser un message plus récent avec le message de secours
     if (!coachMsg) {
       // Message de secours si jamais aucun message n\'a pu être chargé
       coachMsg = "🤖 Yoria fait une pause — réessaie dans quelques instants.";
@@ -3088,7 +3095,6 @@ function renderDashboard() {
     onClick:()=>{ coachMsg=null; coachDate=""; save(clePourPlan("lk_coach_msg"),null); save(clePourPlan("lk_coach_date"),""); fetchCoachMsg(); }
   },"🔄");
   // Coach intégré dans la carte séance — bloc discret
-  console.log('[DEBUG CONSTRUCTION coachEl]', 'coachMsg au moment du render:', coachMsg);
   const coachEl = el("div",{style:{background:"var(--border-soft)",borderRadius:"8px",padding:"10px 12px",display:"flex",gap:"8px",alignItems:"flex-start"}},
     el("span",{style:{fontSize:"16px",flexShrink:"0"}},"🤖"),
     el("div",{style:{flex:"1"}},
