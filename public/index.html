@@ -6907,6 +6907,7 @@ function matchActivitiesToPlan(activities) {
   // automatique sur une séance dont la date est dans le futur, quel que
   // soit le plan affiché.
   const aujourdhui = today();
+  let statutDuJourChange = false; // 18/07/2026 (demande de Laurent) : le coach doit se rafraîchir aussi sur un changement de statut AUTOMATIQUE (pas seulement un clic manuel, cf. gestionnaire de renderStatusRow), pour ne jamais garder un message "pas encore fait" après une synchro Strava qui valide la séance du jour toute seule.
   ALL_SESSIONS.forEach(s => {
     if (s.type==="REPOS"||s.type==="RACE") return;
     if (s.date > aujourdhui) return; // jamais de validation automatique sur une séance future
@@ -6914,11 +6915,20 @@ function matchActivitiesToPlan(activities) {
     if (match) {
       if (!statuses[s.uid] || statuses[s.uid]==="—") {
         const auto = autoValidate(s, match);
-        if (auto) statuses[s.uid] = auto;
+        if (auto) {
+          statuses[s.uid] = auto;
+          if (s.date === aujourdhui) statutDuJourChange = true;
+        }
       }
     }
   });
   save(clePourPlan("lk_statuses"),statuses);
+  if (statutDuJourChange) {
+    coachMsg = null; coachDate = "";
+    save(clePourPlan("lk_coach_msg"), null);
+    save(clePourPlan("lk_coach_date"), "");
+    fetchCoachMsg();
+  }
 }
 
 // Auto-synchro Strava si token valide et dernière synchro > 1h
