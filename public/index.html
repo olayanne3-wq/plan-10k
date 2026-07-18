@@ -6884,23 +6884,44 @@ async function chargerFitParser() {
 // légèrement selon le firmware/fabricant (Garmin/Coros/Polar/Suunto). Le
 // point d'ajustement, si besoin, est cette seule fonction — rien en aval à
 // toucher.
+// Recalcule une vitesse moyenne fiable à partir de distance/temps, plutôt
+// que de faire confiance au champ avg_speed natif du fichier FIT — audit du
+// 18/07/2026 sur un vrai export Amazfit/Zepp : avg_speed rapporté = 2.0 m/s
+// (8'20/km) alors que total_distance/total_elapsed_time donnent 2.667 m/s
+// (6'15/km, cohérent avec la somme des 8 laps réels de la séance). Écart
+// significatif et trompeur — avg_speed semble inclure des phases d'arrêt/
+// pause dans son calcul sur ce fabricant, contrairement à distance/temps qui
+// restent cohérents entre eux. Appliqué à la fois au niveau activité et à
+// chaque lap, par prudence (même fabricant, même défaut probable partout).
+function vitesseFiable(distance, tempsSec, avgSpeedFit) {
+  if (tempsSec > 0 && distance > 0) return distance / tempsSec;
+  return avgSpeedFit ?? 0; // repli si distance/temps manquants (ne devrait pas arriver)
+}
+
 function adapterFitVersFormatActivite(fitParseResult) {
   const session = fitParseResult?.activity?.sessions?.[0] || fitParseResult?.sessions?.[0];
   if (!session) return null;
 
   const lapsFit = session.laps || [];
-  const laps = lapsFit.map((lapFit, i) => ({
-    id: "fit-lap-" + i,
-    lap_index: i,
-    average_speed: lapFit.avg_speed ?? 0,
-    average_heartrate: lapFit.avg_heart_rate ?? null,
-    distance: lapFit.total_distance ?? 0,
-    moving_time: lapFit.total_elapsed_time ?? lapFit.total_timer_time ?? 0,
-  }));
+  const laps = lapsFit.map((lapFit, i) => {
+    const distance = lapFit.total_distance ?? 0;
+    const moving_time = lapFit.total_elapsed_time ?? lapFit.total_timer_time ?? 0;
+    return {
+      id: "fit-lap-" + i,
+      lap_index: i,
+      average_speed: vitesseFiable(distance, moving_time, lapFit.avg_speed),
+      average_heartrate: lapFit.avg_heart_rate ?? null,
+      distance,
+      moving_time,
+    };
+  });
 
   const startTime = session.start_time instanceof Date
     ? session.start_time
     : new Date(session.start_time);
+
+  const distanceTotale = session.total_distance ?? 0;
+  const tempsTotal = session.total_elapsed_time ?? session.total_timer_time ?? 0;
 
   return {
     id: "fit-" + startTime.getTime(),
@@ -6911,10 +6932,10 @@ function adapterFitVersFormatActivite(fitParseResult) {
     // nulle part dans le code existant, cf. usages de .slice(0,10)/(0,19)).
     // On retire le suffixe pour rester au même format exact que Strava.
     start_date_local: startTime.toISOString().replace('Z', ''),
-    average_speed: session.avg_speed ?? 0,
+    average_speed: vitesseFiable(distanceTotale, tempsTotal, session.avg_speed),
     average_heartrate: session.avg_heart_rate ?? null,
-    distance: session.total_distance ?? 0,
-    moving_time: session.total_elapsed_time ?? session.total_timer_time ?? 0,
+    distance: distanceTotale,
+    moving_time: tempsTotal,
     laps,
     _source: "fit", // marqueur interne, pour distinguer d'une activité Strava si besoin plus tard (ex. badge d'origine dans l'UI)
   };
