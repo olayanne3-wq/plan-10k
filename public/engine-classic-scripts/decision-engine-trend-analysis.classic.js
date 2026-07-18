@@ -96,6 +96,45 @@
     return { code: 'STAGNATION_VOLUME', description: 'Le volume hebdomadaire reste quasi stable (±5%) depuis 4 semaines ou plus.', poids: 12 };
   }
 
+  // Déficit de volume durable — ajouté le 18/07/2026 (option 3 retenue
+  // avec Laurent, après avoir écarté STAGNATION_VOLUME ci-dessus comme
+  // substitut : la stagnation capte un PLATEAU, peu importe où il se situe
+  // par rapport au plan — pas un déficit vs le plan prévu, qui est le vrai
+  // signal recherché). Distinct de R-070/R-040 (Module 5, RuleEngine) qui
+  // regardent l'ASSIDUITÉ (séances manquées/ratées) — celui-ci détecte une
+  // sous-réalisation même sur des séances FAITES mais raccourcies, jamais
+  // vu par les règles d'assiduité.
+  //
+  // Seuil de -10% : pas de littérature trouvée pour calibrer un écart en %
+  // au plan individuel (cf. discussion du 18/07/2026 — l'étude marathon
+  // trouvée donne un seuil ABSOLU de 30km/sem, pas transposable en %).
+  // Réutilise le seuil ±10% déjà choisi ailleurs dans ce même fichier
+  // (progressionVsPrecedente, decision-engine-week-analysis.classic.js)
+  // plutôt que d'inventer un nouveau chiffre arbitraire — même prudence
+  // méthodologique déjà assumée sur COEFFICIENT_INTENSITE_PAR_TYPE. À
+  // recalibrer une fois observé sur l'historique réel de Laurent, décision
+  // explicite de ne pas figer ce choix comme définitif.
+  //
+  // TOUTES les semaines de la fenêtre doivent être sous le seuil (pas une
+  // majorité) — plus strict que d'autres détecteurs de ce fichier, pour
+  // éviter qu'une seule semaine très faible fasse basculer une moyenne
+  // globalement correcte (une semaine ponctuellement sous-réalisée est déjà
+  // visible directement via ecartVolumePourcent affiché, ce détecteur ne
+  // sert qu'à capter la RÉPÉTITION).
+  function detecterDeficitVolumeDurable(semaines) {
+    if (semaines.length < 3) return null;
+    const dernieres3 = semaines.slice(-3);
+    const toutesEnDeficit = dernieres3.every(s => typeof s.ecartVolumePourcent === 'number' && s.ecartVolumePourcent <= -10);
+    if (!toutesEnDeficit) return null;
+    const ecarts = dernieres3.map(s => s.ecartVolumePourcent);
+    const ecartMoyen = Math.round((ecarts.reduce((a, b) => a + b, 0) / ecarts.length) * 10) / 10;
+    return {
+      code: 'DEFICIT_VOLUME_DURABLE',
+      description: `Le volume réalisé reste sous le volume prévu par le plan depuis 3 semaines ou plus (écart moyen ${ecartMoyen}%).`,
+      poids: 18,
+    };
+  }
+
   // --------------------------------------------------------------------------
   // Déduit tendanceGenerale depuis les signaux détectés — table de règles
   // simple, pas de logique cachée (cf. doc archi). Priorité aux signaux
@@ -108,6 +147,12 @@
     if (a('FATIGUE_CROISSANTE') && a('CHARGE_CROISSANTE_RAPIDE')) return 'fatigue_accumulee';
     if (a('FATIGUE_CROISSANTE')) return 'baisse_de_forme';
     if (a('SEANCES_MANQUEES_REPETEES')) return 'baisse_de_forme';
+    // DEFICIT_VOLUME_DURABLE ajouté le 18/07/2026 : même famille que
+    // SEANCES_MANQUEES_REPETEES (le coureur produit moins que prévu),
+    // priorité intermédiaire — sous les signaux de fatigue déjà avérée,
+    // mais capte un cas que SEANCES_MANQUEES_REPETEES ne voit pas (séances
+    // FAITES mais raccourcies, pas seulement ratées).
+    if (a('DEFICIT_VOLUME_DURABLE')) return 'baisse_de_forme';
     if (a('3_SEMAINES_REUSSIES') && a('CHARGE_CROISSANTE_RAPIDE')) return 'progression';
     if (a('3_SEMAINES_REUSSIES')) return 'amelioration';
     if (a('STAGNATION_VOLUME')) return 'stagnation';
@@ -164,6 +209,7 @@
       detecterSeancesManqueesRepetees(semaines),
       detecterFatigueCroissante(runnerStates),
       detecterStagnationVolume(semaines),
+      detecterDeficitVolumeDurable(semaines),
     ].filter(Boolean);
 
     const codes = signaux.map(s => s.code);
@@ -192,6 +238,7 @@
     detecterSeancesManqueesRepetees,
     detecterFatigueCroissante,
     detecterStagnationVolume,
+    detecterDeficitVolumeDurable,
     deduireTendanceGenerale,
   };
 
