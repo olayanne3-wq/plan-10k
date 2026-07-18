@@ -6412,7 +6412,13 @@ function renderSettings() {
       { id:"strava", label:"Strava", desc:"Synchro auto, allures et FC détaillées", icon:"🟠", available:true },
       { id:"manuel", label:"Saisie manuelle", desc:"Tu entres allure et FC toi-même après chaque séance", icon:"✏️", available:true },
       { id:"montre", label:"Garmin, Coros, Polar…", desc:"Bientôt disponible", icon:"⌚", available:false },
-      { id:"gpx", label:"Import GPX", desc:"Bientôt disponible", icon:"📁", available:false },
+      // Renommé "Import GPX" -> "Import FIT" (18/07/2026, v2.15) : un GPX pur
+      // n'a pas de laps, donc pas de décomposition possible des séances
+      // qualité (échauffement/effort/récup) — .fit contient nativement ces
+      // laps, mêmes principe que Strava (getLapsAffichage/getEffortLaps).
+      // Activée (available:true) : le composant d'upload correspondant est
+      // ajouté ci-dessous (importFitSection).
+      { id:"fit", label:"Import FIT", desc:"Fichier exporté de ta montre, un par un", icon:"📁", available:true },
     ];
     const dataSourceSection = el("div",{style:{marginBottom:"24px"}},
       el("div",{class:"label"},"Source de données"),
@@ -6488,6 +6494,40 @@ function renderSettings() {
           },"🔓 Déconnecter Strava")
         )
       :el("a",{href:"/api/strava/auth",style:{display:"block",background:"rgba(var(--warn-rgb),0.13)",border:"1px solid rgba(var(--warn-rgb),0.33)",borderRadius:"10px",padding:"12px 16px",color:"var(--warn)",fontWeight:"700",fontSize:"15px",textAlign:"center",textDecoration:"none"}},"🔗 Connecter Strava")
+  );
+
+  // ── Import FIT (v2.15, 18/07/2026) ────────────────────────────────────
+  // Affichée seulement si dataSource === "fit" (pas un mode permanent visible
+  // en dur comme stravaSection — évite de montrer un contrôle d'upload à
+  // quelqu'un qui n'a pas choisi cette source). Un fichier à la fois : pas
+  // de synchro automatique possible pour cette source (contrairement à
+  // Strava), c'est le principe même de l'import manuel — cohérent avec
+  // "sources de données supplémentaires... liées au compte séparément".
+  const importFitSection = dataSource !== "fit" ? null : el("div",{style:{marginBottom:"24px"}},
+    el("div",{class:"label"},"Import FIT"),
+    card(
+      el("div",{class:"muted",style:{fontSize:"13px",marginBottom:"12px"}},
+        "Exporte le fichier .fit de ta séance depuis ta montre ou son application (Garmin Connect, Coros, etc.), puis importe-le ici."
+      ),
+      syncMsg?el("div",{style:{fontSize:"14px",color:syncMsg.startsWith("✅")?"var(--accent2)":"var(--text2)",marginBottom:"10px",padding:"8px 10px",background:"var(--border-soft)",borderRadius:"8px"}},syncMsg):null,
+      (()=>{
+        const fileInp = document.createElement("input");
+        fileInp.type = "file"; fileInp.accept = ".fit"; fileInp.style.display = "none";
+        fileInp.addEventListener("change", avecRetourTactile((e)=>{
+          const file = e.target.files?.[0];
+          if (file) importerFichierFit(file);
+          fileInp.value = ""; // permet de réimporter le même fichier deux fois de suite si besoin
+        }));
+        const btn = el("button",{
+          style:{width:"100%",background:syncing?"var(--bg)":"rgba(var(--accent-rgb),0.13)",border:"1px solid rgba(var(--accent-rgb),0.33)",borderRadius:"10px",padding:"11px",cursor:syncing?"default":"pointer",color:"var(--accent)",fontWeight:"700",fontSize:"15px"},
+          feedback:true,
+          onClick:()=>{ if(!syncing) fileInp.click(); }
+        },syncing?"⏳ "+syncMsg:"📁 Choisir un fichier .fit");
+        const wrap = document.createElement("div");
+        wrap.appendChild(fileInp); wrap.appendChild(btn);
+        return wrap;
+      })()
+    )
   );
 
   // VERSIONS doit rester accessible en dehors de buildVersionSection
@@ -6728,7 +6768,7 @@ function renderSettings() {
     accountSection,
     themeSection,
     formeClotureSection,
-    profileSection, niveauSection, sexeSection, recordsSection, saveBtn, pdfSection, dataSourceSection, stravaSection,
+    profileSection, niveauSection, sexeSection, recordsSection, saveBtn, pdfSection, dataSourceSection, stravaSection, importFitSection,
     el("div",{style:{marginBottom:"24px"}}, stravaSection),
     githubToken ? qrSection : null,
     versionSection
@@ -6795,6 +6835,125 @@ async function ensureFreshToken() {
     save("lk_strava_token",stravaToken); save("lk_strava_refresh",stravaRefresh); save("lk_strava_expires",stravaExpires);
     return true;
   } catch { return false; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Import FIT (v2.15, 18/07/2026) — première étape du chantier "sources de
+// données supplémentaires" (Garmin/Coros/import FIT-GPX, cf. inventaire).
+// Décision actée : viser .fit plutôt que .gpx pur, car .fit contient
+// nativement des laps (Activity > Session > Lap > Record) — exactement ce
+// dont dépend déjà getLapsAffichage()/getEffortLaps() pour décomposer une
+// séance qualité (échauffement/effort/récup/retour au calme). Un GPX pur
+// n'a aucune notion de lap ; sans elle, la décomposition de séance qualité
+// serait perdue ou reposerait sur une heuristique fragile déjà écartée une
+// fois pour Strava (cf. commentaire historique au-dessus de getLapsAffichage,
+// tentative n°2 "filtrer par durée" abandonnée).
+//
+// Librairie : fit-file-parser (npm, maintenue, parse un .fit directement
+// côté navigateur). PAS de build UMD/global (vérifié contre le package.json
+// publié sur registry.npmjs.org : "type":"module", exports { import, require }
+// uniquement, aucun champ browser/unpkg/jsdelivr) — contrairement à ce
+// qu'affichent certains exemples GitHub d'anciennes versions/forks, qui
+// supposaient un global window.FitParser inexistant sur les versions
+// actuelles. Chargée via import() dynamique depuis jsDelivr (qui sait
+// servir n'importe quel fichier ESM d'un package npm), au moment du
+// premier import — pas de <script src> statique dans le <head>, pour ne
+// pas payer ce coût réseau sur des pages qui n'utilisent jamais l'import
+// FIT. Mise en cache dans _fitParserModule après le premier chargement.
+let _fitParserModule = null;
+async function chargerFitParser() {
+  if (_fitParserModule) return _fitParserModule;
+  const mod = await import("https://cdn.jsdelivr.net/npm/fit-file-parser@3.0.2/dist/fit-parser.js");
+  _fitParserModule = mod.default || mod.FitParser || mod;
+  return _fitParserModule;
+}
+
+// Principe central : NE PAS dupliquer la logique d'analyse. Cette fonction
+// traduit uniquement le format de sortie de fit-file-parser vers le même
+// schéma qu'un objet `activity` Strava (type, sport_type, start_date_local,
+// average_speed, average_heartrate, distance, moving_time, laps[]) — une
+// fois adapté, l'activité importée traverse EXACTEMENT le même chemin que
+// Strava : getLapsAffichage(), detecterTypeEffort(), autoValidate(),
+// matchActivitiesToPlan(), le Module 2 (SessionAnalyzer). Zéro nouvelle
+// branche d'analyse à maintenir.
+//
+// Champs FIT natifs utilisés (noms du protocole FIT, différents des noms
+// Strava) : avg_speed (m/s), avg_heart_rate (bpm), total_distance (m),
+// total_elapsed_time (s), start_time. À VÉRIFIER au premier test réel avec
+// un fichier .fit exporté d'une vraie montre — le nommage exact peut varier
+// légèrement selon le firmware/fabricant (Garmin/Coros/Polar/Suunto). Le
+// point d'ajustement, si besoin, est cette seule fonction — rien en aval à
+// toucher.
+function adapterFitVersFormatActivite(fitParseResult) {
+  const session = fitParseResult?.activity?.sessions?.[0] || fitParseResult?.sessions?.[0];
+  if (!session) return null;
+
+  const lapsFit = session.laps || [];
+  const laps = lapsFit.map((lapFit, i) => ({
+    id: "fit-lap-" + i,
+    lap_index: i,
+    average_speed: lapFit.avg_speed ?? 0,
+    average_heartrate: lapFit.avg_heart_rate ?? null,
+    distance: lapFit.total_distance ?? 0,
+    moving_time: lapFit.total_elapsed_time ?? lapFit.total_timer_time ?? 0,
+  }));
+
+  const startTime = session.start_time instanceof Date
+    ? session.start_time
+    : new Date(session.start_time);
+
+  return {
+    id: "fit-" + startTime.getTime(),
+    type: "Run",
+    sport_type: "Run",
+    // toISOString() donne un suffixe "Z" (UTC) — start_date_local de Strava
+    // n'en a pas (heure déjà locale, pas de conversion de fuseau à faire
+    // nulle part dans le code existant, cf. usages de .slice(0,10)/(0,19)).
+    // On retire le suffixe pour rester au même format exact que Strava.
+    start_date_local: startTime.toISOString().replace('Z', ''),
+    average_speed: session.avg_speed ?? 0,
+    average_heartrate: session.avg_heart_rate ?? null,
+    distance: session.total_distance ?? 0,
+    moving_time: session.total_elapsed_time ?? session.total_timer_time ?? 0,
+    laps,
+    _source: "fit", // marqueur interne, pour distinguer d'une activité Strava si besoin plus tard (ex. badge d'origine dans l'UI)
+  };
+}
+
+// Lit et parse un fichier .fit choisi par l'utilisateur (input file), puis
+// l'adapte et l'ajoute à stravaActivities — même tableau que Strava,
+// volontairement partagé plutôt que dupliqué (matchActivitiesToPlan(),
+// predict10K(), le Module 2, etc. lisent tous ce même tableau ; le
+// dupliquer forcerait à répéter cette lecture partout). Une activité déjà
+// présente à la même date (import répété du même fichier, ou Strava a
+// entretemps synchronisé la même séance) est remplacée, pas dupliquée.
+async function importerFichierFit(file) {
+  syncing = true; syncMsg = "Lecture du fichier .fit..."; render();
+  try {
+    const FitParser = await chargerFitParser();
+    const buffer = await file.arrayBuffer();
+    const fitParser = new FitParser({ force: true, speedUnit: "m/s", lengthUnit: "m", mode: "cascade" });
+    const fitData = await new Promise((resolve, reject) => {
+      fitParser.parse(buffer, (error, data) => error ? reject(error) : resolve(data));
+    });
+    const activite = adapterFitVersFormatActivite(fitData);
+    if (!activite) {
+      syncMsg = "❌ Fichier .fit illisible ou vide.";
+      syncing = false; render();
+      return;
+    }
+    const dateActivite = activite.start_date_local.slice(0, 10);
+    stravaActivities = stravaActivities.filter(a => a.start_date_local?.slice(0,10) !== dateActivite || a._source !== "fit");
+    stravaActivities.push(activite);
+    window.stravaActivities = stravaActivities;
+    save("lk_strava_activities", stravaActivities);
+    matchActivitiesToPlan(stravaActivities);
+    syncMsg = "✅ Séance du " + dateActivite + " importée.";
+  } catch (e) {
+    syncMsg = "❌ Erreur de lecture : " + e.message;
+  } finally {
+    syncing = false; render();
+  }
 }
 
 async function syncStrava(force = false) {
