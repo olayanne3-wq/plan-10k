@@ -4738,7 +4738,7 @@ function renderStats() {
   // ── Courbes FC par type de séance ──────────────────────────────────────────
   const fcCurveEl = (()=>{
     const types = ["VMA","SPEC","SEUIL"].filter(t => ieData[t] && ieData[t].some(p=>p.fc));
-    console.log('[DEBUG FC types]', types, 'ieData keys:', Object.keys(ieData));
+    console.log('[DEBUG FC types]', JSON.stringify(types), 'ieData keys:', JSON.stringify(Object.keys(ieData)));
     if (!types.length) return null;
 
     const FC_ZONES_CURVE = { VMA:{min:163,max:181}, SPEC:{min:154,max:163}, SEUIL:{min:145,max:163} };
@@ -4875,6 +4875,7 @@ function renderStats() {
       ...cards
     );
   })();
+  console.log('[DEBUG FC final]', fcCurveEl ? 'element cree, enfants: '+fcCurveEl.children.length : 'NULL');
 
   const paceEl=el("div",{style:{marginBottom:"16px"}},
     el("div",{class:"label"},"Référentiel allures & FC"),
