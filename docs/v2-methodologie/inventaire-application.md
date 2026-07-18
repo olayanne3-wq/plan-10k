@@ -4765,3 +4765,132 @@ occurrences ciblées.
 **Non fait à ce stade** : pas de garde-fou de non-régression automatisé
 (ex. test unitaire dédié dans `test-plan-generator.mjs`) — à ajouter si ce
 fichier de tests est retouché dans une session future.
+
+## 40. Import FIT — audit complet, limitation Zepp/Amazfit confirmée, état des lieux par marque (18/07/2026)
+
+### 40.1 Audit sur fichier réel — bug de vitesse corrigé
+
+Fichier `.fit` réel fourni par Laurent (export manuel Zepp, montre Amazfit
+Cheetah, séance qualité 3×6min/récup 90s le 17/07/2026) — premier vrai test
+de la fonctionnalité import FIT livrée en fin de session précédente (§39.3).
+
+**Bug trouvé et corrigé** : `avg_speed` du fichier FIT (champ natif de la
+session ET de chaque lap) rapportait 2.0 m/s (8'20/km), alors que
+`total_distance / total_elapsed_time` donne 2.667 m/s (6'15/km) — cohérent
+avec la somme des 8 laps réels et avec l'allure attendue pour une EF. Écart
+significatif (>30%) et trompeur, probablement dû à une inclusion des phases
+d'arrêt/pause dans le calcul `avg_speed` côté firmware Amazfit/Zepp.
+
+**Corrigé** dans `adapterFitVersFormatActivite()` (`index.html`) : nouvelle
+fonction `vitesseFiable(distance, tempsSec, avgSpeedFit)` qui recalcule
+systématiquement la vitesse depuis distance/temps plutôt que de faire
+confiance au champ natif — appliquée au niveau activité ET à chaque lap,
+par prudence (même défaut probable partout sur ce fabricant). Validé
+numériquement contre les vraies données du fichier avant push.
+
+### 40.2 Limitation structurelle trouvée — décomposition de séance qualité impossible pour ce fichier
+
+Constat initial erroné : le fichier a été pris pour une EF (allure fausse
+avant correction 40.1) alors que c'était en réalité une vraie séance
+qualité (3×6min/récup 90s). Une fois requalifiée, l'audit a révélé un
+problème plus profond que le simple bug de vitesse.
+
+**Les 8 laps du fichier ne correspondent PAS à la structure programmée.**
+Vérification exhaustive avec `fitdecode` (Python) sur tous les champs et
+tous les types de messages du fichier :
+- `lap_trigger = "distance"` sur les 7 premiers laps (déclenchement
+  automatique au km fixe, 1000m chacun), `"session_end"` sur le dernier —
+  aucun lap de type intervalle/manuel
+- Seuls 2 `event` dans le fichier : `timer start` et `timer stop_all` —
+  aucun événement de type intervalle
+- Tous les types de messages présents listés exhaustivement : `file_id`,
+  `session`, `lap`, `record`, `event`, `device_info`, `activity`,
+  `field_description`, `developer_data_id` — **aucun message `split`**
+  (voir 40.3)
+
+**La vraie structure existe dans les records bruts, mais invisible dans les
+laps.** Analyse manuelle du signal de vitesse instantanée (`enhanced_speed`
+des 2937 records, moyennée par fenêtres de 30s) : 3 blocs d'effort à ~5'00-
+5'10/km clairement identifiables (t≈900-1230s, t≈1350-1680s, t≈1800-2130s,
+soit ~5.5min chacun, proche des 6min programmées), séparés par des creux de
+récup — cohérent avec la séance annoncée par Laurent. Le signal existe donc
+bel et bien dans le fichier, mais aucun marqueur structurel (lap, event,
+champ custom) ne le rend directement exploitable sans ré-implémenter une
+détection par changement de vitesse sur le signal brut — heuristique déjà
+écartée une fois pour Strava (cf. historique `getEffortLaps`, tentative
+"filtrer par durée" abandonnée) pour cause de fragilité.
+
+### 40.3 Découverte clé — pourquoi Strava affiche pourtant les intervalles correctement
+
+Question posée par Laurent : si Strava (alimenté par cette même montre)
+affiche une décomposition précise des 3×6min, d'où vient cette info si le
+fichier `.fit` exporté ne la contient pas ?
+
+**Réponse trouvée (recherche web, source technique fiable — discussion
+GitHub `mytourbook/mytourbook#1279`, développeurs inspectant le format FIT
+brut)** : le protocole FIT distingue deux types de messages différents,
+tous deux appelés "laps" dans le langage courant mais distincts au niveau
+binaire :
+- **`lap`** (mesg_num 19) — celui lu par `fitdecode`/`fit-file-parser`,
+  déclenché par bouton ou auto-lap distance/temps sur l'appareil
+- **`split`** (mesg_num 312) — message séparé, avec des types explicites
+  `interval_active`/`interval_recovery`/`interval_rest`/`rwd_walk` — **ce
+  que Garmin Connect affiche réellement**, pas les `lap`
+
+Confirmé explicitement dans la doc : *"Garmin Connect displays the 'Split'
+messages data from FIT file and not the 'Lap' messages data."*
+
+**Deux explications possibles pour Strava sur cette séance Zepp**, non
+tranchées à ce stade :
+1. Zepp transmet des messages `split` (ou équivalent) via son intégration
+   cloud directe avec Strava, absents de l'export manuel `.fit` que Laurent
+   a fourni (l'app Zepp fait officiellement transiter les activités via une
+   API cloud-to-cloud, cf. doc Strava officielle : *"activities are pushed
+   to us from Zepp's cloud service and we have no insight into their
+   system"*)
+2. Strava applique sa propre détection algorithmique par changement de
+   vitesse sur les records bruts — plausible mais non confirmé par une
+   source
+
+Dans les deux cas, le fichier `.fit` exporté manuellement par Zepp/Amazfit,
+tel que testé, **ne contient exhaustivement aucun signal structurel exploi-
+table** — confirmé, pas supposé.
+
+### 40.4 État des lieux par marque de montre (18/07/2026, sources documentées, non testées empiriquement sauf Zepp)
+
+Recherche complémentaire sur Coros et Suunto pour situer Zepp/Amazfit dans
+un contexte plus large avant de décider d'une action :
+
+| Marque | Message porteur de la structure | Confiance |
+|---|---|---|
+| **Zepp/Amazfit** | Aucun trouvé (testé exhaustivement sur fichier réel, §40.2) | **Confirmé par test direct** |
+| **Garmin** | `split` (interval_active/recovery/rest), distinct de `lap` | Source technique fiable (discussion développeurs), **non vérifié empiriquement** — aucun fichier `.fit` public avec vraie séance fractionnée trouvé malgré recherche sur SDK officiels (Python/Java/C++/JS), `fit-sdk-tools`, projets communautaires (`mytourbook`) |
+| **Suunto** | `lap` standard, avec `event: LAP` / `event_type: STOP` pour les intervalles (`FITNESS_EQUIPMENT — Intervals and downhills`) | Doc développeur officielle Suunto (`apizone.suunto.com/fit-description`) — laisse penser que Suunto encode correctement la structure dans le `lap` classique, contrairement à Zepp et potentiellement plus simplement que Garmin (`split`) |
+| **Coros** | Non déterminé précisément | Doc utilisateur mentionne une distinction "manual laps" vs "1km/5km/10km splits" dans l'app — suggère une architecture proche de Garmin (deux concepts distincts), mais pas de confirmation du format `.fit` exporté lui-même |
+
+**Recherche de fichiers `.fit` publics avec intervalles réels** : tentative
+sur plusieurs sources (SDK officiels Garmin toutes langues, `fit-sdk-tools`,
+`mytourbook`, outils en ligne comme `jasonkuperberg.com/fit-file-viewer`)
+— aucun fichier trouvé et téléchargeable contenant une vraie séance de
+course fractionnée avec message `split`. Piste Garmin non invalidée, mais
+non confirmée non plus — à retester si un fichier réel devient disponible
+(Laurent ou un tiers avec montre Garmin).
+
+### 40.5 Décision — pas de nouveau développement dans l'immédiat
+
+Compte tenu de l'incertitude et du fait qu'une seule marque (Zepp/Amazfit,
+celle de Laurent) a été testée avec certitude :
+
+- **Pas de garde-fou ni message d'avertissement ajouté au code pour
+  l'instant** — prématuré tant que le comportement des autres marques n'est
+  pas vérifié empiriquement, un avertissement mal calibré pourrait être
+  trompeur dans l'autre sens (ex. bloquer à tort un fichier Garmin qui
+  fonctionnerait correctement une fois le message `split` lu)
+- **`adapterFitVersFormatActivite()` reste tel quel** (lit uniquement les
+  `lap`), avec le correctif de vitesse fiable (§40.1) déjà appliqué et
+  poussé
+- **Piste ouverte, non commencée** : si un fichier Garmin ou Suunto réel
+  devient disponible, vérifier si `fit-file-parser` (librairie JS choisie)
+  expose bien les messages `split` en plus des `lap` dans son mode
+  `cascade` — condition nécessaire avant d'envisager de les exploiter côté
+  Yoria
