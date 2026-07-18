@@ -4936,3 +4936,51 @@ tiers) un vrai fichier `.fit` Coros ou Suunto, envoyé directement en
 pièce jointe dans la conversation plutôt que via un lien externe — seule
 méthode fiable pour contourner le blocage réseau du sandbox rencontré
 ici, déjà utilisée avec succès pour le fichier Zepp initial (§40.1).
+
+### 40.7 Apple Watch — cas structurellement différent, pas de fichier `.fit` natif (18/07/2026, même session)
+
+Question posée par Laurent : et pour Apple Watch ? Recherche web menée
+avec la même méthode que pour Coros/Suunto (§40.4/40.6).
+
+**Différence fondamentale avec toutes les autres marques auditées** :
+Apple Watch **n'exporte jamais de `.fit` nativement**. Confirmé
+explicitement par plusieurs sources indépendantes : *"Apple Watch does
+not record FIT natively — workouts are stored in HealthKit"* et *"One
+downside of the Apple Watch workout ecosystem is that there is no way to
+export your data out."* Contrairement à Zepp/Garmin/Coros/Suunto (qui
+produisent tous un `.fit` en interne, avec une fiabilité variable selon
+modèle/export, cf. §40.4/40.6), Apple stocke tout dans **HealthKit**, un
+format propriétaire — aucun export `.fit` natif possible, quelle que soit
+l'app utilisée pour enregistrer.
+
+**Deux chemins distincts identifiés pour obtenir un `.fit` malgré tout** :
+
+1. **Apple Fitness natif + app tierce de conversion a posteriori**
+   (ex. HealthFit, ~2€, référence citée dans plusieurs sources) — lit
+   HealthKit et reconstruit un `.fit`. Gère les segments/laps, mais via
+   un mécanisme de **double-tap manuel** de l'utilisateur pendant l'effort
+   pour marquer un segment — pas une détection automatique d'une structure
+   d'intervalles programmée à l'avance. Pour une vraie séance qualité type
+   3×6min, ce mode ne produirait donc probablement pas une décomposition
+   fiable sans que l'utilisateur double-tape manuellement à chaque
+   changement de phase pendant sa course.
+
+2. **App tierce dédiée aux entraînements structurés** (ex. Watchletic,
+   citée en exemple) — supporte nativement la synchronisation de workouts
+   structurés depuis des plateformes externes (TrainingPeaks, Intervals.icu,
+   etc.), pousse la séance programmée directement sur la montre avant
+   l'effort, puis exporte en FIT/GPX/TCX/Strava après coup. Une note de
+   changelog trouvée est un indice fort en faveur de cette voie : *"Fixes
+   issue with importing interval repeats from FIT files"* — preuve que
+   l'app manipule activement des répétitions d'intervalles dans son export
+   FIT, contrairement au chemin HealthFit/double-tap.
+
+**Conclusion, cohérente avec la prudence déjà actée en §40.5/40.6** :
+Apple Watch n'est PAS un cas comparable aux autres marques — la fiabilité
+de la décomposition dépendrait presque entièrement de l'app tierce
+utilisée par l'utilisateur pour enregistrer sa séance (native Apple
+Fitness vs Watchletic vs autre), plus encore que pour Zepp/Suunto où au
+moins la même app fabricant est en cause. Pas de fichier testé, pas de
+décision à prendre dans l'immédiat — à documenter comme cas à part si un
+utilisateur Apple Watch de Yoria se présente un jour, plutôt qu'à traiter
+comme une marque de montre supplémentaire dans le tableau §40.4.
