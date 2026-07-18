@@ -3088,6 +3088,7 @@ function renderDashboard() {
     onClick:()=>{ coachMsg=null; coachDate=""; save(clePourPlan("lk_coach_msg"),null); save(clePourPlan("lk_coach_date"),""); fetchCoachMsg(); }
   },"🔄");
   // Coach intégré dans la carte séance — bloc discret
+  console.log('[DEBUG CONSTRUCTION coachEl]', 'coachMsg au moment du render:', coachMsg);
   const coachEl = el("div",{style:{background:"var(--border-soft)",borderRadius:"8px",padding:"10px 12px",display:"flex",gap:"8px",alignItems:"flex-start"}},
     el("span",{style:{fontSize:"16px",flexShrink:"0"}},"🤖"),
     el("div",{style:{flex:"1"}},
