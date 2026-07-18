@@ -1460,6 +1460,16 @@ async function fetchCoachMsg() {
   const todaySessObj = ALL_SESSIONS.find(s=>s.date===t&&s.type!=="REPOS");
   const todaySessionStatus = statuses[todaySessObj?.uid];
   const sessionDone = todaySessionStatus==="✅"||todaySessionStatus==="⚠️"||todaySessionStatus==="❌";
+  // 18/07/2026 : bug identifié par Laurent — statut 😴 (repos/séance sautée
+  // délibérément) tombait dans la branche "pas encore fait" du prompt (ni
+  // dans sessionDone), ce qui n'informait jamais explicitement le LLM que la
+  // séance avait été volontairement sautée. Sans instruction contraire, le
+  // LLM a tendance à encourager comme pour une séance simplement à venir,
+  // ce qui pouvait ressembler à tort à un commentaire de réussite. Ajout
+  // d'une branche dédiée dans le prompt ci-dessous, distincte de sessionDone
+  // ET de "pas encore fait" — jamais mélangée avec le RPE (cohérent avec la
+  // décision déjà actée que 😴 n'a pas de RPE, cf. ligne ~3870).
+  const sessionSkipped = todaySessionStatus==="😴";
   const tomorrowKeyStr = new Date(new Date().getTime()+86400000).toISOString().slice(0,10);
   const tomorrowKeySess = ALL_SESSIONS.find(s=>s.date===tomorrowKeyStr&&["VMA","SPEC","SEUIL","TEST"].includes(s.type));
   const isEveOfKeySession = !!tomorrowKeySess;
@@ -1536,7 +1546,7 @@ async function fetchCoachMsg() {
   const prompt = `Tu es Yoria, coach running.${prenomCoureur ? ` Le coureur à qui tu t'adresses s'appelle ${prenomCoureur} — utilise son prénom pour t'adresser à lui, jamais "Yoria" (qui est TON propre prénom, pas le sien).` : ' Ne t\'adresse jamais au coureur par "Yoria" — c\'est ton propre prénom, pas le sien ; utilise "tu" sans prénom si tu ne connais pas le sien.'}${ESTMODEFORME ? ' Ton coureur suit un plan de maintien en forme (pas de course visée actuellement).' : ` Tu prépares le ${RACE_NAME} le ${new Date(DATE_COURSE_REFERENCE+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})} à ${RACE_LOCATION} (objectif ${fmtTime(raceGoalTime)}).`}
 ${ESTMODEFORME ? '' : `Estimation actuelle : ${predNow.timeStr} (${gapStr}).`}
 ${isMonday && prevWeekReport ? `Semaine ${prevWeekNum} terminée : ${prevWeekReport.done}/${prevWeekReport.total} séances validées, ${prevWeekKm} km courus.` : ''}
-${sessionDone ? `Séance ${sessType} déjà terminée aujourd'hui — statut ${todaySessionStatus}.${todayAvgPace ? ' Allure intervalles : '+todayAvgPace+'.' : ''}${todayInTarget ? ' '+todayInTarget+'.' : ''}${todayAvgIE ? ' Indice d\'économie (IE) : '+todayAvgIE+' (100=normal, >100=meilleur qu\'attendu).' : ''}${todayAvgCad ? ' Cadence moy. : '+todayAvgCad+' spm.' : ''}` : `Aujourd'hui (PAS ENCORE FAIT) : ${sessType} — ${sessDesc}.`}
+${sessionDone ? `Séance ${sessType} déjà terminée aujourd'hui — statut ${todaySessionStatus}.${todayAvgPace ? ' Allure intervalles : '+todayAvgPace+'.' : ''}${todayInTarget ? ' '+todayInTarget+'.' : ''}${todayAvgIE ? ' Indice d\'économie (IE) : '+todayAvgIE+' (100=normal, >100=meilleur qu\'attendu).' : ''}${todayAvgCad ? ' Cadence moy. : '+todayAvgCad+' spm.' : ''}` : sessionSkipped ? `Séance ${sessType} du jour volontairement SAUTÉE par le coureur (statut 😴 repos) — ne la félicite JAMAIS comme si elle avait été faite ou réussie, ne mentionne ni allure ni performance. Un mot bienveillant sur le repos ou la reprise est possible, sans culpabiliser.` : `Aujourd'hui (PAS ENCORE FAIT) : ${sessType} — ${sessDesc}.`}
 ${isEveOfKeySession ? `Demain séance clé : ${tomorrowKeySess.type} — ${tomorrowKeySess.session}.` : ''}
 ${weatherTemp ? 'Température : '+weatherTemp+'°C.' : ''}
 ${!ESTMODEFORME && isLastTwoWeeks ? `J–${cd} avant la course.` : ""}
