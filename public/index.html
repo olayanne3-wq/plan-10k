@@ -1364,43 +1364,6 @@ function analyserSemaineActuelle(weekNum, semainePrecedenteAnalyse) {
   return DecisionEngineWeekAnalysis.analyser(weekNum, seancesRealisees, seancesPrevues, planContext, semainePrecedenteAnalyse || null, fcMax, fcRepos, sexe);
 }
 
-// TEST TEMPORAIRE (18/07/2026) — à retirer après le test empirique
-// recuperationEstimee vs ACWR. Compare, semaine par semaine, ce que
-// WeekAnalysis (recuperationEstimee/progressionVsPrecedente) raconte face
-// à RunnerState (fatigue/ratio ACWR), pour juger si ces deux angles sont
-// redondants ou complémentaires avant de concevoir une règle.
-window.__testCompareRecupACWR = function(nbSemaines) {
-  const semaineActuelleNum = currentWeek();
-  const premiere = Math.max(1, semaineActuelleNum - nbSemaines + 1);
-  const resultats = [];
-  let precedente = null;
-  for (let w = premiere; w <= semaineActuelleNum; w++) {
-    const analyse = analyserSemaineActuelle(w, precedente);
-    if (!analyse) continue;
-    precedente = analyse;
-    const week = PLAN.find(pw => pw.week === w);
-    const dernierJour = week ? week.sessions[week.sessions.length - 1] : null;
-    const dateRef = dernierJour && dernierJour.date <= today() ? dernierJour.date : today();
-    let fatigue = null, ratioAcwr = null;
-    try {
-      const samples = adapterHistoriqueAvecRpe(window.stravaActivities || [], "strava_gratuit");
-      const rs = DecisionEngineRunnerState.calculerRunnerState(samples, { ...optionsRunnerStateActuel(), dateReference: dateRef });
-      fatigue = rs.fatigue;
-      ratioAcwr = rs.charge ? rs.charge.ratio : null;
-    } catch(e) {}
-    resultats.push({
-      semaine: w,
-      recuperationEstimee: analyse.recuperationEstimee,
-      progressionVsPrecedente: analyse.progressionVsPrecedente,
-      ecartVolumePourcent: analyse.ecartVolumePourcent,
-      fatigue,
-      ratioAcwr: ratioAcwr ? Math.round(ratioAcwr * 100) / 100 : null,
-    });
-  }
-  console.table(resultats);
-  return resultats;
-};
-
 // ── Branchement Module 4 (TrendAnalyzer) — 17/07/2026 ──────────────────────
 // Boucle sur les fenetreSemaines dernières semaines DÉJÀ COMMENCÉES du plan
 // (semaine courante incluse, semaines futures exclues — pas de sens
