@@ -4138,3 +4138,105 @@ passé :
    dérivée cohérente
 3. Une activité Strava n'apparaît plus nulle part (UI + coach IA + ACWR
    affiché) si une saisie manuelle existe pour ce jour
+
+## 35. R-062 (fatigue installée, Module 4) + fix coach IA sur les 4 statuts de séance (17-18/07/2026, session ultérieure)
+
+Suite directe de la session §34 (même conversation, poursuivie). Deux
+chantiers distincts : une nouvelle règle du moteur de décision, puis un
+bug utilisateur trouvé en observant le résultat du premier chantier.
+
+### 35.1 R-062 — Fatigue installée sur plusieurs semaines
+
+Décision reprise du point en suspens depuis §26 ("concevoir une règle
+exploitant `weekAnalysis`/`trendAnalysis`, livrés mais inertes"). Choix
+tranché avec Laurent : démarrer par `TrendAnalysis` plutôt que
+`WeekAnalysis` (moins redondant avec l'existant), sur le signal
+`FATIGUE_CROISSANTE` (déjà calculé par le Module 4, 3 points de suivi
+hebdomadaires) plutôt qu'un nouveau signal à inventer.
+
+**Constat en relisant le Module 4** (`decision-engine-trend-analysis.classic.js`) :
+plus riche que documenté en mémoire — 5 signaux déjà détectés et testés
+(`FATIGUE_CROISSANTE`, `CHARGE_CROISSANTE_RAPIDE`, `SEANCES_MANQUEES_REPETEES`,
+`3_SEMAINES_REUSSIES`, `STAGNATION_VOLUME`), avec `tendanceGenerale` déjà
+déduite par une table de priorité (fatigue > baisse de forme > progression
+> stagnation). Seul le RuleEngine n'en consommait rien.
+
+**Distinction posée avec R-060 existante** (qui regarde les 7 derniers
+jours, J/J-4/J-7) : R-060 est réactive à court terme et se redéclenche
+chaque semaine sans mémoire du passé. R-062 capte la **persistance** d'une
+fatigue qui ne redescend jamais sur 3 semaines — le vrai trou identifié :
+rien n'ajustait la trajectoire de fond quand la fatigue reste élevée
+plusieurs semaines de suite.
+
+**Nouvelle règle R-062** (`decision-engine-rules.classic.js`,
+`evaluerFatigueInstalleeTendance()`) :
+- Priorité **82** — sous R-050 (ACWR élevé, 85 : un ratio déjà critique
+  reste plus urgent et actionnable dans l'instant), au-dessus de R-060 (80)
+- Décision explicite : les deux règles "fatigue" ne doivent jamais
+  s'afficher simultanément (confusion pour le coureur) — R-062 éclipse
+  R-060 naturellement via le tri "une seule règle gagnante" déjà en place
+  dans `evaluerRegles()`, sans logique de fusion à ajouter
+- Type `alerter_tendance_fatigue` — **informative uniquement**, pas
+  d'action sur le plan (`reduire_charge`) : décision de démarrer
+  prudemment, observer en conditions réelles avant d'envisager un
+  `adapter_plan`, cohérent avec la même prudence déjà appliquée à R-070
+- Consomme `trendAnalysis.signauxDetectes` — **aucune modification
+  nécessaire côté `index.html`** pour le câblage : `trendAnalysis` était
+  déjà transmis à `evaluerRegles()` depuis le 17/07 (branché "à vide",
+  §32/§34), seul le commentaire explicatif a été mis à jour pour refléter
+  qu'une règle le consomme désormais
+
+**Fichiers modifiés** : `decision-engine-rules.classic.js` (nouvelle
+règle) + `public/index.html` (commentaire seul, pas de logique changée).
+Le moteur de décision n'a pas de copie ES Modules (confirmé en listant
+`public/v2/engine/` : uniquement `plan-generator.js`, `strava.js`, etc. —
+aucun `decision-engine-*.js`) — pas de risque d'oubli de duplication ici.
+
+**Non vérifié en conditions réelles** : comme R-070, cette règle n'a
+jamais encore été observée se déclencher sur les données de Laurent —
+signal à surveiller aux prochaines sessions.
+
+### 35.2 Bug coach IA — statuts de séance mal interprétés par le LLM
+
+**Découvert par Laurent en vérifiant le déploiement** : séance marquée 😴
+(sautée délibérément), le coach commentait comme si elle avait été
+réussie.
+
+**Cause racine identifiée** : le prompt du coach (`fetchCoachMsg()`)
+transmettait le statut de la séance de deux façons insuffisantes :
+1. `sessionDone` (booléen) ne testait que `✅`/`⚠️`/`❌` — `😴` tombait
+   silencieusement dans la branche "pas encore fait" du prompt, sans
+   jamais informer le LLM que la séance avait été volontairement sautée
+2. Même pour `✅`/`⚠️`/`❌` : le prompt transmettait l'**emoji brut**
+   ("statut ✅", "statut ❌") sans jamais expliciter en toutes lettres ce
+   que chaque statut signifie ni la tonalité attendue — le LLM devait
+   deviner, ce qui pouvait dériver vers des félicitations inappropriées
+   sur une séance ❌ ou ⚠️
+
+Laurent a testé le fix sur 😴 (Yoria a validé "le commentaire est bon")
+avant de demander de généraliser aux 3 autres statuts par le même
+principe.
+
+**Correctif** (`fetchCoachMsg()`, `public/index.html`) :
+- Nouvelle variable `sessionSkipped` (statut `😴`), distincte de
+  `sessionDone`
+- Le prompt explicite désormais en toutes lettres, pour chacun des 4
+  statuts, ce qu'il signifie et la tonalité attendue :
+  - `✅` : "RÉUSSIE, tu peux féliciter et être positif"
+  - `⚠️` : "PARTIELLEMENT réussie ou difficile, reste nuancé"
+  - `❌` : "RATÉE ou interrompue, NE FÉLICITE JAMAIS [...] sois
+    compréhensif [...] sans culpabiliser"
+  - `😴` : "volontairement SAUTÉE [...] ne la félicite JAMAIS [...] Un mot
+    bienveillant sur le repos ou la reprise est possible, sans
+    culpabiliser"
+
+**Angle mort identifié en marge, volontairement reporté** (décision
+explicite de Laurent, "on le garde pour plus tard") : pour une séance ❌
+avec des laps Strava partiels (coureur arrêté après 2 répétitions sur 5
+par ex.), `getLapsAffichage()`/`todayAvgPace` calculent une allure
+correcte mais **partielle**, sans que le prompt précise au LLM que ce
+chiffre ne porte que sur une partie de la séance. Pas trompeur en soi
+(donnée réelle), mais pourrait laisser croire à une performance complète
+si le LLM la commente sans nuance. À traiter dans une session future.
+
+**Fichier modifié** : `public/index.html` uniquement.
