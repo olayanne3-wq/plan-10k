@@ -1634,7 +1634,11 @@ Réponds uniquement avec le message, sans guillemets.`;
       coachDate = t;
       save(clePourPlan("lk_coach_msg"), coachMsg);
       save(clePourPlan("lk_coach_date"), coachDate);
+      console.log('[DEBUG AVANT RENDER]', 'coachMsg mis a jour a:', coachMsg);
       render();
+      console.log('[DEBUG APRES RENDER]', 'coachMsg toujours:', coachMsg);
+    } else {
+      console.log('[DEBUG MSG VIDE]', 'msg etait:', msg, 'data:', JSON.stringify(data));
     }
   } catch(e) {
     console.warn("Coach indisponible:", e.message);
