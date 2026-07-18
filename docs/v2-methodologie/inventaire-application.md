@@ -4894,3 +4894,45 @@ celle de Laurent) a été testée avec certitude :
   expose bien les messages `split` en plus des `lap` dans son mode
   `cascade` — condition nécessaire avant d'envisager de les exploiter côté
   Yoria
+
+### 40.6 Tentative de récupération de fichiers Coros/Suunto réels — bloquée techniquement, nuance importante trouvée (18/07/2026, même session)
+
+Recherche de fichiers `.fit` publics Coros et Suunto avec vraie séance
+d'intervalles, pour compléter l'audit §40.4 au-delà des sources
+documentaires.
+
+**Trouvé** : discussion GitHub `mytourbook/mytourbook#1194` contient des
+liens vers de vrais fichiers `.fit` Suunto originaux (attachments
+`.zip`), postés par un utilisateur pour du débogage d'export.
+
+**Téléchargement impossible** : les pièces jointes GitHub sont hébergées
+sur `objects.githubusercontent.com`, domaine absent de l'allowlist
+réseau du sandbox (`github.com` lui-même est autorisé, pas ce
+sous-domaine de stockage) — blocage technique, pas un manque de source.
+
+**Nuance importante trouvée sans avoir besoin du fichier** : dans cette
+même discussion, un développeur a passé un vrai fichier `.fit` d'une
+montre **Suunto Vertical** dans l'outil de validation officiel Garmin
+(`FitTestTool.jar`, fourni dans `fit-sdk-tools`), qui rapporte :
+
+> "Lap Message Exists — Level: REQUIRED — Status: **FAILED**"
+
+C'est-à-dire que ce fichier Suunto réel **n'avait aucun message `lap`**,
+pas juste des laps mal structurés comme sur le fichier Zepp déjà testé
+(§40.1-40.2). Ça contredit partiellement la doc développeur officielle
+Suunto (`apizone.suunto.com/fit-description`, qui décrit un format
+`event: LAP` pour les intervalles, cf. §40.4) — en pratique, au moins un
+modèle/export Suunto n'a aucun lap du tout.
+
+**Conclusion révisée** : le contenu réel d'un fichier `.fit` varie non
+seulement par marque, mais aussi par **modèle précis et par mode
+d'export** au sein d'une même marque — confirmé ici pour Suunto, déjà
+suspecté pour Zepp. Ça renforce la prudence de la décision §40.5 (pas de
+garde-fou générique par marque) : même une règle "Suunto = fiable, Zepp =
+pas fiable" serait probablement fausse dans certains cas concrets.
+
+**Reste à faire, si l'occasion se présente** : demander à Laurent (ou un
+tiers) un vrai fichier `.fit` Coros ou Suunto, envoyé directement en
+pièce jointe dans la conversation plutôt que via un lien externe — seule
+méthode fiable pour contourner le blocage réseau du sandbox rencontré
+ici, déjà utilisée avec succès pour le fichier Zepp initial (§40.1).
