@@ -6503,11 +6503,28 @@ function renderSettings() {
   // de synchro automatique possible pour cette source (contrairement à
   // Strava), c'est le principe même de l'import manuel — cohérent avec
   // "sources de données supplémentaires... liées au compte séparément".
+  //
+  // Aide enrichie (18/07/2026, suite audit inventaire §40) : la précision
+  // de la décomposition d'une séance qualité (échauffement/effort/récup)
+  // dépend entièrement de la présence d'un marqueur structurel utilisable
+  // dans le fichier .fit — testé et confirmé absent sur un fichier Zepp/
+  // Amazfit réel malgré une séance parfaitement programmée sur la montre
+  // (audit §40.1-40.2), et confirmé variable même au sein d'une même marque
+  // pour Suunto (§40.6, un fichier Suunto réel testé n'avait aucun lap).
+  // Message volontairement honnête plutôt qu'optimiste par défaut : mieux
+  // vaut prévenir que laisser croire à une précision qui peut ne pas être
+  // au rendez-vous, cohérent avec le principe "warning plutôt que silencieux"
+  // déjà appliqué ailleurs dans l'app.
   const importFitSection = dataSource !== "fit" ? null : el("div",{style:{marginBottom:"24px"}},
     el("div",{class:"label"},"Import FIT"),
     card(
       el("div",{class:"muted",style:{fontSize:"13px",marginBottom:"12px"}},
-        "Exporte le fichier .fit de ta séance depuis ta montre ou son application (Garmin Connect, Coros, etc.), puis importe-le ici."
+        "Exporte le fichier .fit de ta séance depuis ta montre ou son application (Garmin Connect, Coros, Suunto app, etc.), puis importe-le ici."
+      ),
+      el("div",{style:{fontSize:"12px",color:"var(--text-muted)",background:"var(--border-soft)",borderRadius:"8px",padding:"10px 12px",marginBottom:"12px",lineHeight:"1.5"}},
+        el("div",{style:{fontWeight:"700",marginBottom:"4px"}},"À savoir avant d'importer"),
+        "Allure, distance et FC sont toujours récupérées correctement. Pour une sortie EF ou longue, c'est suffisant. ",
+        "Pour une séance qualité (fractionné), la précision du découpage effort/récup dépend de ta montre : certaines (Zepp/Amazfit notamment, testé) n'incluent pas cette structure dans le fichier exporté, même si la séance a été suivie fidèlement. Si le découpage semble faux après import, ce n'est pas forcément une erreur — vérifie la séance manuellement si besoin. Apple Watch nécessite systématiquement une app tierce (ex. Watchletic) pour produire un .fit — Apple Fitness natif ne le permet pas."
       ),
       syncMsg?el("div",{style:{fontSize:"14px",color:syncMsg.startsWith("✅")?"var(--accent2)":"var(--text2)",marginBottom:"10px",padding:"8px 10px",background:"var(--border-soft)",borderRadius:"8px"}},syncMsg):null,
       (()=>{
