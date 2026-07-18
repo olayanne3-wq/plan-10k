@@ -4625,7 +4625,6 @@ function renderStats() {
       const ieVals = laps.map(l=>economyScore(l,type)).filter(v=>v!==null);
       const cadVals = laps.map(l=>l.average_cadence?Math.round(l.average_cadence*2):null).filter(v=>v!==null);
       const hrVals = laps.filter(l=>l.average_heartrate).map(l=>l.average_heartrate);
-      console.log('[DEBUG FC]', type, s.date, 'laps:', laps.length, 'hrVals:', hrVals, 'laps bruts:', laps.map(l=>({idx:l.lap_index, hr:l.average_heartrate, speed:l.average_speed})));
       return {
         week: s.week,
         date: s.date,
@@ -4739,6 +4738,7 @@ function renderStats() {
   // ── Courbes FC par type de séance ──────────────────────────────────────────
   const fcCurveEl = (()=>{
     const types = ["VMA","SPEC","SEUIL"].filter(t => ieData[t] && ieData[t].some(p=>p.fc));
+    console.log('[DEBUG FC types]', types, 'ieData keys:', Object.keys(ieData));
     if (!types.length) return null;
 
     const FC_ZONES_CURVE = { VMA:{min:163,max:181}, SPEC:{min:154,max:163}, SEUIL:{min:145,max:163} };
