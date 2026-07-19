@@ -4390,14 +4390,19 @@ function renderWeekDetail(weekNum) {
       ):null
     );
 
-  if (effSess.type==="RACE") {
+    if (effSess.type==="RACE") {
+      // Réutilise calculerStrategieCourse() — même stratégie/segments/
+      // allures que l'onglet Course (splitsCard dans renderCourse()), pour
+      // éviter la divergence entre les deux vues (bug corrigé 19/07/2026).
       const raceDistKm = DISTANCE_M_REFERENCE / 1000;
-      const raceGoalPace = fmtPace(DISTANCE_M_REFERENCE / raceGoalTime) + "/km";
-      const kmMid = Math.max(1, Math.round(raceDistKm / 2));
+      const splitsSemaine = calculerStrategieCourse(raceDistKm, raceGoalTime);
+      const resumeSegments = splitsSemaine.map(s => {
+        const paceStr = Math.floor(s.pace/60)+":"+(Math.round(s.pace%60)).toString().padStart(2,"0")+"/km";
+        return "Km "+s.from+"-"+s.to+" : "+s.note+" ("+paceStr+")";
+      }).join(" · ");
       card.appendChild(el("div",{style:{background:"rgba(var(--accent-rgb),0.13)",border:"1px solid rgba(var(--accent-rgb),0.27)",borderRadius:"8px",padding:"10px 12px",marginTop:"4px"}},
         el("div",{style:{color:"var(--accent)",fontWeight:"700",fontSize:"15px"}},"🏁 Jour J — Objectif "+fmtTime(raceGoalTime)),
-        el("div",{class:"text2",style:{fontSize:"14px",marginTop:"4px"}},
-          "Km 1-"+kmMid+" : prudent, autour de "+raceGoalPace+" · Km "+(kmMid+1)+"-"+Math.round(raceDistKm)+" : tout donner !")
+        el("div",{class:"text2",style:{fontSize:"14px",marginTop:"4px"}},resumeSegments)
       ));
     } else if (effSess.type!=="REPOS") {
       // Raison du statut ❌ ou ⚠️
@@ -5364,6 +5369,82 @@ function renderStats() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// STRATÉGIE DE COURSE (partagée)
+// ══════════════════════════════════════════════════════════════════════════════
+// Sortie de renderCourse() le 19/07/2026 pour être réutilisable aussi par la
+// carte de séance RACE dans la vue Semaine (bug : les deux endroits
+// affichaient des segments/allures différents, la vue Semaine ayant sa
+// propre version simplifiée à 2 segments non calibrée).
+//
+// Calcule les segments à partir de définitions avec un ÉCART relatif
+// (offsetSecKm) pour tous les segments SAUF le dernier — le dernier
+// segment est calibré mathématiquement pour compenser exactement l'écart
+// accumulé, garantissant que la somme des temps de tous les segments
+// corresponde TOUJOURS exactement au temps objectif, quelle que soit la
+// stratégie choisie pour les segments intermédiaires.
+//
+// Bug corrigé le 11 juillet 2026 : l'ancienne version fixait une allure
+// PLUS LENTE que l'objectif sur le premier segment (marge de sécurité au
+// départ), mais le second segment restait exactement à l'allure cible
+// moyenne, sans jamais compenser la perte de temps du premier — le temps
+// total dépassait systématiquement l'objectif (33s de trop mesurées sur
+// un 10K à 48:30, repéré par Laurent). Cette fonction élimine
+// structurellement ce risque : le dernier segment absorbe toujours
+// exactement l'écart nécessaire.
+function calculerSplitsCalibres(distanceKm, tempsObjectifSec, definitionsSegmentsIntermediaires, dernierNote) {
+  const paceMoyen = tempsObjectifSec / distanceKm;
+  let tempsUtilise = 0, distUtilisee = 0;
+  const segments = definitionsSegmentsIntermediaires.map(d => {
+    const pace = paceMoyen + d.offsetSecKm;
+    const dist = d.to - d.from;
+    tempsUtilise += dist * pace;
+    distUtilisee += dist;
+    return { from: d.from, to: d.to, note: d.note, pace };
+  });
+  const distRestante = distanceKm - distUtilisee;
+  const tempsRestant = tempsObjectifSec - tempsUtilise;
+  segments.push({ from: distUtilisee, to: distanceKm, note: dernierNote, pace: tempsRestant / distRestante });
+  return segments;
+}
+
+// Choix des segments selon la distance de course. Bug trouvé le 7 juillet
+// 2026 : la carte était entièrement câblée pour un 10K (5 segments de 0 à
+// 10km, conseil coach mentionnant "le km 7 et 10") — un plan Semi/
+// Marathon/5K affichait des allures et un conseil complètement hors sujet.
+function calculerStrategieCourse(distanceKmCourse, tempsObjectifSec) {
+  if (distanceKmCourse <= 5.5) {
+    // 5K : quasi-plat, 4 segments avec progression continue
+    const d = Math.round(distanceKmCourse);
+    return calculerSplitsCalibres(distanceKmCourse, tempsObjectifSec, [
+      { from:0, to:Math.min(1,d*0.2), note:"Départ prudent", offsetSecKm: 6 },
+      { from:Math.min(1,d*0.2), to:d*0.45, note:"Allure cible", offsetSecKm: 1 },
+      { from:d*0.45, to:d*0.8, note:"Accélération progressive", offsetSecKm: -2 },
+    ], "Tout donner");
+  } else if (distanceKmCourse <= 12) {
+    // 10K : 4 segments — départ prudent, montée en régime, allure cible
+    // soutenue, effort final (au lieu des 2 segments bruts de l'ancienne
+    // version, qui ne compensaient jamais le départ prudent)
+    const d = distanceKmCourse;
+    return calculerSplitsCalibres(d, tempsObjectifSec, [
+      { from:0, to:d*0.2, note:"Départ prudent", offsetSecKm: 8 },
+      { from:d*0.2, to:d*0.5, note:"Montée en régime", offsetSecKm: 2 },
+      { from:d*0.5, to:d*0.8, note:"Allure cible soutenue", offsetSecKm: -2 },
+    ], "Dernier effort, tout donner");
+  } else {
+    // Semi / Marathon : marge de sécurité au départ, allure stable au
+    // milieu, ajustement final au ressenti — 3 segments, pas de paliers
+    // aussi marqués que sur un 10K (distance plus longue, gestion d'effort
+    // différente)
+    const d = distanceKmCourse;
+    const kmDepart = d * 0.15;
+    return calculerSplitsCalibres(d, tempsObjectifSec, [
+      { from:0, to:kmDepart, note:"Marge de sécurité, ne pars pas trop vite", offsetSecKm: 5 },
+      { from:kmDepart, to:d*0.85, note:"Allure cible, régularité", offsetSecKm: -0.5 },
+    ], "Ajuste au ressenti en fin de course");
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // COURSE
 // ══════════════════════════════════════════════════════════════════════════════
 function renderCourse() {
@@ -5500,78 +5581,15 @@ function renderCourse() {
   // ── Allures de passage aux km clés ───────────────────────────────────────
   // Segments par distance — même logique/mêmes décalages de pace que
   // genererContenuRace() dans plan-generator.js (section 2.7 du doc de
-  // convergence), réécrite ici en données structurées (segments avec bornes
-  // km + allure + temps de passage cumulé) plutôt qu'un texte narratif tout
-  // fait, pour que cette carte visuelle puisse les afficher dans son propre
-  // format tableau. Bug trouvé le 7 juillet 2026 : cette carte était
-  // entièrement câblée pour un 10K (5 segments de 0 à 10km, conseil coach
-  // mentionnant "le km 7 et 10") — un plan Semi/Marathon/5K affichait des
-  // allures et un conseil complètement hors sujet.
+  // convergence). calculerStrategieCourse() est définie plus haut comme
+  // fonction globale (cf. section "STRATÉGIE DE COURSE (partagée)") pour
+  // être réutilisée à la fois ici et dans la carte de séance de la vue
+  // Semaine — bug corrigé le 19/07/2026 : les deux endroits affichaient
+  // des stratégies différentes (segments/allures) car la vue Semaine avait
+  // sa propre version simplifiée à 2 segments, non calibrée, divergente de
+  // celle-ci.
   const distanceKmCourse = DISTANCE_M_REFERENCE / 1000;
-  const paceSecKm = raceGoalTime / distanceKmCourse; // secondes par km, allure cible moyenne
-
-  // Calcule les segments à partir de définitions avec un ÉCART relatif
-  // (offsetSecKm) pour tous les segments SAUF le dernier — le dernier
-  // segment est calibré mathématiquement pour compenser exactement l'écart
-  // accumulé, garantissant que la somme des temps de tous les segments
-  // corresponde TOUJOURS exactement à raceGoalTime, quelle que soit la
-  // stratégie choisie pour les segments intermédiaires.
-  //
-  // Bug corrigé le 11 juillet 2026 : l'ancienne version fixait un allure
-  // PLUS LENTE que l'objectif sur le premier segment (marge de sécurité au
-  // départ), mais le second segment restait exactement à l'allure cible
-  // moyenne, sans jamais compenser la perte de temps du premier — le temps
-  // total dépassait systématiquement l'objectif (33s de trop mesurées sur
-  // un 10K à 48:30, repéré par Laurent). Cette nouvelle fonction élimine
-  // structurellement ce risque : le dernier segment absorbe toujours
-  // exactement l'écart nécessaire.
-  function calculerSplitsCalibres(distanceKm, tempsObjectifSec, definitionsSegmentsIntermediaires, dernierNote) {
-    const paceMoyen = tempsObjectifSec / distanceKm;
-    let tempsUtilise = 0, distUtilisee = 0;
-    const segments = definitionsSegmentsIntermediaires.map(d => {
-      const pace = paceMoyen + d.offsetSecKm;
-      const dist = d.to - d.from;
-      tempsUtilise += dist * pace;
-      distUtilisee += dist;
-      return { from: d.from, to: d.to, note: d.note, pace };
-    });
-    const distRestante = distanceKm - distUtilisee;
-    const tempsRestant = tempsObjectifSec - tempsUtilise;
-    segments.push({ from: distUtilisee, to: distanceKm, note: dernierNote, pace: tempsRestant / distRestante });
-    return segments;
-  }
-
-  let splits;
-  if (distanceKmCourse <= 5.5) {
-    // 5K : quasi-plat, 4 segments avec progression continue
-    const d = Math.round(distanceKmCourse);
-    splits = calculerSplitsCalibres(distanceKmCourse, raceGoalTime, [
-      { from:0, to:Math.min(1,d*0.2), note:"Départ prudent", offsetSecKm: 6 },
-      { from:Math.min(1,d*0.2), to:d*0.45, note:"Allure cible", offsetSecKm: 1 },
-      { from:d*0.45, to:d*0.8, note:"Accélération progressive", offsetSecKm: -2 },
-    ], "Tout donner");
-  } else if (distanceKmCourse <= 12) {
-    // 10K : 4 segments — départ prudent, montée en régime, allure cible
-    // soutenue, effort final (au lieu des 2 segments bruts de l'ancienne
-    // version, qui ne compensaient jamais le départ prudent)
-    const d = distanceKmCourse;
-    splits = calculerSplitsCalibres(d, raceGoalTime, [
-      { from:0, to:d*0.2, note:"Départ prudent", offsetSecKm: 8 },
-      { from:d*0.2, to:d*0.5, note:"Montée en régime", offsetSecKm: 2 },
-      { from:d*0.5, to:d*0.8, note:"Allure cible soutenue", offsetSecKm: -2 },
-    ], "Dernier effort, tout donner");
-  } else {
-    // Semi / Marathon : marge de sécurité au départ, allure stable au
-    // milieu, ajustement final au ressenti — 3 segments, pas de paliers
-    // aussi marqués que sur un 10K (distance plus longue, gestion d'effort
-    // différente)
-    const d = distanceKmCourse;
-    const kmDepart = d * 0.15;
-    splits = calculerSplitsCalibres(d, raceGoalTime, [
-      { from:0, to:kmDepart, note:"Marge de sécurité, ne pars pas trop vite", offsetSecKm: 5 },
-      { from:kmDepart, to:d*0.85, note:"Allure cible, régularité", offsetSecKm: -0.5 },
-    ], "Ajuste au ressenti en fin de course");
-  }
+  const splits = calculerStrategieCourse(distanceKmCourse, raceGoalTime);
 
   // Calculer les temps de passage cumulés
   const passageTimes = [];
