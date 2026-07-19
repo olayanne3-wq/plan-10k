@@ -177,7 +177,11 @@ input[type=text], input[type=number], input[type=password] {
      dynamique de v2/engine/plan-forme.js, chargé juste après
      plan-generator.js dont il dépend (import ES direct : formatPace,
      riegelPredict, computeFcMaxTanaka, etc.). -->
-<script src="/engine-classic-scripts/v1-bridge.classic.js"></script>
+<!-- v1-bridge.classic.js retiré le 19/07/2026 — étape 2 du chantier de
+     conversion module (cf. mémoire de session). Remplacé par un import()
+     dynamique de v2/engine/v1-bridge.js, chargé juste après plan-forme.js
+     (aucune dépendance entre eux, mais regroupé au même endroit pour
+     cohérence). Module autonome, aucun autre import nécessaire. -->
 <!-- gist-sync.classic.js retiré le 19/07/2026 — étape 2 du chantier de
      conversion module (cf. mémoire de session). Remplacé par un import()
      dynamique de v2/engine/gist-sync.js, chargé une seule fois au tout
@@ -243,6 +247,12 @@ input[type=text], input[type=number], input[type=password] {
     // être chargé APRÈS plan-generator.js ci-dessus, jamais avant.
     window._planFormeModule = await import("/v2/engine/plan-forme.js");
     Object.assign(window, window._planFormeModule);
+    // v1-bridge.js — module autonome, aucune dépendance vers un autre
+    // module. construireAllSessions() n'est jamais appelée (index.html a
+    // sa propre fonction locale recalculerAllSessions() qui fait la même
+    // chose, dupliquée en dur — dette technique mineure, non traitée ici).
+    window._v1BridgeModule = await import("/v2/engine/v1-bridge.js");
+    Object.assign(window, window._v1BridgeModule);
 
     const idPlanChoisi = localStorage.getItem('v2_preview_plan_id');
     let planBrut = null;
