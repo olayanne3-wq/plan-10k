@@ -372,7 +372,7 @@ Repère pour reprendre le travail sans avoir à fouiller l'historique git.
 
 Ces choix ont déjà été débattus et tranchés avec de bonnes raisons — les reprendre à zéro sans ce contexte risquerait de refaire le même chemin :
 
-- **Scripts classiques, pas modules ES, dans `index-v2-preview.html`** : presque tout le script existant lit `PLAN` dès le chargement (pas seulement sur clic), contrairement à v2/index.html. Un chargement en modules ES (asynchrone) aurait un risque de timing bien plus large — potentiellement tout le dashboard cassé, pas juste une fonctionnalité isolée. D'où la duplication assumée en `engine-classic-scripts/`.
+- **~~Scripts classiques, pas modules ES, dans `index-v2-preview.html`~~ — RÉVISÉ le 19 juillet 2026, cf. section 12** : cette décision a été inversée. `index.html` et `v2/index.html` utilisent maintenant tous les deux `<script type="module">`, via `import()` dynamique au point d'usage plutôt qu'un `<script type="module">` statique en tête (qui aurait cassé le timing). Le risque de timing qui avait motivé la décision initiale a été résolu par cette approche — voir section 12 pour le détail complet.
 - **Fidélité du plan v2 aux "grandes masses", pas jour par jour** : le moteur reste générique, ne doit pas recoder les spécificités du plan personnel de Laurent. Conséquence acceptée : la prédiction de performance ne doit plus dépendre d'une correspondance stricte de date avec le plan (cf. section 6).
 - **Détection du type d'effort par allure réelle, pas par correspondance au plan** : à la fois pour la prédiction (section 6) et implicitement pour tout futur usage similaire — un plan affiché n'est jamais une garantie de ce qui a été réellement couru ce jour-là.
 - **Garde-fou par comparaison à `BASE_TIME`, pas à la médiane des autres sources** : avec seulement 2 sources, la médiane ne peut jamais détecter d'aberration (elle vaut leur moyenne, chaque valeur en est mécaniquement à égale distance).
@@ -410,3 +410,53 @@ Tous doivent passer sans "ÉCHEC" dans la sortie. Si un test échoue après une 
 - Nettoyage des logs de debug dans `weather.js` (jamais retirés malgré un commentaire de commit le prévoyant)
 - **Découverte non résolue** : la preview avait en fait son propre mécanisme météo historique (coordonnées Toulon codées en dur, appel Open-Meteo séparé), distinct de `weather.js`/`verifierMeteoPourSeance` (celui documenté en section 2.2, qui ne vit que dans le wizard v2). Les deux systèmes coexistent sans lien entre eux dans `index.html` maintenant — à réconcilier dans une prochaine session
 - Recherche exhaustive de valeurs codées en dur : plus de 40 résidus trouvés et corrigés le 7 juillet 2026 sur plusieurs passes successives (section 7bis) — aucune garantie qu'il n'en reste aucun, chaque nouveau test en révèle parfois de nouveaux
+
+## 12. Conversion en modules ES — architecture duale éliminée (19 juillet 2026)
+
+**Contexte** : depuis la mise en place du moteur v2, chaque fichier de `public/v2/engine/*.js` (modules ES, avec `export`) devait être dupliqué manuellement en `public/engine-classic-scripts/*.classic.js` (mêmes fichiers, `export` retirés via `sed`) pour être utilisable dans `index.html` et `v2/index.html`, tous deux chargés en scripts classiques pour des raisons de timing (cf. section 9, décision maintenant révisée).
+
+Cette duplication devait être régénérée manuellement à chaque modification du moteur — un risque d'oubli réel, rencontré plusieurs fois en pratique (un correctif poussé sur le module source, oublié sur son miroir `.classic.js`).
+
+**Ce qui a changé** : les deux fichiers (`index.html`, `v2/index.html`) chargent maintenant directement les modules sources via `import()` **dynamique**, au point d'usage exact, plutôt qu'un `<script type="module">` statique en tête de fichier.
+
+### Pourquoi `import()` dynamique et pas `<script type="module">` statique
+
+Un `<script type="module">` classique (avec `src` ou inline) s'exécute **toujours en différé**, après le parsing complet du DOM — comportement fixe du navigateur, pas configurable. Dans `index.html`, une bonne partie du code compte sur un ordre d'exécution strictement séquentiel et immédiat (un script pose une variable globale, le suivant la lit tout de suite). Un module statique aurait cassé cet ordre : le code qui suit s'exécuterait avant que le module ait fini de charger.
+
+`import()` (appelé comme une fonction, avec parenthèses) est différent : il est asynchrone mais peut être appelé **n'importe où** dans un script classique, avec `await`, exactement au moment où on a besoin du module — pas de changement d'ordre d'exécution pour le reste du fichier.
+
+```javascript
+// Au lieu d'un <script type="module" src="..."> statique en tête :
+const module = await import("/v2/engine/nom-module.js");
+Object.assign(window, module); // republie les exports en global,
+                                 // pour rester compatible avec le code
+                                 // existant qui les appelle sans préfixe
+```
+
+Exception : `auth.js`/`sync-storage.js` exposent leurs fonctions comme un **objet nommé** (`window.LkAuth = {...}`, `window.LkSync = {...}`) plutôt qu'`Object.assign(window, ...)` brut — pour ne pas casser tous les appels existants du type `LkAuth.monterEcranAuth(...)`.
+
+### État par fichier
+
+| Ancien fichier `.classic.js` | Statut | Remplacé par |
+|---|---|---|
+| `weather.classic.js` | Supprimé | `import()` dynamique de `weather.js`, dans `verifierMeteoSeanceDemain()` |
+| `gist-sync.classic.js` | Supprimé | `import()` dynamique de `gist-sync.js`, tôt dans `window.__PLAN_PRET__` |
+| `plan-generator.classic.js` | Supprimé | `import()` dynamique de `plan-generator.js`, même bloc que gist-sync |
+| `plan-forme.classic.js` | Supprimé | `import()` dynamique de `plan-forme.js`, juste après plan-generator (dépendance directe : `formatPace`, `riegelPredict`, `computeFcMaxTanaka`, etc., importés en interne par plan-forme.js) |
+| `v1-bridge.classic.js` | Supprimé | `import()` dynamique de `v1-bridge.js`, module autonome |
+| `auth.classic.js` | Supprimé | `import()` dynamique de `auth.js`, reconstruit sous `window.LkAuth` |
+| `sync-storage.classic.js` | Supprimé | `import()` dynamique de `sync-storage.js`, reconstruit sous `window.LkSync` |
+| `decision-engine-*.classic.js` (8 fichiers) | **Conservés, inchangés** | N'ont jamais eu de version module ES source dans `v2/engine/` — pas une duplication, des fichiers uniques. S'exposent via des namespaces globaux (`window.DecisionEngineAdapter`, `.RunnerState`, `.Engagement`, `.SessionAnalysis`, `.WeekAnalysis`, `.TrendAnalysis`, `.Rules`, `.Apply`), restent des scripts classiques. |
+| `changelog.classic.js` | **Conservé, inchangé** | Fichier de données pur (tableau `VERSIONS`), jamais eu de source module ES non plus. |
+
+Le bloc principal de `index.html` lui-même (~7300 lignes, définit `render()`, `PLAN`, `ALL_SESSIONS`, tous les gestionnaires de clic) a aussi été converti en `<script type="module">` — analyse préalable : seulement 9 assignations `window.x = ...` explicites dans tout le bloc (le reste comptait sur la globalité implicite d'un script classique, devenue privée au module sans que rien à l'extérieur n'en dépende), zéro `onclick="..."` inline HTML (uniquement des gestionnaires JS, compatibles modules), zéro `document.write`.
+
+`v2/index.html` avait déjà, avant cette session, un `<script type="module">` statique existant important les modules du moteur (`plan-generator`, `plan-forme`, `strava`, `gist-sync`, `pdf-export`, `weather`) sous `window.Engine`, synchronisé avec le reste du fichier via un événement `engineReady` — seuls `auth.classic.js`/`sync-storage.classic.js` restaient donc à migrer là, avec la même méthode `import()` dynamique que dans `index.html`.
+
+### Ce qui reste dans `engine-classic-scripts/`
+
+Uniquement `changelog.classic.js` et les 8 `decision-engine-*.classic.js` — tous des fichiers **uniques**, sans version module ES équivalente, donc légitimement présents (pas de la dette technique).
+
+### Point de vigilance pour toute future modification du moteur
+
+Un changement dans `public/v2/engine/*.js` n'a plus besoin d'être répercuté nulle part ailleurs — c'est justement le but de ce chantier. Seule exception : les 8 fichiers `decision-engine-*.classic.js`, qui restent des fichiers autonomes sans équivalent module ES ; toute modification s'y fait directement, sans duplication à craindre.
