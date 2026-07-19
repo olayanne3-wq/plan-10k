@@ -4401,21 +4401,14 @@ function renderWeekDetail(weekNum) {
       ):null
     );
 
-    if (effSess.type==="RACE") {
-      // Réutilise calculerStrategieCourse() — même stratégie/segments/
-      // allures que l'onglet Course (splitsCard dans renderCourse()), pour
-      // éviter la divergence entre les deux vues (bug corrigé 19/07/2026).
-      const raceDistKm = DISTANCE_M_REFERENCE / 1000;
-      const splitsSemaine = calculerStrategieCourse(raceDistKm, raceGoalTime);
-      const resumeSegments = splitsSemaine.map(s => {
-        const paceStr = Math.floor(s.pace/60)+":"+(Math.round(s.pace%60)).toString().padStart(2,"0")+"/km";
-        return "Km "+s.from+"-"+s.to+" : "+s.note+" ("+paceStr+")";
-      }).join(" · ");
-      card.appendChild(el("div",{style:{background:"rgba(var(--accent-rgb),0.13)",border:"1px solid rgba(var(--accent-rgb),0.27)",borderRadius:"8px",padding:"10px 12px",marginTop:"4px"}},
-        el("div",{style:{color:"var(--accent)",fontWeight:"700",fontSize:"15px"}},"🏁 Jour J — Objectif "+fmtTime(raceGoalTime)),
-        el("div",{class:"text2",style:{fontSize:"14px",marginTop:"4px"}},resumeSegments)
-      ));
-    } else if (effSess.type!=="REPOS") {
+    // effSess.type==="RACE" : aucun bloc dédié ici — effSess.session
+    // (déjà affiché plus haut dans la carte, titre principal de la
+    // séance) contient déjà le texte complet généré par
+    // genererContenuRace() (segments/allures), cohérent avec l'onglet
+    // Course depuis le fix du 19/07/2026. Un bloc "Jour J" avait été
+    // ajouté ici puis retiré le même jour : il dupliquait mot pour mot
+    // ce texte déjà visible, sans valeur ajoutée (signalé par Laurent).
+    if (effSess.type!=="RACE" && effSess.type!=="REPOS") {
       // Raison du statut ❌ ou ⚠️
       const reason = stravaRun ? validateReason({...s, uid}, stravaRun) : null;
       if (reason) {
