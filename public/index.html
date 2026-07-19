@@ -166,7 +166,12 @@ input[type=text], input[type=number], input[type=password] {
 <script src="/engine-classic-scripts/plan-generator.classic.js"></script>
 <script src="/engine-classic-scripts/plan-forme.classic.js"></script>
 <script src="/engine-classic-scripts/v1-bridge.classic.js"></script>
-<script src="/engine-classic-scripts/gist-sync.classic.js"></script>
+<!-- gist-sync.classic.js retiré le 19/07/2026 — étape 2 du chantier de
+     conversion module (cf. mémoire de session). Remplacé par un import()
+     dynamique de v2/engine/gist-sync.js, chargé une seule fois au tout
+     début de window.__PLAN_PRET__ et exposé en global via
+     Object.assign(window, ...) pour rester compatible avec les points
+     d'appel existants (chargerPlans/sauvegarderPlan/getGithubToken/etc.). -->
 <!-- weather.classic.js retiré le 19/07/2026 — étape 1 du chantier de
      conversion module (cf. mémoire de session). Remplacé par un
      import() dynamique de v2/engine/weather.js, au point d'appel exact
@@ -201,6 +206,19 @@ input[type=text], input[type=number], input[type=password] {
     // à Supabase avant de tenter le Gist, légèrement plus lent qu'avant,
     // mais correct plutôt que rapide-et-faux.
     await window.__AUTH_PRET__;
+
+    // Cache du module gist-sync.js (19/07/2026, étape 2 du chantier de
+    // conversion module — cf. mémoire de session). Même pattern que
+    // _fitParserModule plus bas dans ce fichier : import() dynamique,
+    // chargé une seule fois puis réutilisé, plutôt qu'un <script src>
+    // statique (gist-sync.classic.js retiré). Les fonctions du module
+    // sont exposées en global via Object.assign(window, ...) pour rester
+    // compatibles avec tout le code existant qui les appelle directement
+    // (chargerPlans(), sauvegarderPlan(), getGithubToken(), etc. sans
+    // préfixe, à plusieurs endroits de ce fichier) — pas de réécriture de
+    // chaque point d'appel, seul le tout premier chargement change.
+    window._gistSyncModule = await import("/v2/engine/gist-sync.js");
+    Object.assign(window, window._gistSyncModule);
 
     const idPlanChoisi = localStorage.getItem('v2_preview_plan_id');
     let planBrut = null;
@@ -781,12 +799,22 @@ let githubToken = load("lk_github_token", "");
 // Récupérer token + gistV2 (unifié le 11 juillet 2026 — Laurent a demandé
 // qu'un seul lien synchronise tout, plutôt que deux mécanismes séparés
 // dans deux fichiers différents) depuis l'URL si présent
-(function() {
+(async function() {
   const params = new URLSearchParams(window.location.search);
   const urlToken = params.get("token");
   const urlGistV2 = params.get("gistV2");
   if (urlToken) { githubToken = urlToken; save("lk_github_token", githubToken); }
-  if (urlGistV2 && typeof setV2GistId === "function") { setV2GistId(urlGistV2); }
+  if (urlGistV2) {
+    // Garde-fou du 19/07/2026 (étape 2 chantier modules) : setV2GistId
+    // vient du module gist-sync.js, chargé de façon asynchrone par
+    // window.__PLAN_PRET__ plus haut dans ce même script — pas garanti
+    // résolu à ce stade (ce IIFE, lui, tourne de façon synchrone dans le
+    // flux normal du script). On attend explicitement avant d'appeler la
+    // fonction, plutôt que de vérifier typeof (qui échouerait presque
+    // toujours ici avant que le module ait fini de se charger).
+    await window.__PLAN_PRET__;
+    if (typeof setV2GistId === "function") setV2GistId(urlGistV2);
+  }
   if (urlToken || urlGistV2 || params.get("gist")) { window.history.replaceState({}, "", window.location.pathname); }
 })();
 let predHistory = load(clePourPlan("lk_pred_history"), []); // [{date, time, confidence}]
