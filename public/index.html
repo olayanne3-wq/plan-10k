@@ -395,7 +395,7 @@ input[type=text], input[type=number], input[type=password] {
   })();
 </script>
 
-<script>
+<script type="module">
 (async () => {
 await window.__PLAN_PRET__; // attend que le premier script ait chargé/généré le plan
 await window.__AUTH_PRET__; // attend la session ET le premier préchargement (sans planId)
