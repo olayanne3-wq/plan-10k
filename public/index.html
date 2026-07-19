@@ -839,6 +839,7 @@ function migrerVersProfilCoureur() {
   const profil = {
     prenom: "", nom: "",
     anneeNaissance: null,
+    dateNaissance: null, // "YYYY-MM-DD" — ajouté le 19/07/2026, remplace anneeNaissance à terme (cf. calculerCategorieAgeFFA). anneeNaissance reste dérivée automatiquement de dateNaissance dès que celle-ci est renseignée, pour ne rien casser côté plan-generator.js/wizard (formule de Tanaka, computeFcMaxTanaka) qui ne consomment que l'année.
     niveau: null, // 'debutant'|'intermediaire'|'confirme' — v2.8, retire du wizard (§17.7)
     poids: ancienPoids, taille: ancienneTaille, fcMax: ancienneFcMax ?? 181,
     pps: ancienPps,
@@ -1030,6 +1031,55 @@ if (sessionStorage.getItem("lk_strava_sync_apres_reload")) {
 // UTILS
 // ══════════════════════════════════════════════════════════════════════════════
 function today() { return new Date().toISOString().slice(0,10); }
+
+// ── Catégorie d'âge FFA (ajouté le 19/07/2026, cf. mémoire dateNaissance) ──
+// Règles officielles (athle.fr, "les catégories d'âge en 2026") : la
+// catégorie dépend de l'ANNÉE de naissance (pas du jour exact), et la
+// saison FFA bascule chaque 1er septembre — les catégories valables du
+// 01/09/N au 31/08/(N+1) sont calculées sur l'année de fin de saison
+// (ex. saison 2025-2026, valable jusqu'au 31/08/2026, catégorie calculée
+// avec 2026 comme année de référence). Grille figée au 19/07/2026,
+// valable jusqu'au 31/08/2026 (à réviser chaque rentrée de septembre) :
+// Masters (MA) 1991 et avant, Seniors (SE) 1992-2003, Espoirs (ES)
+// 2004-2006, Juniors (JU) 2007-2008, Cadets (CA) 2009-2010, Minimes (MI)
+// 2011-2012, Benjamins (BE) 2013-2014, Poussins (PO) 2015-2016, Éveil
+// Athlétique (EA) 2017-2019, Baby Athlé (BB) 2020 et après. Masters
+// subdivisés en tranches de 5 ans (M0 = 1987-1991, M1 = 1982-1986, etc.).
+function calculerAnneeReferenceSaisonFFA(dateReference) {
+  const d = dateReference ? new Date(dateReference+"T00:00:00") : new Date();
+  // Bascule le 1er septembre : avant cette date, on est encore dans la
+  // saison de l'année en cours (référence = année en cours) ; à partir du
+  // 1er septembre, on bascule sur la saison suivante (référence = année
+  // en cours + 1).
+  return d.getMonth() >= 8 ? d.getFullYear() + 1 : d.getFullYear();
+}
+
+function calculerCategorieAgeFFA(anneeNaissance, dateReference) {
+  if (!anneeNaissance) return null;
+  const anneeRef = calculerAnneeReferenceSaisonFFA(dateReference);
+  const age = anneeRef - anneeNaissance;
+  if (age >= 35) {
+    const indexMaster = Math.min(10, Math.floor((age - 35) / 5));
+    return { code: "M"+indexMaster, label: "Master "+indexMaster };
+  }
+  if (age >= 23) return { code: "SE", label: "Senior" };
+  if (age >= 20) return { code: "ES", label: "Espoir" };
+  if (age >= 18) return { code: "JU", label: "Junior" };
+  if (age >= 16) return { code: "CA", label: "Cadet" };
+  if (age >= 14) return { code: "MI", label: "Minime" };
+  if (age >= 12) return { code: "BE", label: "Benjamin" };
+  if (age >= 10) return { code: "PO", label: "Poussin" };
+  return { code: "EA", label: "Éveil athlétique" };
+}
+
+// Vrai anniversaire du jour (mois+jour identiques à dateNaissance), pour
+// afficher un message dédié — indépendant de calculerCategorieAgeFFA qui
+// ne regarde que l'année.
+function estAnniversaireAujourdhui(dateNaissance) {
+  if (!dateNaissance) return false;
+  const t = today();
+  return dateNaissance.slice(5) === t.slice(5); // compare "MM-DD"
+}
 
 // Filtre stravaActivities pour ne garder que les activités depuis le début
 // du plan actuellement affiché — fonction utilitaire centralisée, créée le
@@ -6231,8 +6281,11 @@ function renderSettings() {
   );
 
   // ── Profil coureur + Objectif + PPS ─────────────────────────────────────
+  const categorieFFA = calculerCategorieAgeFFA(profilCoureur.anneeNaissance, today());
+  const estAnniv = estAnniversaireAujourdhui(profilCoureur.dateNaissance);
   const profileSection = el("div",{style:{marginBottom:"16px"}},
     el("div",{class:"label"},"👤 Profil & objectif"),
+    estAnniv ? el("div",{style:{background:"rgba(var(--accent-rgb),0.13)",border:"1px solid rgba(var(--accent-rgb),0.27)",borderRadius:"10px",padding:"10px 14px",marginBottom:"8px",fontSize:"14px",color:"var(--accent)",fontWeight:"700"}},"🎂 Joyeux anniversaire !") : null,
     (()=>{
       const wrap = document.createElement("div");
       wrap.style.cssText = "background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;";
@@ -6241,7 +6294,7 @@ function renderSettings() {
       const rows = [
         {label:"Prénom", id:"inp-prenom", type:"text", unit:"", val:profilCoureur.prenom||""},
         {label:"Nom", id:"inp-nom", type:"text", unit:"", val:profilCoureur.nom||""},
-        {label:"Année de naissance", id:"inp-annee-naissance", type:"number", unit:"", val:profilCoureur.anneeNaissance||""},
+        {label:"Date de naissance", id:"inp-date-naissance", type:"date", unit:"", val:profilCoureur.dateNaissance||"", width:"140px"},
         {label:"separator"},
         {label:"Poids", id:"inp-poids", type:"number", unit:"kg", val:runnerWeight||""},
         {label:"Taille", id:"inp-taille", type:"number", unit:"cm", val:runnerHeight||""},
@@ -6283,6 +6336,12 @@ function renderSettings() {
         tbl.appendChild(tr);
       });
       wrap.appendChild(tbl);
+      if (categorieFFA) {
+        const catRow = document.createElement("div");
+        catRow.style.cssText = "margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:13px;color:var(--text-muted);";
+        catRow.textContent = "Catégorie FFA saison en cours : "+categorieFFA.label+" ("+categorieFFA.code+")";
+        wrap.appendChild(catRow);
+      }
       return wrap;
     })(),
   );
@@ -6666,7 +6725,14 @@ function renderSettings() {
     // Lire toutes les valeurs des inputs
     const prenom = document.getElementById("inp-prenom"); if(prenom) { profilCoureur.prenom=prenom.value.trim(); }
     const nom = document.getElementById("inp-nom"); if(nom) { profilCoureur.nom=nom.value.trim(); }
-    const anneeNaissance = document.getElementById("inp-annee-naissance"); if(anneeNaissance) { profilCoureur.anneeNaissance=parseInt(anneeNaissance.value)||null; }
+    const dateNaissance = document.getElementById("inp-date-naissance"); if(dateNaissance) {
+      profilCoureur.dateNaissance = dateNaissance.value || null;
+      // anneeNaissance reste dérivée automatiquement de dateNaissance —
+      // ne consomme jamais dateNaissance directement, seul plan-generator.js/
+      // le wizard (computeFcMaxTanaka) et calculerCategorieAgeFFA lisent
+      // encore anneeNaissance (l'année seule leur suffit).
+      profilCoureur.anneeNaissance = profilCoureur.dateNaissance ? parseInt(profilCoureur.dateNaissance.slice(0,4)) : null;
+    }
     profilCoureur.records = profilCoureur.records || {};
     ["5K","10K","Semi","Marathon"].forEach(dist => {
       const hInp = document.getElementById("rec-temps-"+dist+"-h");
