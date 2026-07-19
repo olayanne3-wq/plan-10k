@@ -295,9 +295,30 @@ export async function precharger(userId, planId) {
 
     if (integrationsRes.data) {
       const i = integrationsRes.data;
-      if (i.strava_token) localStorage.setItem('lk_strava_token', JSON.stringify(i.strava_token));
-      if (i.strava_refresh) localStorage.setItem('lk_strava_refresh', JSON.stringify(i.strava_refresh));
-      if (i.strava_expires) localStorage.setItem('lk_strava_expires', JSON.stringify(new Date(i.strava_expires).getTime()));
+      // Garde-fou ajouté le 19/07/2026 (déconnexions Strava fréquentes
+      // signalées par Laurent). Cause identifiée : Strava utilise un
+      // "rotating refresh token" — chaque appel /oauth/token (via
+      // ensureFreshToken()) renvoie un NOUVEAU refresh_token et invalide
+      // l'ancien immédiatement côté Strava. Ce préchargement, exécuté à
+      // chaque connexion/rechargement, écrasait localStorage avec la
+      // valeur Supabase sans jamais vérifier si le token local était plus
+      // récent — un onglet/appareil A qui vient de rafraîchir son token
+      // pouvait voir son propre nouveau refresh_token écrasé par l'ancien
+      // (pas encore propagé vers Supabase, sync fire-and-forget dans
+      // save()), le rendant inutilisable au prochain refresh (Strava le
+      // rejette : déjà invalidé). Fix : ne remplacer le token Strava
+      // local QUE s'il est absent (vraie première connexion sur cet
+      // appareil) — un token local déjà présent, même expiré, doit
+      // d'abord être essayé par ensureFreshToken() avant d'être
+      // remplacé ; s'il échoue, la reconnexion manuelle (déjà en place,
+      // cf. stravaAuthInvalide dans index.html) prend le relais. Miroir
+      // exact de sync-storage.classic.js (architecture duale).
+      const aDejaUnTokenLocal = !!localStorage.getItem('lk_strava_token');
+      if (!aDejaUnTokenLocal) {
+        if (i.strava_token) localStorage.setItem('lk_strava_token', JSON.stringify(i.strava_token));
+        if (i.strava_refresh) localStorage.setItem('lk_strava_refresh', JSON.stringify(i.strava_refresh));
+        if (i.strava_expires) localStorage.setItem('lk_strava_expires', JSON.stringify(new Date(i.strava_expires).getTime()));
+      }
       if (i.strava_activities_cache) localStorage.setItem('lk_strava_activities', JSON.stringify(i.strava_activities_cache));
       if (i.github_token) localStorage.setItem('lk_github_token', JSON.stringify(i.github_token));
       // lk_gist_id retiré le 16 juillet 2026 (résidu mort de l'ancien
