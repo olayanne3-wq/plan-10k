@@ -21,7 +21,13 @@
  */
 
 const VERSIONS = [
-      { ver:"v2.12", title:"Historique de plan figé, Modules 3 & 4 du moteur, RPE unifié", current:true, notes:[
+      { ver:"v2.13", title:"Stratégie de course cohérente, catégorie d'âge FFA & explications du ressenti", current:true, notes:[
+        "🏁 La stratégie de jour de course (segments et allures) est désormais identique partout dans l'app — vue Semaine, onglet Course et conseil du coach racontaient parfois des histoires différentes pour la même course, corrigé",
+        "🎂 Nouveau champ date de naissance complète (à la place de l'année seule) dans Réglages — affiche ta catégorie d'âge officielle FFA de la saison en cours, et te souhaite ton anniversaire le jour J",
+        "😓 Le ressenti (RPE) affiche maintenant clairement son niveau au moment où tu le sélectionnes (ex. \"Difficile\"), avec la référence scientifique associée — plus lisible sur mobile, où l'ancienne info-bulle ne s'affichait jamais",
+        "❓ Nouvelle entrée dans l'aide expliquant à quoi sert le ressenti et comment lire l'échelle",
+      ]},
+      { ver:"v2.12", title:"Historique de plan figé, Modules 3 & 4 du moteur, RPE unifié", current:false, notes:[
         "🗂️ Chaque plan créé garde désormais une copie figée de sa version d'origine, séparée de la version que le moteur ajuste au fil du temps — utile pour comparer où on en est par rapport au plan initial",
         "🧠 Deux nouveaux modules du moteur de décision : bilan hebdomadaire complet (volume, séances réussies/manquées, charge, récupération estimée) et détection de tendances sur plusieurs semaines — tous deux consultables dans un bloc de test en bas de Stats",
         "😓 Le ressenti (RPE) se note maintenant directement sur chaque séance validée, pas seulement en cas de correction manuelle — 5 niveaux simples (🙂 à 🥵) qui alimentent vraiment le calcul de fatigue et de charge, ce qui n'était pas le cas avant malgré la saisie existante",
