@@ -289,6 +289,23 @@ export async function precharger(userId, planId) {
         : Promise.resolve({ data: null, error: null }),
     ]);
 
+    let echecChargementProfil = false;
+    if (profilRes.error) {
+      // Bug trouvé le 20/07/2026 : cette erreur était auparavant ignorée
+      // silencieusement — si la requête échoue (réseau, RLS, timeout),
+      // localStorage n'est jamais réhydraté avec le vrai profil Supabase.
+      // Le code appelant (index.html, écran onboarding) traitait alors une
+      // absence de profil local comme "jamais renseigné" et redéclenchait
+      // l'onboarding, qui écrasait ensuite le vrai profil en base avec un
+      // profil minimal (niveau perdu notamment). Pas de throw ici : aucun
+      // appelant de precharger() n'a de try/catch, un throw ferait
+      // échouer tout le login sur une simple erreur réseau transitoire —
+      // pire que le bug d'origine. On logge et on renvoie un flag
+      // explicite à la place, que l'appelant peut vérifier avant de
+      // décider d'afficher l'onboarding.
+      console.warn('Préchargement du profil coureur échoué, onboarding non déclenché par précaution :', profilRes.error.message);
+      echecChargementProfil = true;
+    }
     if (profilRes.data?.data) {
       localStorage.setItem('lk_profil_coureur', JSON.stringify(profilRes.data.data));
     }
@@ -359,13 +376,17 @@ export async function precharger(userId, planId) {
       }
     }
 
-    return true;
+    return { ok: true, echecChargementProfil };
   } catch (err) {
     // Échec réseau ou autre : on laisse localStorage tel quel (données
     // d'une session précédente, ou vide au tout premier login) plutôt
-    // que de bloquer l'affichage de l'app.
+    // que de bloquer l'affichage de l'app. echecChargementProfil:true
+    // ici aussi (20/07/2026) : un échec global doit être traité par
+    // l'appelant avec la même prudence qu'un échec ciblé sur le profil —
+    // ne pas conclure "profil absent" juste parce que ce préchargement
+    // a échoué en bloc.
     console.warn('Préchargement Supabase échoué, poursuite avec localStorage local :', err.message);
-    return false;
+    return { ok: false, echecChargementProfil: true };
   }
 }
 
