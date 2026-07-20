@@ -21,7 +21,11 @@
  */
 
 const VERSIONS = [
-      { ver:"v2.13", title:"Stratégie de course cohérente, catégorie d'âge FFA & explications du ressenti", current:true, notes:[
+      { ver:"v2.14", title:"Connexion Strava plus stable, écran de bienvenue corrigé", current:true, notes:[
+        "🔗 Correctif d'une cause probable de déconnexions Strava répétées — à confirmer dans les prochains jours",
+        "🎬 L'écran de bienvenue (à la création d'un compte) s'affichait parfois en partant du milieu du formulaire plutôt que du début — corrigé",
+      ]},
+      { ver:"v2.13", title:"Stratégie de course cohérente, catégorie d'âge FFA & explications du ressenti", current:false, notes:[
         "🏁 La stratégie de jour de course (segments et allures) est désormais identique partout dans l'app — vue Semaine, onglet Course et conseil du coach racontaient parfois des histoires différentes pour la même course, corrigé",
         "🎂 Nouveau champ date de naissance complète (à la place de l'année seule) dans Réglages — affiche ta catégorie d'âge officielle FFA de la saison en cours, et te souhaite ton anniversaire le jour J",
         "😓 Le ressenti (RPE) affiche maintenant clairement son niveau au moment où tu le sélectionnes (ex. \"Difficile\"), avec la référence scientifique associée — plus lisible sur mobile, où l'ancienne info-bulle ne s'affichait jamais",
