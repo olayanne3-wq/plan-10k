@@ -43,11 +43,27 @@
   // --------------------------------------------------------------------------
   const SEUIL_RPE_AMPLIFICATION = 8;
   const FACTEUR_AMPLIFICATION_RPE_ELEVE = 1.12;
+  // Repli sur une FC repos moyenne (bpm) si l'utilisateur ne l'a pas
+  // renseignée dans son profil — ajouté le 20/07/2026, suite à un bug
+  // découvert en conditions réelles (Laurent, doc convergence-v1-v2.md
+  // désormais supprimé mais cf. mémoire de session) : sans ce repli, la
+  // condition d'entrée du calcul TRIMP échouait silencieusement dès que
+  // fcReposReference était absent, faisant basculer TOUTE séance avec RPE
+  // vers la méthode sRPE (duréeMin × RPE) — une échelle de charge bien
+  // plus élevée que le TRIMP normal, produisant un ratio ACWR aberrant
+  // (observé : 1.88 au lieu de ~0.8) sans aucune erreur ni avertissement.
+  // 60 bpm est une valeur moyenne raisonnable pour un coureur amateur/
+  // intermédiaire (repos réel généralement entre 50 et 70 bpm) — l'écart
+  // avec la vraie FC repos de l'utilisateur reste dans une plage qui ne
+  // fait pas diverger le calcul de façon spectaculaire, contrairement au
+  // changement complet de méthode que ce repli remplace.
+  const FC_REPOS_DEFAUT = 60;
 
   function calculerChargeSeance(sample, fcMaxReference, fcReposReference, sexe) {
-    if (sample.fcMoyenne !== undefined && fcMaxReference && fcReposReference
-        && fcMaxReference > fcReposReference) {
-      const fcReserve = (sample.fcMoyenne - fcReposReference) / (fcMaxReference - fcReposReference);
+    const fcReposEffective = fcReposReference || FC_REPOS_DEFAUT;
+    if (sample.fcMoyenne !== undefined && fcMaxReference
+        && fcMaxReference > fcReposEffective) {
+      const fcReserve = (sample.fcMoyenne - fcReposEffective) / (fcMaxReference - fcReposEffective);
       const fcReserveBornee = Math.max(0, Math.min(1, fcReserve)); // sécurité : jamais hors [0,1]
       const [a, b] = sexe === 'femme' ? [0.86, 1.67] : [0.64, 1.92];
       // sexe === 'autre' ou non renseigné : moyenne des deux jeux de constantes (cf. §5.1 doc archi)
@@ -64,7 +80,10 @@
       if (sample.ressentiRPE !== undefined && sample.ressentiRPE !== null && sample.ressentiRPE >= SEUIL_RPE_AMPLIFICATION) {
         valeur *= FACTEUR_AMPLIFICATION_RPE_ELEVE;
       }
-      return { valeur, methode: 'trimp', confiance: 85 };
+      // Confiance réduite si la FC repos est un repli plutôt que la vraie
+      // valeur du profil — le calcul reste TRIMP (bien plus fiable que
+      // sRPE), mais moins précis qu'avec la vraie donnée personnelle.
+      return { valeur, methode: 'trimp', confiance: fcReposReference ? 85 : 70 };
     }
     if (sample.ressentiRPE !== undefined && sample.ressentiRPE !== null) {
       // sRPE de Foster — corrélé au TRIMP (r=0.79-0.91), cf. §5.1 doc archi
