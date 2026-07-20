@@ -1065,7 +1065,7 @@
     <button class="arrow-btn back" id="backBtn" onclick="prevStep()" aria-label="Étape précédente">←</button>
     <div class="stepmeta">
       <span class="num" id="stepNum">ÉTAPE 1</span>
-      <span class="total">SUR 9</span>
+      <span class="total">SUR 8</span>
     </div>
     <button class="arrow-btn next" id="nextBtn" onclick="nextStep()" aria-label="Étape suivante">→</button>
   </div>
@@ -1102,44 +1102,17 @@
     </div>
 
     <!-- STEP 2: Niveau -->
+    <!-- Étape "Niveau" retirée le 20/07/2026 (demande explicite de Laurent :
+         le niveau ne doit plus apparaître du tout dans le wizard, pas même
+         en lecture seule). Un premier essai de verrouillage visuel avait été
+         tenté le même jour puis écarté au profit de ce retrait complet.
+         Lu exclusivement depuis profilCoureur.niveau (Réglages), cf.
+         collectParamsFromWizard/estGrandDebutant plus bas. Toutes les
+         étapes suivantes renumérotées de -1 (l'ancien Step 9 devient Step 8,
+         etc.), totalSteps passé de 9 à 8. -->
+
+    <!-- STEP 2: Volume actuel -->
     <div class="screen" data-step="2">
-      <span class="eyebrow">Point de départ</span>
-      <h1>Où en es-tu aujourd'hui&nbsp;?</h1>
-      <p class="sub">Ça nous aide à calibrer le point de départ du plan — pas de mauvaise réponse.</p>
-
-      <div class="options">
-        <div class="opt" data-group="niveau" onclick="selectOpt(this)">
-          <div class="ico">🚶</div>
-          <div><div class="label">Je n'ai jamais couru</div><div class="desc">Je marche, ou je découvre — pas encore capable de courir en continu</div></div>
-          <div class="check"></div>
-        </div>
-        <div class="opt" data-group="niveau" onclick="selectOpt(this)">
-          <div class="ico">🌱</div>
-          <div><div class="label">Je débute</div><div class="desc">Moins de 6 mois de course régulière</div></div>
-          <div class="check"></div>
-        </div>
-        <div class="opt selected" data-group="niveau" onclick="selectOpt(this)">
-          <div class="ico">🏃</div>
-          <div><div class="label">Intermédiaire</div><div class="desc" id="niveauInterDesc">Je cours depuis un moment, j'ai déjà couru un 10K</div></div>
-          <div class="check"></div>
-        </div>
-        <div class="opt" data-group="niveau" onclick="selectOpt(this)">
-          <div class="ico">⚡</div>
-          <div><div class="label">Confirmé</div><div class="desc">Plusieurs courses, je connais mes allures</div></div>
-          <div class="check"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Step 2 : niveau + champs profil (année naissance, FC max) retirés
-         du wizard le 14/07/2026 (v2.8, §17.7) — ces données vivent
-         désormais uniquement dans Réglages > Profil (profilCoureur.niveau,
-         onboarding post-inscription, cf. auth.js/monterEcranOnboarding).
-         collectParamsFromWizard lit désormais profilCoureur directement
-         plutôt que ces champs, cf. plus bas. -->
-
-    <!-- STEP 3: Volume actuel -->
-    <div class="screen" data-step="3">
       <span class="eyebrow">Point de départ</span>
       <h1>Combien tu cours actuellement&nbsp;?</h1>
       <p class="sub">Sert à calculer une progression du volume sûre, sans à-coups d'une semaine à l'autre.</p>
@@ -1179,7 +1152,7 @@
     </div>
 
     <!-- STEP 4: Temps de référence -->
-    <div class="screen" data-step="4">
+    <div class="screen" data-step="3">
       <span class="eyebrow">Chrono actuel</span>
       <h1><span id="refDistLabel">Ton dernier 10K</span>, ou une estimation</h1>
       <p class="sub" id="refHelpText">Sers-toi d'une course récente, ou d'un 5K x2,1 si tu n'as pas de 10K officiel.</p>
@@ -1218,7 +1191,7 @@
     </div>
 
     <!-- STEP 5: Objectif -->
-    <div class="screen" data-step="5">
+    <div class="screen" data-step="4">
       <span class="eyebrow">Objectif</span>
       <h1>Quel chrono tu vises&nbsp;?</h1>
       <p class="sub">On vérifie la faisabilité selon le temps disponible avant course.</p>
@@ -1241,7 +1214,7 @@
     </div>
 
     <!-- STEP 6: Date de course -->
-    <div class="screen" data-step="6">
+    <div class="screen" data-step="5">
       <span class="eyebrow">Échéance</span>
       <h1 id="step6Title">C'est pour quand&nbsp;?</h1>
       <p class="sub" id="step6Sub">La durée du plan se calcule automatiquement entre le début et le jour J.</p>
@@ -1277,7 +1250,7 @@
     </div>
 
     <!-- STEP 7: Contraintes -->
-    <div class="screen" data-step="7">
+    <div class="screen" data-step="6">
       <span class="eyebrow">Vigilance</span>
       <h1>Des contraintes à connaître&nbsp;?</h1>
       <p class="sub">Sélectionne ce qui s'applique — le plan adapte la progression du volume et évite les appuis à risque.</p>
@@ -1315,7 +1288,7 @@
     </div>
 
     <!-- STEP 8: Disponibilité -->
-    <div class="screen" data-step="8">
+    <div class="screen" data-step="7">
       <span class="eyebrow">Disponibilité</span>
       <h1>Quels jours tu peux courir&nbsp;?</h1>
       <p class="sub">Sélectionne tes créneaux possibles, le plan placera les séances clés dessus.</p>
@@ -1330,7 +1303,7 @@
     </div>
 
     <!-- STEP 9: Récap / bib -->
-    <div class="screen" data-step="9">
+    <div class="screen" data-step="8">
       <span class="eyebrow">Dossard généré</span>
       <h1>Ton plan est prêt à être construit</h1>
       <p class="sub">Vérifie les paramètres avant de lancer la génération.</p>
@@ -1451,7 +1424,7 @@
 </script>
 
 <script>
-  const totalSteps = 9;
+  const totalSteps = 8;
   let current = 1;
 
   // Retour vers l'app (demandé par Laurent le 8 juillet 2026) — confirmation
@@ -1794,6 +1767,7 @@
   }
 
   const NIVEAU_MAP = { "Je n'ai jamais couru": "grand-debutant", "Je débute": "debutant", "Intermédiaire": "intermediaire", "Confirmé": "confirme" };
+  const NIVEAU_INVERSE = Object.fromEntries(Object.entries(NIVEAU_MAP).map(([label, val]) => [val, label]));
   const DISTANCE_MAP = { "5": "5K", "10": "10K", "21.1": "Semi", "42.2": "Marathon" };
 
   function readTimeFields(prefix, longFormat){
@@ -1806,7 +1780,6 @@
   function collectParamsFromWizard(){
     const grandDebutant = estGrandDebutant();
     const longFormat = distanceMeta[currentDist].unit === "h:min:sec";
-    const niveauLabel = document.querySelector('.opt[data-group="niveau"].selected .label').textContent;
     const joursDisponibles = [...document.querySelectorAll('#daysGrid .day.selected')]
       .map(el => parseInt(el.dataset.dayIndex));
 
@@ -1822,7 +1795,13 @@
     try { profilStocke = JSON.parse(localStorage.getItem('lk_profil_coureur')); } catch { profilStocke = null; }
 
     const profil = {
-      niveau: NIVEAU_MAP[niveauLabel] ?? 'intermediaire',
+      // 20/07/2026 : lu exclusivement depuis le profil global (Réglages) —
+      // l'étape "Niveau" a été retirée du wizard ce jour-là (demande
+      // explicite de Laurent), le niveau est un attribut du coureur, pas
+      // du plan, il ne doit pas être redemandé/modifiable à chaque
+      // génération (même principe déjà appliqué à anneeNaissance/
+      // fcMaxConnue le 14/07/2026, cf. commentaire juste en dessous).
+      niveau: profilStocke?.niveau ?? 'intermediaire',
       // Retirés du wizard le 14/07/2026 (v2.8, §17.7) — lus depuis le profil
       // global (Réglages > Profil), plus jamais saisis ici.
       anneeNaissance: profilStocke?.anneeNaissance || undefined,
@@ -2709,7 +2688,12 @@
       const longFormat = distanceMeta[currentDist].unit === "h:min:sec";
       const refSeconds = Engine.parseTimeToSeconds(readTimeFields('t', longFormat));
       const objSeconds = Engine.parseTimeToSeconds(readTimeFields('o', longFormat));
-      const niveauLabel = document.querySelector('.opt[data-group="niveau"].selected .label').textContent;
+      // 20/07/2026 : l'étape "Niveau" du wizard a été retirée — le niveau
+      // se lit désormais depuis le profil stocké (Réglages), comme partout
+      // ailleurs dans ce fichier (collectParamsFromWizard, estGrandDebutant).
+      let profilStockeFeasibility;
+      try { profilStockeFeasibility = JSON.parse(localStorage.getItem('lk_profil_coureur')); } catch { profilStockeFeasibility = null; }
+      const niveauLabel = NIVEAU_INVERSE[profilStockeFeasibility?.niveau] ?? 'Intermédiaire';
 
       const startVal = document.getElementById('startDate').value;
       const raceVal = document.getElementById('raceDate').value;
@@ -2825,7 +2809,7 @@
     nextBtn.innerHTML = n === totalSteps ? '✓' : '→';
     nextBtn.setAttribute('aria-label', n === totalSteps ? 'Générer le plan' : 'Étape suivante');
     nextBtn.title = n === totalSteps ? 'Générer le plan' : 'Continuer';
-    if (n === 6) {
+    if (n === 5) {
       // Marche-course : pas de "jour de course" à proprement parler, juste
       // une échéance de fin de bloc — libellés adaptés, infos course
       // (nom/lieu/lien) masquées (non pertinentes pour ce profil).
@@ -2847,14 +2831,24 @@
     sessionStorage.setItem('v2_wizard_step', n);
   }
 
-  // Marche-course (grand débutant, 14/07/2026) : steps 3 (volume actuel),
-  // 4 (chrono de référence) et 5 (objectif chrono) n'ont pas de sens pour
+  // Marche-course (grand débutant, 14/07/2026) : steps 2 (volume actuel),
+  // 3 (chrono de référence) et 4 (objectif chrono) n'ont pas de sens pour
   // ce profil — sautés dans les deux sens plutôt que masqués avec des
   // valeurs par défaut invisibles (cf. décision avec Laurent : plus honnête
-  // sur ce que le plan représente réellement).
+  // sur ce que le plan représente réellement). Renumérotés le 20/07/2026
+  // suite au retrait complet de l'ancienne étape "Niveau" (ex-step 2).
   function estGrandDebutant(){
-    const sel = document.querySelector('.opt[data-group="niveau"].selected .label');
-    return sel && sel.textContent === "Je n'ai jamais couru";
+    // 20/07/2026 : lit le profil stocké (Réglages) plutôt qu'un sélecteur
+    // du wizard — l'étape "Niveau" a été retirée complètement du wizard ce
+    // jour-là (demande explicite de Laurent), le niveau ne doit plus être
+    // redemandé/modifiable à chaque génération de plan.
+    let profilStocke;
+    try { profilStocke = JSON.parse(localStorage.getItem('lk_profil_coureur')); } catch { profilStocke = null; }
+    // Pas de repli sur un sélecteur DOM : l'étape "Niveau" du wizard n'existe
+    // plus (retirée le 20/07/2026), il n'y a donc rien à y lire. Un profil
+    // introuvable ici ne devrait plus arriver en pratique (l'onboarding
+    // impose le choix d'un niveau) — traité comme "pas grand-débutant".
+    return profilStocke?.niveau === 'grand-debutant';
   }
 
   async function nextStep(){
@@ -2931,7 +2925,7 @@
     }
     if(current < totalSteps){
       current++;
-      if (estGrandDebutant() && current === 3) current = 6;
+      if (estGrandDebutant() && current === 2) current = 5;
       showStep(current);
     }
     else { generateAndShowResults(); }
@@ -2952,12 +2946,12 @@
         return;
       }
       showingResults = false;
-      showStep(current); // current est resté à totalSteps (9) : retour au récap
+      showStep(current); // current est resté à totalSteps (8) : retour au récap
       return;
     }
     if(current > 1){
       current--;
-      if (estGrandDebutant() && current === 5) current = 2;
+      if (estGrandDebutant() && current === 5) current = 1;
       showStep(current);
     } else {
       // Retour à l'écran de choix de mode depuis la toute première étape —
@@ -3139,6 +3133,18 @@
     let profil;
     try { profil = JSON.parse(localStorage.getItem('lk_profil_coureur')); } catch { profil = null; }
     if (!profil) return;
+
+    // Niveau — l'étape correspondante a été retirée du wizard le 20/07/2026
+    // (demande explicite de Laurent : plus aucune trace dans le wizard,
+    // même en lecture seule — un premier essai de verrouillage visuel avait
+    // été tenté le même jour puis écarté). Reste un seul point d'affichage
+    // à alimenter : la ligne "Niveau" du récap final (bibNiveau), qui
+    // n'était mise à jour que par un clic sur l'ancien sélecteur
+    // (selectOpt) — désormais peuplée directement depuis le profil ici.
+    if (NIVEAU_INVERSE[profil.niveau]) {
+      const bibNiveau = document.getElementById('bibNiveau');
+      if (bibNiveau) bibNiveau.textContent = NIVEAU_INVERSE[profil.niveau];
+    }
 
     // birthYear/fcMaxConnue retirés du wizard le 14/07/2026 (v2.8, §17.7) —
     // profil.anneeNaissance et profil.fcMax ne sont plus lus ici, uniquement
