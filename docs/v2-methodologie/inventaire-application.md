@@ -5293,3 +5293,278 @@ du champ de vision initial.
 **Fix** : `align-items: flex-start` à la place de `center`, garantissant
 un affichage démarrant toujours depuis le haut du contenu, quelle que
 soit sa hauteur. Validé par Laurent sur PC et mobile après déploiement.
+
+## 43. Session du 20/07/2026 — 7 correctifs et un chantier stratégie de course
+
+Session dense de petits bugs remontés en usage réel + une évolution
+demandée sur la stratégie de course. Chronologie : fix reconnexion
+Strava → nettoyage `lk_gist_id` confirmé déjà clos → bug jour de course
+post-course (reporté depuis §29) → retrait de l'étape Niveau du wizard
+→ bug distance perdue au retour OAuth → bug écart d'estimation
+(48'30" en dur) → bug d'arrondi flottant → stratégie de course en
+bornes km fixes.
+
+### 43.1 Fix — reconnexion Strava, refresh_token révoqué non détecté
+
+Symptôme signalé par Laurent : Strava "encore déconnecté ce matin",
+malgré le mécanisme déjà en place (§18.2, §21) qui détecte un
+`access_token` invalide côté Strava.
+
+**Cause** : `ensureFreshToken()` (`index.html`) appelle
+`/api/strava/refresh` avec le `refresh_token` local, mais ne vérifiait
+jamais si ce refresh avait réellement réussi. Si le `refresh_token`
+lui-même est révoqué côté Strava, `/api/strava/refresh` répond avec
+`{errors:[...]}` sans `access_token` — la fonction affectait quand
+même `stravaToken = undefined` et retournait `true`, faisant échouer
+silencieusement l'appel suivant plutôt que de déclencher proprement le
+message "Connexion Strava expirée".
+
+**Corrigé** : `ensureFreshToken()` détecte maintenant explicitement
+`!data.access_token` et positionne `stravaAuthInvalide = true` avant
+de retourner `false`. `syncStrava()` affiche directement le bon
+message ("❌ Connexion Strava expirée — reconnecte-toi...") avec le
+bouton 🔄 Reconnecter dans ce cas, au lieu du générique "Erreur de
+token".
+
+**Fichier modifié** : `public/index.html` uniquement.
+
+### 43.2 `lk_gist_id` — chantier de nettoyage confirmé déjà CLOS
+
+Réexaminé sur demande de Laurent (identifié comme "reste à faire" dans
+une session précédente). Vérification dans `sync-storage.js`,
+`gist-sync.js` et `index.html` : aucun code actif ne lit/écrit
+`lk_gist_id` — seuls des commentaires historiques subsistent,
+volontairement conservés pour traçabilité (cf. §14, nettoyage déjà
+fait le 16/07/2026). Seule trace restante : colonne `gist_id` en base
+Supabase (table `integrations`), plus jamais lue/écrite.
+
+**Non fait, optionnel, sans urgence** : suppression SQL de la colonne
+morte, fournie à Laurent mais pas exécutée :
+```sql
+ALTER TABLE integrations DROP COLUMN IF EXISTS gist_id;
+```
+
+Aucun fichier modifié — chantier déjà clos, pas de nouveau code.
+
+### 43.3 Fix — jours après la course non neutralisés (bug reporté depuis §29)
+
+Bug identifié le 19/07/2026 (§29) mais non corrigé à l'époque : quand
+`dateCourse` ne tombe pas sur le dernier jour généré de la dernière
+semaine (ex. course un samedi, dimanche aussi présent dans
+`assignment`), les jours suivant la course dans cette même semaine
+gardaient leur type normal (EF/longue/qualité) au lieu de repos.
+
+**Corrigé** : nouvelle fonction `neutraliserJoursApresCourse(plan)`
+(`plan-generator.js`), appelée juste après `placerSeanceCourse()`
+(avant `injecterApprocheCourse`, qui gère symétriquement les jours
+AVANT la course) — transforme en `type: 'repos'` (`role:
+'recuperation-post-course'`) tout jour de la dernière semaine dont
+l'index dépasse le jour de course.
+
+Testé en isolation (script Node local avant push) : cas du bug (course
+samedi=5, dimanche=6 présent → dimanche neutralisé) et non-régression
+(course dimanche=6 = dernier jour → rien de neutralisé) tous deux
+confirmés.
+
+**Fichier modifié** : `public/v2/engine/plan-generator.js` uniquement
+(plus de `.classic.js` depuis la conversion modules ES du 19/07, §42).
+Pas de correction rétroactive nécessaire — le cas observé par Laurent
+était un test, pas un vrai plan affecté.
+
+### 43.4 Fix — étape "Niveau" du wizard retirée complètement
+
+Bug remonté par Laurent : le niveau du coureur (Débutant/Intermédiaire/
+Confirmé) restait demandé et modifiable à chaque génération de plan
+dans le wizard course, alors qu'il s'agit d'un attribut du profil
+(Réglages), pas du plan.
+
+**Cause racine** : un commentaire du 14/07/2026 (§17.7) affirmait que
+cette étape avait été retirée du wizard — en réalité, seuls
+`anneeNaissance`/`fcMax` avaient été réellement migrés vers le profil
+à ce moment-là. Le HTML complet du sélecteur de niveau (`data-step="2"`,
+4 options cliquables) et sa lecture dans `collectParamsFromWizard()`
+étaient toujours actifs, jamais réellement retirés malgré le
+commentaire.
+
+**Premier essai (abandonné) — verrouillage visuel** : pré-sélection
+automatique du niveau depuis le profil + désactivation du clic, avec
+message "Défini dans Réglages → Profil". Fonctionnel et testé, mais
+Laurent a préféré un retrait complet plutôt qu'un affichage en lecture
+seule.
+
+**Fix retenu — retrait complet** (`public/v2/index.html`) :
+- HTML de l'ancienne étape "Niveau" supprimé entièrement
+- Toutes les étapes suivantes renumérotées de -1 : `data-step="3"`→2
+  (volume), 4→3 (temps de référence), 5→4 (objectif), 6→5 (dates), 7→6
+  (contraintes), 8→7 (jours), 9→8 (récap) — `totalSteps` passé de 9 à 8,
+  affichage "SUR 9"→"SUR 8"
+- `collectParamsFromWizard()` et `estGrandDebutant()` lisent
+  exclusivement `profilCoureur.niveau` (plus de repli sur un sélecteur
+  DOM qui n'existe plus)
+- Sauts conditionnels grand-débutant réajustés à la nouvelle
+  numérotation : avant `current===2 → current=5` (étape volume →
+  étape dates, au lieu de 3→6) ; arrière `current===5 → current=1`
+  (retour à distance, au lieu de 5→2)
+- `showStep()` : condition `n === 6` (écran dates, ids `step6Title`/
+  `step6Sub`/`raceDateLabel`/`raceInfosBlock`) corrigée en `n === 5`
+- `updateFeasibilityText()` lisait le niveau via le sélecteur DOM
+  retiré (aurait planté silencieusement, texte de faisabilité disparu)
+  — corrigé pour lire depuis le profil stocké
+- `preremplirDepuisProfilCoureur()` simplifiée : ne fait plus que
+  peupler la ligne "Niveau" du récap final (`bibNiveau`) depuis le
+  profil, plus de logique de verrouillage visuel devenue inutile
+
+Syntaxe validée (`node --check` sur le bloc `<script type="module">`
+extrait). Testé et confirmé par Laurent : l'étape a disparu du
+parcours, compteur "SUR 8" correct, parcours grand-débutant toujours
+fonctionnel.
+
+**Fichier modifié** : `public/v2/index.html` uniquement.
+
+### 43.5 Fix — distance du wizard perdue au retour de reconnexion Strava
+
+Bug remonté par Laurent juste après 43.4, en testant un plan Marathon :
+sélectionner Marathon à l'étape 1, arriver à l'étape volume (nouvelle
+étape 2), reconnecter Strava (retour OAuth) → au retour, le formulaire
+redemandait un record 10K et générait un plan 10K.
+
+**Cause** : `currentDist` (distance sélectionnée) est une simple
+variable JS, jamais persistée. Le retour de reconnexion Strava force un
+`window.location.reload()` complet (`capterRetourStravaOAuth()`,
+contournement d'un bug de rendu Android/PWA) — ça restaure bien le bon
+numéro d'étape (`v2_wizard_step`, déjà persisté), mais `currentDist`
+repartait de sa valeur par défaut (`"10"`), donnant l'impression qu'un
+plan Marathon se transformait silencieusement en plan 10K.
+
+**Corrigé** (`public/v2/index.html`) :
+- `showStep()` persiste désormais aussi `sessionStorage.setItem('v2_wizard_dist', currentDist)`, en plus de l'étape
+- Au retour Strava (bloc `rechargementVientDeStrava`), restauration de
+  `currentDist` depuis `v2_wizard_dist`, re-sélection visuelle de la
+  bonne carte `.dist`, ré-application de `applyDistanceMeta()` et
+  `preremplirDepuisProfilCoureur()` — même logique que `selectDist()`
+  mais sans dépendre d'un élément cliqué
+- `v2_wizard_dist` nettoyée en même temps que `v2_wizard_step` quand ce
+  n'est pas un retour Strava (évite un résidu périmé)
+
+Pas de changement nécessaire dans `validerChoixMode()` (second point de
+restauration d'étape) : ce chemin s'active sur un choix volontaire
+depuis l'écran d'accueil, sans reload, donc `currentDist` n'y est
+jamais perdue.
+
+Testé et confirmé par Laurent : la distance Marathon reste correcte
+après reconnexion Strava.
+
+**Fichier modifié** : `public/v2/index.html` uniquement.
+
+### 43.6 Fix — écart Objectif/Estimation absurde (48'30" codé en dur)
+
+Symptôme signalé par Laurent sur un plan Marathon (objectif 3h50) :
+carte "Objectif vs Estimation" affichant un écart de `+3h11'30"` —
+valeur clairement fausse pour comparer deux temps proches.
+
+**Cause** : dans `predict10K()` (`index.html`), la variable `target`
+(utilisée pour calculer l'écart affiché) était codée en dur à
+`48.5*60` (48'30", l'ancien objectif historique 10K de Laurent) —
+jamais dérivée du plan réellement chargé. Même famille de résidu que
+le bug déjà corrigé section 7bis (RACE_NAME/FC_MAX/BASE_TIME_REFERENCE
+codés en dur, doc convergence-v1-v2.md), simplement oublié
+spécifiquement dans cette fonction.
+
+**Corrigé** : `target = OBJECTIF_REFERENCE` — variable déjà déclarée
+plus haut dans `index.html`, dérivée dynamiquement de
+`paramsOrigine.objectif`/`plan.objectif`, avec repli sur 48'30"
+uniquement si le plan chargé n'a vraiment aucun objectif (cas
+théorique, ne devrait pas arriver en pratique).
+
+Vérifié : `predict10KAtDate()` (fonction sœur, utilisée pour
+l'historique de courbe de prédiction) ne calcule que `estimate`, pas
+de `target`/`gap` — pas affectée par ce même bug.
+
+**Fichier modifié** : `public/index.html` uniquement.
+
+### 43.7 Fix — arrondi flottant sur les bornes km affichées
+
+Symptôme signalé par Laurent dans la foulée, sur la même carte
+"Allures de passage" : segment affiché `35.870000000000005→42.2 km`
+plutôt qu'un nombre propre.
+
+**Cause** : `s.from`/`s.to` (bornes de segment) sont des flottants
+issus de calculs proportionnels (ex. `42.2 * 0.85`), sujets à
+l'imprécision binaire classique de JavaScript (`0.1+0.2 !== 0.3`) —
+jamais arrondis avant l'affichage dans `segLabel`.
+
+**Corrigé** : arrondi à 1 décimale (`Math.round(x*10)/10`)
+appliqué uniquement à l'AFFICHAGE de la borne (`fromArrondi`/
+`toArrondi`) — le calcul interne (pace, cumul des temps de passage)
+reste sur les valeurs précises non arrondies, pour ne rien perdre en
+précision de calcul.
+
+**Fichier modifié** : `public/index.html` uniquement. Ce fix reste en
+place même après 43.8 (bornes désormais entières dans le nouveau
+découpage, donc moins susceptible de se déclencher, mais toujours utile
+pour la borne finale `42.2`/`21.1`, elle-même non entière).
+
+### 43.8 Stratégie de course — bornes km fixes pour Semi/Marathon
+
+Demande explicite de Laurent : remplacer le découpage proportionnel
+(pourcentages de la distance totale) par des bornes km FIXES pour
+Semi/Marathon — plus lisible en course, où un coureur suit ses
+passages sur des repères ronds plutôt que des pourcentages calculés.
+5K/10K non concernés, restent en proportionnel (pas demandé).
+
+**Bornes retenues, décidées avec Laurent (plusieurs allers-retours)** :
+- **Semi** (0 à 21.1km) : 0-5 (départ prudent), 5-10 et 10-15 (allure
+  cible, régularité, offset identique), 15-21.1 (ajuste au ressenti)
+- **Marathon** (0 à 42.2km) : 0-5 (marge de sécurité), 5-10 (encore
+  prudent, palier intermédiaire propre au marathon — l'erreur de départ
+  pèse plus lourd sur cette distance), 10-20/20-30/30-35 (allure cible,
+  régularité, offset identique sur les trois), 35-42.2 (ajuste au
+  ressenti en fin de course)
+
+**Implémentation, miroir exact entre les deux fichiers** (contrainte
+déjà documentée : `genererContenuRace()`/`calculerStrategieCourse()`
+dans `plan-generator.js` doivent rester alignées avec
+`calculerStrategieCourse()` dans `index.html`) :
+- `index.html` : nouveau seuil `distanceKmCourse <= 25` pour distinguer
+  Semi de Marathon (au lieu du bloc unique "Semi/Marathon" précédent),
+  définitions de segments avec bornes `from`/`to` fixes plutôt que
+  `d * ratio`
+- `plan-generator.js` : même structure, mêmes bornes, même seuil —
+  fonction `calculerStrategieCourse()` interne au module (utilisée par
+  `genererContenuRace()`, qui fige le texte de la séance de course au
+  moment de la génération du plan)
+
+Testé (script Node local avant push, sur des valeurs réalistes) :
+- Marathon 3h50 (13800s) : cumul final exactement 3h50'00", allures
+  cohérentes (5:33 → 5:30 → 5:27 → 5:27 → 5:27 → 5:22/km)
+- Semi 1h50 (6600s) : cumul final exactement 1h50'00", allures
+  cohérentes (5:18 → 5:12 → 5:12 → 5:10/km)
+- `genererContenuRace()` produit un texte propre avec bornes entières
+  (`Km 35-42`, plus de flottant à arrondir sur les bornes intermédiaires)
+
+**Fichiers modifiés** : `public/index.html` (carte "Allures de
+passage") + `public/v2/engine/plan-generator.js` (texte figé de la
+séance de course, `genererContenuRace`).
+
+**Non rétroactif** : les futurs plans Semi/Marathon générés après ce
+push utiliseront le nouveau découpage ; les plans déjà actifs en base
+gardent l'ancien texte proportionnel dans leur séance de course tant
+qu'ils ne sont pas régénérés — la carte "Allures de passage" (calculée
+dynamiquement à l'affichage, pas figée) suit en revanche le nouveau
+découpage immédiatement après le push de `index.html`, sans attendre
+une régénération de plan.
+
+### 43.9 Reste à faire
+
+- Vérifier en conditions réelles sur le prochain cycle de synchro
+  automatique du matin que le fix Strava (43.1) tient — si le problème
+  revient, observer précisément le message affiché pour confirmer que
+  la détection fonctionne bien (message "Connexion Strava expirée"
+  plutôt qu'un échec muet)
+- Exécuter (optionnel, non urgent) le `ALTER TABLE` de nettoyage de la
+  colonne `gist_id` morte côté Supabase, cf. 43.2
+- Tester le parcours wizard grand-débutant en conditions réelles avec
+  la nouvelle numérotation d'étapes (43.4) au-delà du test déjà fait
+  par Laurent — en particulier le cas où l'utilisateur revient en
+  arrière plusieurs fois d'affilée
+
