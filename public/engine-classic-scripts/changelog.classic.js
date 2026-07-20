@@ -21,7 +21,16 @@
  */
 
 const VERSIONS = [
-      { ver:"v2.14", title:"Connexion Strava plus stable, écran de bienvenue corrigé", current:true, notes:[
+      { ver:"v2.15", title:"Stratégie de course par km ronds, wizard simplifié & correctifs Strava/estimation", current:true, notes:[
+        "🏁 Stratégie de jour de course en repères kilométriques ronds pour Semi et Marathon (tous les 5km, avec un palier supplémentaire à 35km sur marathon) — plus simple à suivre en course que les pourcentages calculés précédents",
+        "📝 L'étape \"Niveau\" a disparu du parcours de création de plan — c'est un réglage de ton profil, plus besoin de le repréciser à chaque nouveau plan",
+        "🔗 Nouveau correctif sur la reconnexion Strava : un jeton de renouvellement expiré est maintenant détecté immédiatement, avec le bon message et le bouton de reconnexion, au lieu d'un échec silencieux",
+        "🐛 La distance choisie (ex. Marathon) pouvait se réinitialiser en 10K si une reconnexion Strava survenait en cours de création de plan — corrigé",
+        "🐛 L'écart affiché entre ton objectif et l'estimation du moteur pouvait montrer une valeur absurde (plusieurs heures d'écart) sur les plans Semi/Marathon — corrigé",
+        "🐛 Une sortie longue ou une séance de qualité pouvait encore apparaître le lendemain d'un jour de course en fin de plan, selon le jour de la semaine où tombait la course — corrigé, ce jour passe maintenant en repos",
+        "🐛 Petit défaut d'affichage (nombre à rallonge) sur les bornes kilométriques de la stratégie de course, corrigé",
+      ]},
+      { ver:"v2.14", title:"Connexion Strava plus stable, écran de bienvenue corrigé", current:false, notes:[
         "🔗 Correctif d'une cause probable de déconnexions Strava répétées — à confirmer dans les prochains jours",
         "🎬 L'écran de bienvenue (à la création d'un compte) s'affichait parfois en partant du milieu du formulaire plutôt que du début — corrigé",
       ]},
