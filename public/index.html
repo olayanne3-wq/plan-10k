@@ -7204,24 +7204,25 @@ function renderSettings() {
   // en lecture directe Supabase (RLS "Users can view their own subscription",
   // policy select où auth.uid()=user_id) — pas de route API dédiée, cohérent
   // avec le reste de l'app qui lit déjà Supabase directement côté client.
-  let abonnementStatutActuel = null; // rempli en async ci-dessous, re-render() une fois connu
-  (async () => {
-    if (!window.__UTILISATEUR__?.id || !LkAuth?.supabase) return;
-    try {
-      const { data, error } = await LkAuth.supabase
-        .from('abonnements')
-        .select('subscription_status, price_id')
-        .eq('user_id', window.__UTILISATEUR__.id)
-        .maybeSingle();
-      if (!error) {
-        abonnementStatutActuel = data ? data.subscription_status : 'none';
+if (typeof window.__abonnementStatutCache__ === "undefined") {
+    window.__abonnementStatutCache__ = null;
+    (async () => {
+      if (!window.__UTILISATEUR__?.id || !LkAuth?.supabase) { window.__abonnementStatutCache__ = 'none'; return; }
+      try {
+        const { data, error } = await LkAuth.supabase
+          .from('abonnements')
+          .select('subscription_status, price_id')
+          .eq('user_id', window.__UTILISATEUR__.id)
+          .maybeSingle();
+        window.__abonnementStatutCache__ = error ? 'none' : (data ? data.subscription_status : 'none');
         if (view === "settings") render();
+      } catch (e) {
+        console.warn("Lecture abonnement échouée :", e.message);
+        window.__abonnementStatutCache__ = 'none';
       }
-    } catch (e) {
-      console.warn("Lecture abonnement échouée :", e.message);
-    }
-  })();
-
+    })();
+  }
+  const abonnementStatutActuel = window.__abonnementStatutCache__;
   async function demarrerCheckout(plan) {
     if (!LkAuth?.supabase) return;
     const boutonClique = document.getElementById("abonnement-btn-"+plan);
