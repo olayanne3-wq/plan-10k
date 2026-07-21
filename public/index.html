@@ -1067,7 +1067,8 @@ function boutonSignalerProbleme() {
 function ouvrirSignalementProbleme() {
   const overlay = el("div", {style:{
     position:"fixed", inset:"0", background:"rgba(0,0,0,0.5)", zIndex:"1000",
-    display:"flex", alignItems:"center", justifyContent:"center", padding:"20px"
+    display:"flex", alignItems:"flex-start", justifyContent:"center",
+    padding:"20px", paddingTop:"60px", overflowY:"auto"
   }});
   const textarea = el("textarea", {
     placeholder: "Qu'est-ce qui ne va pas ? Décris ce que tu observes...",
