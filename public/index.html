@@ -1070,6 +1070,36 @@ function ouvrirSignalementProbleme() {
     display:"flex", alignItems:"flex-start", justifyContent:"center",
     padding:"20px", paddingTop:"60px", overflowY:"auto"
   }});
+  // Typologie ajoutée le 21/07/2026 (module admin signalements) — alimente
+  // la table Supabase signalements pour un triage humain structuré côté
+  // beta-admin, en complément de Sentry qui ne capte que le contexte
+  // technique brut (pas de statut, pas de catégorie).
+  const TYPES_SIGNALEMENT = { bug: "🐛 Bug", donnee_incorrecte: "📊 Donnée incorrecte", suggestion: "💡 Suggestion", autre: "❓ Autre" };
+  let typeSelectionne = "bug";
+  const typeButtons = {};
+  const typeRow = el("div", {style:{display:"flex", gap:"6px", marginBottom:"10px", flexWrap:"wrap"}},
+    ...Object.entries(TYPES_SIGNALEMENT).map(([val, label]) => {
+      const btn = el("button", {
+        type: "button",
+        style: {
+          padding:"6px 10px", borderRadius:"8px", cursor:"pointer", fontSize:"13px", fontWeight:"600",
+          border: val === typeSelectionne ? "1px solid var(--accent)" : "1px solid var(--border)",
+          background: val === typeSelectionne ? "rgba(var(--accent-rgb),0.13)" : "transparent",
+          color: val === typeSelectionne ? "var(--accent)" : "var(--text-muted)"
+        },
+        onClick: () => {
+          typeSelectionne = val;
+          Object.entries(typeButtons).forEach(([v, b]) => {
+            b.style.border = v === val ? "1px solid var(--accent)" : "1px solid var(--border)";
+            b.style.background = v === val ? "rgba(var(--accent-rgb),0.13)" : "transparent";
+            b.style.color = v === val ? "var(--accent)" : "var(--text-muted)";
+          });
+        }
+      }, label);
+      typeButtons[val] = btn;
+      return btn;
+    })
+  );
   const textarea = el("textarea", {
     placeholder: "Qu'est-ce qui ne va pas ? Décris ce que tu observes...",
     style: {
@@ -1080,13 +1110,17 @@ function ouvrirSignalementProbleme() {
   });
   const statutMsg = el("div", {class:"muted", style:{fontSize:"13px", marginTop:"8px", minHeight:"18px"}});
   const fermer = () => overlay.remove();
-  const envoyer = () => {
+  const envoyer = async () => {
     // Lu directement depuis le DOM au clic plutôt que via un state
     // séparé — corrige un bug (20/07/2026) où onInput n'est pas un
     // événement supporté par la fonction el() de ce fichier (seuls
     // onClick/onChange le sont), donc le texte n'était jamais capté.
     const description = textarea.value;
     if (!description.trim()) { statutMsg.textContent = "Décris le problème avant d'envoyer."; return; }
+    const planId = window.__PLAN_BRUT__?.id || "aucun";
+    const estPlanRepli = !!window.__PLAN_BRUT__?.estPlanRepli;
+    const contexteTxt = "vue=" + view + " | planId=" + planId + " | estPlanRepli=" + estPlanRepli + " | url=" + window.location.href;
+    let sentryEventId = null;
     try {
       if (typeof Sentry !== 'undefined' && typeof Sentry.captureMessage === 'function') {
         // Contexte réintégré le 21/07/2026 — la vraie cause du crash OOM
@@ -1095,15 +1129,26 @@ function ouvrirSignalementProbleme() {
         // argument string malgré tout (pas de second argument objet) —
         // c'est la forme la plus sûre, garantie bufferisée par le Loader
         // Script quel que soit l'état de chargement du SDK complet.
-        const planId = window.__PLAN_BRUT__?.id || "aucun";
-        const estPlanRepli = !!window.__PLAN_BRUT__?.estPlanRepli;
-        const contexte = "vue=" + view + " | planId=" + planId + " | estPlanRepli=" + estPlanRepli + " | url=" + window.location.href;
-        Sentry.captureMessage("[Signalement utilisateur] " + description.trim() + " | " + contexte);
-        statutMsg.textContent = "Merci, c'est envoyé !";
-        setTimeout(fermer, 1200);
-      } else {
-        statutMsg.textContent = "Envoi indisponible pour le moment, réessaie plus tard.";
+        sentryEventId = Sentry.captureMessage("[Signalement utilisateur] " + description.trim() + " | " + contexteTxt);
       }
+    } catch (e) {
+      // Signalement Sentry best-effort — l'insert Supabase ci-dessous
+      // reste la source de vérité pour le triage admin, donc on continue
+      // même si Sentry échoue silencieusement.
+    }
+    try {
+      if (LkAuth?.supabase) {
+        await LkAuth.supabase.from('signalements').insert({
+          type: typeSelectionne,
+          message: description.trim(),
+          contexte: { vue: view, planId, estPlanRepli, url: window.location.href },
+          user_id: window.__UTILISATEUR__?.id || null,
+          email: window.__UTILISATEUR__?.email || null,
+          sentry_event_id: typeof sentryEventId === 'string' ? sentryEventId : null,
+        });
+      }
+      statutMsg.textContent = "Merci, c'est envoyé !";
+      setTimeout(fermer, 1200);
     } catch (e) {
       statutMsg.textContent = "Envoi indisponible pour le moment, réessaie plus tard.";
     }
@@ -1113,6 +1158,7 @@ function ouvrirSignalementProbleme() {
     border:"1px solid var(--border)"
   }},
     el("div", {style:{fontSize:"16px", fontWeight:"700", marginBottom:"12px"}}, "🐛 Signaler un problème"),
+    typeRow,
     textarea,
     statutMsg,
     el("div", {style:{display:"flex", gap:"8px", marginTop:"14px", justifyContent:"flex-end"}},
