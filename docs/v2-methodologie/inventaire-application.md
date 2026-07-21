@@ -247,7 +247,11 @@ dynamique depuis jsDelivr, pas de build UMD/browser), `importerFichierFit()`.
 `v2/engine/strava.js`. Sync conditionnelle sur `dataSource === "strava"`
 via paramètre `force` (syncs auto respectent le garde, actions explicites
 passent `force: true`). Comparaison séance programmée vs laps réels filtrée
-par allure cible ±15%.
+par allure cible ±15%. Token invalide/révoqué détecté explicitement
+(`activities?.errors?.some(e => e.field === "access_token" && e.code ===
+"invalid")`, `stravaAuthInvalide`) — message "Connexion Strava expirée"
+avec bouton "🔄 Reconnecter Strava", affiché sans auto-effacement tant que
+non résolu (contrairement aux messages de sync ordinaires).
 
 **Météo** — proxy Open-Meteo (`api/weather.js`), gratuit, sans clé.
 Paramètre `type=forecast|current|historical` (forecast = défaut,
@@ -394,8 +398,6 @@ côté `index.html` — décider si automatique ou action explicite utilisateur.
 | Réduction d'intervalles pour séances qualité | 🔜 Session de conception dédiée nécessaire |
 | Saisie plaisir par séance (PACES-S) | 🔜 Reporté |
 | Republier piste "V2" Play Console | 🔜 Pas urgent, Alpha suffit pour Laurent |
-| Nettoyage `lk_gist_id` résiduel | 🔜 Pas urgent |
-| Détection auto `invalid access_token` Strava | 🔜 Amélioration future |
 | Passage Stripe en clés live (commercialisation réelle) | 🔜 Quand prêt à lancer publiquement |
 
 Pour l'historique des versions livrées et des correctifs, voir
