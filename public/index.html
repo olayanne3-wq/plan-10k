@@ -1083,15 +1083,14 @@ function ouvrirSignalementProbleme() {
     if (!description.trim()) { statutMsg.textContent = "Décris le problème avant d'envoyer."; return; }
     try {
       if (typeof Sentry !== 'undefined' && typeof Sentry.captureMessage === 'function') {
-        Sentry.captureMessage("[Signalement utilisateur] " + description.trim(), {
-          level: "info",
-          extra: {
-            vue: view,
-            planId: window.__PLAN_BRUT__?.id || null,
-            estPlanRepli: !!window.__PLAN_BRUT__?.estPlanRepli,
-            url: window.location.href
-          }
-        });
+        // Payload volontairement minimal (20/07/2026) : un appel avec un
+        // second argument options (extra:{...}) a provoqué un crash "out
+        // of memory" en test réel, cause exacte non identifiée avec
+        // certitude (bug connu du SDK Sentry sur la sérialisation de
+        // contexte, cf. github.com/getsentry/sentry-javascript/issues/
+        // 1717 et 13939) — évité en gardant l'appel à un seul argument
+        // string, dans le buffer garanti du Loader Script.
+        Sentry.captureMessage("[Signalement utilisateur] " + description.trim() + " | vue=" + view);
         statutMsg.textContent = "Merci, c'est envoyé !";
         setTimeout(fermer, 1200);
       } else {
