@@ -407,3 +407,111 @@ export function genererBlocSuivant(planPrecedent, profilOrigine, paramsOrigine) 
 
   return generatePlanForme(profilOrigine, { ...paramsOrigine, volumeActuel: volumeRepart });
 }
+
+// ---------------------------------------------------------------------------
+// Semaine test semi-Cooper (21/07/2026) — flux "je n'ai pas de référence"
+// dans le wizard Mode Forme. Contrairement à generatePlanForme() classique,
+// aucune allure n'est encore connue à ce stade : impossible de générer un
+// contenu EF/qualité normal pour quelque jour que ce soit de cette première
+// semaine (genererContenuEF/genererContenuQualiteForme dépendent tous deux
+// d'alluresSec, lui-même dérivé de la référence absente). Décision actée
+// avec Laurent : seul le jour du test reçoit un contenu structuré ; tous
+// les autres jours de cette semaine 1 sont en "footing libre" (sans allure
+// chiffrée) plutôt que forcés à un contenu EF qui suggérerait une allure
+// qu'on n'a en réalité pas. Semaines 2 à N générées séparément une fois le
+// résultat du test connu (cf. index.html, à câbler — étape 3/4 du chantier).
+// ---------------------------------------------------------------------------
+
+const DUREE_TEST_SEMI_COOPER_MIN = 6;
+const DUREE_ECHAUFFEMENT_TEST_MIN = 15;
+const DUREE_RETOUR_CALME_TEST_MIN = 10;
+
+/**
+ * Contenu du jour de test — pas d'allure chiffrée pour l'échauffement/retour
+ * au calme non plus (aucune référence disponible à ce stade), contrairement
+ * à genererContenuTest() du mode course qui peut s'appuyer sur alluresSec.E.
+ */
+export function genererContenuTestSemiCooper() {
+  const contenu = `Échauffement ${DUREE_ECHAUFFEMENT_TEST_MIN}min tranquille + Test semi-Cooper : cours le plus loin possible en ${DUREE_TEST_SEMI_COOPER_MIN}min, effort maximal mais régulier (ne pars pas trop vite) + Retour au calme ${DUREE_RETOUR_CALME_TEST_MIN}min tranquille`;
+  const structureIntervalles = {
+    blocs: [{ repetitions: 1, dureeEffortSec: DUREE_TEST_SEMI_COOPER_MIN * 60, allure: 'effort maximal régulier', dureeRecupSec: 0 }],
+    echauffementSec: DUREE_ECHAUFFEMENT_TEST_MIN * 60,
+    retourCalmeSec: DUREE_RETOUR_CALME_TEST_MIN * 60,
+    allureEchauffement: 'footing tranquille'
+  };
+  return { sousType: 'test-semi-cooper', contenu, kmEstime: null, structureIntervalles };
+}
+
+/**
+ * Contenu des jours hors test de la semaine 1 — kmEstime: null, même
+ * convention que genererContenuMarcheCourse() (plan-generator.js) pour un
+ * contenu dont la distance n'est délibérément pas estimée.
+ */
+export function genererContenuFootingLibre() {
+  return {
+    contenu: "Footing libre, à l'écoute des sensations — pas d'allure imposée cette semaine, en attendant ton test.",
+    kmEstime: null
+  };
+}
+
+/**
+ * Génère uniquement la semaine 1 d'un bloc Mode Forme quand aucune référence
+ * de temps n'est fournie (params.tempsReference absent). Le plan retourné a
+ * enAttenteTest: true — index.html doit détecter ce champ pour proposer la
+ * suite (saisie/détection du résultat du test, puis génération des semaines
+ * 2 à N via une fonction dédiée, à câbler séparément).
+ */
+export function generatePlanFormeAvecTest(profil, params) {
+  const { assignment, warnings: warningsPlacement } = placerSemaine({
+    joursDisponibles: profil.joursDisponiblesHabituels,
+    niveau: profil.niveau,
+    renforcementActif: profil.renforcementMusculaire,
+    modulation: {},
+    forcerAucuneQualite: false
+  });
+
+  for (const [, seance] of Object.entries(assignment)) {
+    if (seance.type === 'qualite') {
+      const { sousType, contenu, kmEstime, structureIntervalles } = genererContenuTestSemiCooper();
+      seance.sousType = sousType;
+      seance.contenu = contenu;
+      seance.kmEstime = kmEstime;
+      seance.structureIntervalles = structureIntervalles;
+      seance.estTest = true;
+    } else if (seance.type === 'ef' || seance.type === 'longue') {
+      const { contenu, kmEstime } = genererContenuFootingLibre();
+      seance.contenu = contenu;
+      seance.kmEstime = kmEstime;
+    }
+  }
+
+  const semaine1 = {
+    semaineNum: 1,
+    phase: 'Forme',
+    volumeCibleKm: null,
+    estDechargeSemaine: false,
+    assignment,
+    warnings: warningsPlacement
+  };
+
+  return {
+    mode: 'forme',
+    enAttenteTest: true,
+    accent: params.accent ?? 'polyvalent',
+    dateDebut: params.dateDebut,
+    dateCloture: params.dateCloture || undefined,
+    tailleBlocSemaines: params.nbSemainesBloc ?? TAILLE_BLOC_SEMAINES,
+    allures: null,
+    zoneFC: (() => {
+      const fcMax = profil.fcMaxConnue ?? (profil.anneeNaissance ? computeFcMaxTanaka(profil.anneeNaissance) : null);
+      if (!fcMax) return null;
+      return {
+        methode: profil.fcMaxConnue ? 'mesuree' : 'tanaka',
+        fcMax,
+        zonesParType: computeZonesFC(fcMax)
+      };
+    })(),
+    semaines: [semaine1],
+    warnings: warningsPlacement
+  };
+}
