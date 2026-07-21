@@ -134,6 +134,13 @@ réseau et toutes les 5 min, abandon après 10 essais).
   profil (sélection du record le plus pertinent, repli Riegel sinon).
 - `verifierCoherenceRecord()` : écarte un record si écart >10% à
   l'estimation Riegel moyenne des autres records.
+- **Sauvegarde** : un seul point d'entrée réel, `sauvegarderProfilCoureur()`
+  (bouton "Enregistrer les paramètres", qui relit tous les champs du
+  formulaire avant d'appeler `save()`). Les sélecteurs Niveau et Sexe ne
+  doivent JAMAIS appeler `sauvegarderProfilCoureur()` directement au clic
+  — seulement mettre à jour l'état local (`profilCoureur.niveau/sexe` +
+  `render()`) — sinon un profil incomplet (champs texte pas encore relus)
+  écrase Supabase. Bug déjà rencontré et corrigé le 20/07/2026.
 
 ## 7. Moteur de plan (`v2/engine/plan-generator.js`)
 
@@ -164,7 +171,11 @@ pour 5K/10K.
 
 1. **RunnerStateCalculator** — TRIMP/ACWR/fatigue/confiance/risque à partir
    des vraies données Strava (charge aiguë = 7j, charge chronique = moyenne
-   sur fenêtres réellement couvertes si historique <28j)
+   sur fenêtres réellement couvertes si historique <28j). `calculerChargeSeance()` :
+   repli `FC_REPOS_DEFAUT=60bpm` si `fcReposReference` absent — sans ce
+   repli, le calcul bascule silencieusement de TRIMP vers sRPE
+   (`dureeMin × RPE`, échelle bien plus élevée), ce qui a produit un ratio
+   ACWR aberrant (1.88 au lieu de ~0.8) en conditions réelles le 20/07/2026.
 2. **SessionAnalyzer** — score de réussite d'une séance (FC, allure,
    répétitions dans zone `okPace`)
 3. **WeekAnalyzer** — bilan hebdomadaire (volume, séances, charge,
@@ -225,13 +236,28 @@ passent `force: true`). Comparaison séance programmée vs laps réels filtrée
 par allure cible ±15%.
 
 **Météo** — proxy Open-Meteo (`api/weather.js`), gratuit, sans clé.
-Géolocalisation GPS réelle (dernière activité Strava avec GPS, repli
-position par défaut sinon).
+Paramètre `type=forecast|current|historical` (forecast = défaut,
+rétrocompatible). Géolocalisation selon l'usage : dernière activité Strava
+avec GPS pour la météo actuelle/passée (repli position par défaut sinon),
+position live du navigateur pour la prévision J+1 (alerte chaleur avant
+séance, `v2/engine/weather.js`) — deux besoins différents, pas un doublon.
 
 **Coach (messages courts)** — `api/coach.js`, proxy Claude Haiku 4.5.
 
 **Sync multi-device** — GitHub Gist (`lk_github_token`), géré par
 `v2/engine/gist-sync.js`.
+
+**Sentry (suivi d'erreurs)** — Loader Script CDN dans le `<head>` de
+`index.html` (`window.sentryOnLoad` défini avant le tag). `user_id`
+attaché via `Sentry.getCurrentScope().setUser({id})` dans le bloc
+`window.__AUTH_PRET__`, différé par `Sentry.onLoad()`. Point de vigilance
+important : ne jamais utiliser `Sentry.setUser()` directement (absent du
+mini-buffer du Loader Script tant que le SDK complet n'est pas chargé) ni
+`Sentry.configureScope()` (déprécié en SDK v8, cause un crash "out of
+memory" confirmé — cf. principes transverses §15). Bouton "Signaler un
+problème" (icône 🐛, dans les headers) envoie un `Sentry.captureMessage()`
+avec le contexte (vue, planId, url) inline dans le message, jamais en
+second argument objet.
 
 ## 12. Authentification Supabase
 
@@ -239,6 +265,18 @@ Auth email/mot de passe (pas de Google/Apple sign-in). Variables
 `SUPABASE_URL`/`SUPABASE_ANON_KEY` exposées via `api/config.js`
 (`fetch('/api/config')` avant création du client, `supabaseReady` à
 attendre). Migration douce depuis anciennes clés localStorage.
+
+`LkSync.precharger(userId, planId)` (`sync-storage.js`) : réhydrate
+`localStorage` depuis Supabase avant que `window.__AUTH_PRET__` ne se
+résolve. Renvoie `{ok, echecChargementProfil}` — si la requête
+`profils_coureur` échoue (réseau/RLS/timeout), `echecChargementProfil`
+passe à `true` et **aucun throw** n'est levé (un throw casserait tout le
+login sur une erreur transitoire). Point de vigilance critique :
+`index.html` ne doit jamais déclencher l'écran de bienvenue si
+`echecChargementProfil` est vrai — sinon un `localStorage` non réhydraté
+(faute d'échec réseau) est pris à tort pour "profil jamais renseigné", ce
+qui écrase ensuite le vrai profil Supabase avec un profil minimal une
+fois l'onboarding validé. Bug réel rencontré et corrigé le 20/07/2026.
 
 ## 13. Publication Play Store (TWA Android)
 
@@ -285,14 +323,15 @@ côté `index.html` — décider si automatique ou action explicite utilisateur.
 
 | Chantier | Statut |
 |---|---|
-| v2.5 commercialisation (Stripe, abonnements) | 🔜 Non commencé |
+| v2.5 commercialisation (Stripe via redirection navigateur, abonnements) | 🔜 Non commencé — décision d'architecture actée (bouton dans l'app → Stripe Checkout en navigateur externe, jamais de formulaire carte intégré dans la TWA) |
+| Abonnements gratuits beta testeurs depuis beta-admin | 🔜 Non commencé — dépend de la v2.5, lien par email entre Stripe et Supabase Auth |
+| Module admin signalements (beta-admin) | 🔜 Non commencé — table Supabase, typologie (Bug/Donnée incorrecte/Suggestion/Autre), lien vers dashboard Sentry pour les erreurs auto |
 | Déclenchement `genererBlocSuivant()` (Mode Forme) | 🔜 À décider |
 | Réduction d'intervalles pour séances qualité | 🔜 Session de conception dédiée nécessaire |
 | Saisie plaisir par séance (PACES-S) | 🔜 Reporté |
 | Republier piste "V2" Play Console | 🔜 Pas urgent, Alpha suffit pour Laurent |
 | Nettoyage `lk_gist_id` résiduel | 🔜 Pas urgent |
 | Détection auto `invalid access_token` Strava | 🔜 Amélioration future |
-| Mise à jour `docs/v2-methodologie/convergence-v1-v2.md` | 🔜 Post-conversion modules ES, pas critique |
 
 Pour l'historique des versions livrées et des correctifs, voir
 `changelog.classic.js`. Pour le détail méthodologique des séances, voir
