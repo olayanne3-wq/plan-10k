@@ -170,14 +170,18 @@ input[type=text], input[type=number], input[type=password] {
     // Sentry (20/07/2026) — le Loader Script (cf. <head>) initialise déjà
     // Sentry automatiquement avec le vrai DSN dès son chargement (config
     // window.sentryOnLoad définie en tête de <head>, cf. juste après
-    // <!DOCTYPE html>). Ici on attache seulement l'utilisateur dès qu'il
-    // est connu — pas de ré-appel à Sentry.init(), qui écraserait la
-    // config déjà faite par le Loader Script. typeof Sentry !== 'undefined'
-    // : ne jamais planter le login si Sentry est bloqué (adblocker) ou pas
-    // encore chargé à cet instant précis.
+    // <!DOCTYPE html>). setUser() n'est PAS bufferisé par le Loader Script
+    // (contrairement à captureException/captureMessage/captureEvent) —
+    // appelé trop tôt il échoue avec "Sentry.setUser is not a function"
+    // (constaté en test le 20/07/2026). Sentry.onLoad() est la méthode
+    // documentée pour différer un appel jusqu'à ce que le SDK complet soit
+    // effectivement chargé, à utiliser à tout moment (pas seulement au
+    // chargement initial de la page) — cf. doc Sentry Loader Script.
     try {
-      if (typeof Sentry !== 'undefined') {
-        Sentry.setUser({ id: user.id });
+      if (typeof Sentry !== 'undefined' && typeof Sentry.onLoad === 'function') {
+        Sentry.onLoad(function () {
+          Sentry.setUser({ id: user.id });
+        });
       }
     } catch (e) {
       console.warn('Sentry setUser non déclenché :', e.message);
