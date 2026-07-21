@@ -1064,19 +1064,22 @@ function ouvrirSignalementProbleme() {
     position:"fixed", inset:"0", background:"rgba(0,0,0,0.5)", zIndex:"1000",
     display:"flex", alignItems:"center", justifyContent:"center", padding:"20px"
   }});
-  let description = "";
   const textarea = el("textarea", {
     placeholder: "Qu'est-ce qui ne va pas ? Décris ce que tu observes...",
     style: {
       width:"100%", minHeight:"120px", padding:"10px", borderRadius:"8px",
       border:"1px solid var(--border)", background:"var(--bg)", color:"var(--text)",
       fontSize:"14px", fontFamily:"inherit", resize:"vertical"
-    },
-    onInput: (e) => { description = e.target.value; }
+    }
   });
   const statutMsg = el("div", {class:"muted", style:{fontSize:"13px", marginTop:"8px", minHeight:"18px"}});
   const fermer = () => overlay.remove();
   const envoyer = () => {
+    // Lu directement depuis le DOM au clic plutôt que via un state
+    // séparé — corrige un bug (20/07/2026) où onInput n'est pas un
+    // événement supporté par la fonction el() de ce fichier (seuls
+    // onClick/onChange le sont), donc le texte n'était jamais capté.
+    const description = textarea.value;
     if (!description.trim()) { statutMsg.textContent = "Décris le problème avant d'envoyer."; return; }
     try {
       if (typeof Sentry !== 'undefined' && typeof Sentry.captureMessage === 'function') {
@@ -3927,6 +3930,7 @@ function renderDashboard() {
     runByLeaIcon(24, 6),
     el("div",{style:{color:"var(--text)",fontSize:"16px",fontWeight:"800"}},"Yoria"),
     el("div",{style:{flex:"1"}}),
+    boutonSignalerProbleme(),
     ESTMODEFORME ? null : el("div",{style:{background:"var(--border-soft)",borderRadius:"8px",padding:"4px 10px",color:"var(--accent)",fontSize:"14px",fontWeight:"700"}},"J–"+countdown()),
     helpBtn
   );
