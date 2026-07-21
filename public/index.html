@@ -3149,6 +3149,7 @@ function renderDashboard() {
   })();
 
 
+  const cw=currentWeek();
   const done=ALL_SESSIONS.filter(s=>statuses[s.uid]==="✅").length;
   const missed=ALL_SESSIONS.filter(s=>statuses[s.uid]==="❌").length;
   const adapted=ALL_SESSIONS.filter(s=>statuses[s.uid]==="⚠️").length;
