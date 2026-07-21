@@ -715,6 +715,20 @@
      miroir exact du fix appliqué à public/index.html le même soir).
      Remplacés par import() dynamique ci-dessous. -->
 <script>
+// window.__AUTH_PRET__ créée ici, de façon SYNCHRONE, avant même de
+// commencer les import() dynamiques ci-dessous — corrige une race
+// condition découverte le 21/07/2026 (Laurent, écran "Consulter un plan
+// existant" jamais affiché malgré un plan bien présent en base). Cause :
+// window.__AUTH_PRET__ n'était assignée qu'après deux `await import(...)`
+// dans l'IIFE async plus bas ; si DOMContentLoaded (et donc
+// initialiserApresChargementEngine()) se déclenchait avant que ces imports
+// ne se terminent, `if (window.__AUTH_PRET__)` évaluait `undefined` =
+// false, et l'attente de l'authentification était silencieusement
+// sautée — chargerPlansSupabase() s'exécutait alors avec
+// window.__UTILISATEUR__ encore undefined, retournait [] à tort, et le
+// wizard sautait directement à la création de plan au lieu de proposer
+// la consultation.
+window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = resolve; });
 (async () => {
   // Cache des modules auth.js et sync-storage.js — même pattern que
   // public/index.html (cf. mémoire de session, étape 3a) : LkAuth/LkSync
@@ -743,10 +757,10 @@
     activerRealtime: syncModule.activerRealtime
   };
 
-  window.__AUTH_PRET__ = LkAuth.monterEcranAuth('ecran-auth-hote').then(function (user) {
+  LkAuth.monterEcranAuth('ecran-auth-hote').then(function (user) {
     window.__UTILISATEUR__ = user;
     document.getElementById('wizard-contenu').style.display = 'block';
-    return user;
+    window.__resoudreAuthPret__(user);
   });
 })();
 </script>
@@ -2357,17 +2371,13 @@
 
     if (document.getElementById('accueil-wizard-contenu')?.style.display === 'block') {
       let plans = [];
-      console.log('[DEBUG accueil] UTILISATEUR au moment du check:', window.__UTILISATEUR__?.id, 'LkSync dispo:', !!window.LkSync);
       try {
         if (window.__UTILISATEUR__?.id && window.LkSync) {
           plans = await window.LkSync.chargerPlansSupabase(window.__UTILISATEUR__.id);
-          console.log('[DEBUG accueil] plans Supabase chargés:', plans.length);
-        } else {
-          console.log('[DEBUG accueil] condition UTILISATEUR/LkSync fausse, saut du chargement Supabase');
         }
-      } catch (e) { console.log('[DEBUG accueil] erreur chargement Supabase:', e.message); }
+      } catch (e) { /* pas grave, traité comme "aucun plan" */ }
       if (plans.length === 0) {
-        try { plans = await chargerPlans(); console.log('[DEBUG accueil] plans Gist chargés:', plans.length); } catch (e) { console.log('[DEBUG accueil] erreur Gist:', e.message); }
+        try { plans = await chargerPlans(); } catch (e) { /* pas de Gist configuré */ }
       }
       if (plans.length === 0) {
         document.getElementById('accueil-wizard-contenu').style.display = 'none';
