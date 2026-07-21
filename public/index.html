@@ -4474,7 +4474,7 @@ async function changerPalierGrandDebutant(nouveauPalierId) {
 // programmé sa montre en 3 laps manuels (échauffement/effort/retour au calme),
 // comme pour toute autre séance qualité.
 function renderTestSemiCooperRow(uid, seance, stravaRun) {
-  if (statuses[uid]) return null; // déjà validé, plus rien à afficher ici
+  if (statuses[uid] && statuses[uid] !== '—') return null; // déjà validé, plus rien à afficher ici
 
   const effortLaps = stravaRun ? getLapsAffichage(stravaRun, seance.structureIntervalles) : [];
   const distanceDetectee = effortLaps.length === 1 ? Math.round(effortLaps[0].distance) : null;
