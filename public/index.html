@@ -3816,7 +3816,6 @@ function renderDashboard() {
           // Test semi-Cooper (Mode Forme sans référence, 21/07/2026) —
           // affiché uniquement pour la séance test tant qu'elle n'est pas
           // encore validée, à la place du bloc manualPerf classique.
-          (() => { console.log('[DEBUG appel] s.estTest=', s.estTest, 's.sousType=', s.sousType, 'uid2=', uid2); return null; })(),
           (s.estTest && s.sousType === 'test-semi-cooper') ? renderTestSemiCooperRow(uid2, s, stravaRun2) : null,
           // Saisie/correction manuelle de performance (docs/source-donnees-
           // seances.md) : toujours accessible pour SPEC/VMA quel que soit
@@ -4475,7 +4474,6 @@ async function changerPalierGrandDebutant(nouveauPalierId) {
 // programmé sa montre en 3 laps manuels (échauffement/effort/retour au calme),
 // comme pour toute autre séance qualité.
 function renderTestSemiCooperRow(uid, seance, stravaRun) {
-  console.log('[DEBUG test] appel avec uid=', uid, 'statut actuel=', statuses[uid], 'seance=', seance?.sousType, seance?.estTest);
   if (statuses[uid] && statuses[uid] !== '—') return null; // déjà validé, plus rien à afficher ici
 
   const effortLaps = stravaRun ? getLapsAffichage(stravaRun, seance.structureIntervalles) : [];
