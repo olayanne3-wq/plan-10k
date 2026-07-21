@@ -1089,14 +1089,16 @@ function ouvrirSignalementProbleme() {
     if (!description.trim()) { statutMsg.textContent = "Décris le problème avant d'envoyer."; return; }
     try {
       if (typeof Sentry !== 'undefined' && typeof Sentry.captureMessage === 'function') {
-        // Payload volontairement minimal (20/07/2026) : un appel avec un
-        // second argument options (extra:{...}) a provoqué un crash "out
-        // of memory" en test réel, cause exacte non identifiée avec
-        // certitude (bug connu du SDK Sentry sur la sérialisation de
-        // contexte, cf. github.com/getsentry/sentry-javascript/issues/
-        // 1717 et 13939) — évité en gardant l'appel à un seul argument
-        // string, dans le buffer garanti du Loader Script.
-        Sentry.captureMessage("[Signalement utilisateur] " + description.trim() + " | vue=" + view);
+        // Contexte réintégré le 21/07/2026 — la vraie cause du crash OOM
+        // était Sentry.configureScope() (cf. correctif window.__AUTH_PRET__
+        // plus haut dans ce fichier), pas ce message. Gardé en un seul
+        // argument string malgré tout (pas de second argument objet) —
+        // c'est la forme la plus sûre, garantie bufferisée par le Loader
+        // Script quel que soit l'état de chargement du SDK complet.
+        const planId = window.__PLAN_BRUT__?.id || "aucun";
+        const estPlanRepli = !!window.__PLAN_BRUT__?.estPlanRepli;
+        const contexte = "vue=" + view + " | planId=" + planId + " | estPlanRepli=" + estPlanRepli + " | url=" + window.location.href;
+        Sentry.captureMessage("[Signalement utilisateur] " + description.trim() + " | " + contexte);
         statutMsg.textContent = "Merci, c'est envoyé !";
         setTimeout(fermer, 1200);
       } else {
