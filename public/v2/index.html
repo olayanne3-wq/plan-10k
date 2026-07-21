@@ -2682,7 +2682,22 @@
     const titre = plan.nom || `${plan.distance} — ${plan.objectif}`;
     if (!confirm(`Supprimer définitivement "${titre}" ? Cette action ne supprime que ce plan (le reste de tes sauvegardes est conservé).`)) return;
     try {
-      await supprimerPlan(id);
+      // Suppression Gist rendue non-bloquante le 21/07/2026 — jusqu'ici,
+      // un échec ici (ex: aucun token GitHub configuré, cf. ecrireListePlans
+      // qui lève une exception explicite dans ce cas) interrompait TOUTE la
+      // fonction avant même d'atteindre la suppression Supabase plus bas,
+      // qui elle aurait réussi. Symptôme observé par Laurent : impossible de
+      // supprimer un plan du tout, malgré la suppression Supabase déjà en
+      // place et fonctionnelle depuis le 13/07 — son propre token GitHub
+      // ayant été volontairement retiré (v2.8, Supabase devenu le mécanisme
+      // de sauvegarde principal), ce chemin échouait systématiquement.
+      // Traitement désormais symétrique au bloc Supabase juste après :
+      // best-effort, on continue même en cas d'échec.
+      try {
+        await supprimerPlan(id);
+      } catch (eGist) {
+        console.warn('Suppression Gist échouée (Supabase reste la source de vérité principale, non bloquant) :', eGist.message);
+      }
       // Suppression Supabase — ajoutée le 13 juillet 2026, étendue le
       // 17/07/2026 pour couvrir plans_original ET plans_actif (chantier
       // séparation original/actif). plans_actif.id a un ON DELETE CASCADE
