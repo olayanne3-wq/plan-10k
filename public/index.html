@@ -114,6 +114,21 @@ input[type=text], input[type=number], input[type=password] {
 <script src="/engine-classic-scripts/decision-engine-rules.classic.js"></script>
 <script src="/engine-classic-scripts/decision-engine-apply.classic.js"></script>
 <script>
+// window.__AUTH_PRET__ créée ici, de façon SYNCHRONE, avant même l'IIFE
+// async ci-dessous — corrige une race condition découverte le 21/07/2026
+// sur v2/index.html (écran "Consulter un plan existant" jamais affiché
+// malgré un plan bien présent en base) et reproduite ici à l'identique.
+// Cause : window.__AUTH_PRET__ n'était assignée qu'après plusieurs
+// `await import(...)` dans l'IIFE async plus bas ; tout code qui exécute
+// `await window.__AUTH_PRET__` avant que ce point ne soit atteint reçoit
+// `undefined`, et `await undefined` ne bloque jamais (JS résout
+// immédiatement une valeur non-promise) — l'attente de l'authentification
+// est donc silencieusement sautée. Symptôme observé : le dashboard
+// retombe sur le plan de repli par défaut (estPlanRepli:true) au lieu du
+// vrai plan Forme fraîchement créé, malgré sa présence réelle en base
+// (chargerPlansSupabase() s'exécutant avec window.__UTILISATEUR__.id
+// encore undefined, retournant [] à tort).
+window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = resolve; });
 (async () => {
   // Cache des modules auth.js et sync-storage.js (19/07/2026, étape 3 du
   // chantier de conversion module — cf. mémoire de session, la partie la
@@ -165,7 +180,7 @@ input[type=text], input[type=number], input[type=password] {
   // planId — les données préfixées par plan seront chargées séparément
   // une fois le plan connu (cf. bloc juste avant render(), fin de fichier).
   // Chantier v2.5 migration, 13 juillet 2026 — voir inventaire §8bis.
-  window.__AUTH_PRET__ = LkAuth.monterEcranAuth('ecran-auth-hote').then(async function (user) {
+  LkAuth.monterEcranAuth('ecran-auth-hote').then(async function (user) {
     window.__UTILISATEUR__ = user;
     // Sentry (20/07/2026, corrigé le 21/07/2026 après un crash) — le
     // Loader Script (cf. <head>) initialise déjà Sentry automatiquement
@@ -251,6 +266,7 @@ input[type=text], input[type=number], input[type=password] {
       }
     }
 
+    window.__resoudreAuthPret__(user);
     return user;
   });
 })();
