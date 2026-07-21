@@ -42,6 +42,14 @@
       "src": "/api/delete-account",
       "dest": "/api/delete-account.js"
     },
+    {
+      "src": "/api/stripe-checkout",
+      "dest": "/api/stripe-checkout.js"
+    },
+    {
+      "src": "/api/stripe-webhook",
+      "dest": "/api/stripe-webhook.js"
+    },
 
     {
       "src": "/v2",
