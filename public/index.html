@@ -167,26 +167,31 @@ input[type=text], input[type=number], input[type=password] {
   // Chantier v2.5 migration, 13 juillet 2026 — voir inventaire §8bis.
   window.__AUTH_PRET__ = LkAuth.monterEcranAuth('ecran-auth-hote').then(async function (user) {
     window.__UTILISATEUR__ = user;
-    // Sentry (20/07/2026) — le Loader Script (cf. <head>) initialise déjà
-    // Sentry automatiquement avec le vrai DSN dès son chargement (config
-    // window.sentryOnLoad définie en tête de <head>, cf. juste après
-    // <!DOCTYPE html>). setUser() n'existe PAS dans le mini-buffer exposé
-    // par le Loader Script tant que le SDK complet n'est pas chargé —
-    // constaté en test le 20/07/2026 (Object.keys(Sentry) ne contient que
-    // onLoad/forceLoad/init/addBreadcrumb/captureMessage/captureException/
-    // captureEvent/configureScope/withScope/showReportDialog). Même
-    // Sentry.onLoad() n'a pas résolu le souci en pratique. configureScope
-    // EST dans ce buffer et fonctionne dès le départ — utilisé à la place,
-    // c'est la méthode recommandée par Sentry pour les anciennes versions
-    // de toute façon (setUser est un raccourci plus récent).
+    // Sentry (20/07/2026, corrigé le 21/07/2026 après un crash) — le
+    // Loader Script (cf. <head>) initialise déjà Sentry automatiquement
+    // avec le vrai DSN dès son chargement (config window.sentryOnLoad
+    // définie en tête de <head>).
+    // BUG GRAVE TROUVÉ ET CORRIGÉ : Sentry.configureScope() a été utilisé
+    // ici dans une première version (car présent dans le buffer du Loader
+    // Script — contrairement à setUser()), mais configureScope() est
+    // DÉPRÉCIÉ et cause un crash "out of memory" documenté et confirmé
+    // avec le SDK v8 (github.com/getsentry/sentry-javascript/issues/13939
+    // — cause confirmée par l'équipe Sentry elle-même : "configureScope
+    // does not exist anymore in v8"). Reproduit en conditions réelles le
+    // 21/07/2026 : onglet navigateur planté après clic sur "Envoyer" du
+    // formulaire de signalement. Fix recommandé par Sentry : utiliser
+    // Sentry.getCurrentScope().setUser() à la place — mais getCurrentScope
+    // n'est pas non plus dans le buffer du Loader Script, donc différé via
+    // Sentry.onLoad(), qui garantit que le SDK complet est chargé avant
+    // d'appeler cette méthode.
     try {
-      if (typeof Sentry !== 'undefined' && typeof Sentry.configureScope === 'function') {
-        Sentry.configureScope(function (scope) {
-          scope.setUser({ id: user.id });
+      if (typeof Sentry !== 'undefined' && typeof Sentry.onLoad === 'function') {
+        Sentry.onLoad(function () {
+          Sentry.getCurrentScope().setUser({ id: user.id });
         });
       }
     } catch (e) {
-      console.warn('Sentry configureScope non déclenché :', e.message);
+      console.warn('Sentry setUser non déclenché :', e.message);
     }
     // Migration rétroactive (one-shot par appareil) AVANT le préchargement :
     // pousse vers Supabase les données déjà présentes en localStorage
