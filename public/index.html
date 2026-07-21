@@ -3073,7 +3073,21 @@ function renderDashboard() {
         nouveauPlan.nom = planCourant.nom;
         nouveauPlan.statuses = planCourant.statuses;
 
-        await sauvegarderPlan(nouveauPlan);
+        // Sauvegarde Supabase — bloquante et principale (21/07/2026, même
+        // correctif que la suppression de plan le même jour). sauvegarderPlan()
+        // (Gist) levait une exception explicite sans token GitHub configuré,
+        // ce qui interrompait TOUTE la fonction avant même d'atteindre une
+        // sauvegarde qui aurait pu réussir — LkSync.mettreAJourPlanSupabase()
+        // est la vraie source de vérité depuis le passage v2.8 ("Supabase
+        // devient le mécanisme de sauvegarde principal").
+        if (window.__UTILISATEUR__?.id && window.LkSync) {
+          await window.LkSync.mettreAJourPlanSupabase(nouveauPlan.id, nouveauPlan);
+        }
+        // Gist : best-effort, jamais bloquant (compatibilité ascendante).
+        if (getGithubToken()) {
+          try { await sauvegarderPlan(nouveauPlan); }
+          catch (eGist) { console.warn('Sauvegarde Gist échouée (Supabase OK, non bloquant) :', eGist.message); }
+        }
         window.location.reload();
       } catch (e) {
         alert("La génération du bloc suivant a échoué : " + e.message);
@@ -3138,7 +3152,15 @@ function renderDashboard() {
         nouveauPlan.nom = planCourant.nom;
         nouveauPlan.statuses = planCourant.statuses;
 
-        await sauvegarderPlan(nouveauPlan);
+        // Sauvegarde Supabase — bloquante et principale, même correctif que
+        // genererSuivant() juste au-dessus (21/07/2026).
+        if (window.__UTILISATEUR__?.id && window.LkSync) {
+          await window.LkSync.mettreAJourPlanSupabase(nouveauPlan.id, nouveauPlan);
+        }
+        if (getGithubToken()) {
+          try { await sauvegarderPlan(nouveauPlan); }
+          catch (eGist) { console.warn('Sauvegarde Gist échouée (Supabase OK, non bloquant) :', eGist.message); }
+        }
         window.location.reload();
       } catch (e) {
         alert("La génération de la suite de ton plan a échoué : " + e.message);
