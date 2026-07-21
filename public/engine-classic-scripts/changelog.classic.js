@@ -21,7 +21,14 @@
  */
 
 const VERSIONS = [
-      { ver:"v2.15", title:"Stratégie de course par km ronds, wizard simplifié & correctifs Strava/estimation", current:true, notes:[
+      { ver:"v2.16", title:"Fiabilité du profil et de la charge d'entraînement, premiers outils de suivi qualité", current:true, notes:[
+        "🐛 Bug important corrigé : dans certains cas, le profil (nom, prénom, poids, taille) pouvait s'effacer en partie après avoir changé le niveau ou le sexe juste avant d'enregistrer les réglages — l'enregistrement se fait maintenant toujours en une seule fois, sans perte possible",
+        "🐛 L'écran de bienvenue pouvait se redéclencher à tort sur un compte déjà configuré si la connexion au serveur était temporairement instable — corrigé, le profil existant n'est plus jamais écrasé dans ce cas",
+        "🐛 Le calcul de fatigue et de charge d'entraînement pouvait donner une valeur aberrante si la fréquence cardiaque de repos n'était pas renseignée dans le profil — corrigé avec une valeur de repli cohérente",
+        "🌦️ La météo (actuelle et passée sur tes séances) passe maintenant par le même circuit technique que la météo prévisionnelle, plus fiable et plus simple à faire évoluer",
+        "🐛 Signalement d'un problème : un nouveau bouton (icône 🐛) est disponible en haut de chaque écran pour décrire directement un souci rencontré dans l'app",
+      ]},
+      { ver:"v2.15", title:"Stratégie de course par km ronds, wizard simplifié & correctifs Strava/estimation", current:false, notes:[
         "🏁 Stratégie de jour de course en repères kilométriques ronds pour Semi et Marathon (tous les 5km, avec un palier supplémentaire à 35km sur marathon) — plus simple à suivre en course que les pourcentages calculés précédents",
         "📝 L'étape \"Niveau\" a disparu du parcours de création de plan — c'est un réglage de ton profil, plus besoin de le repréciser à chaque nouveau plan",
         "🔗 Nouveau correctif sur la reconnexion Strava : un jeton de renouvellement expiré est maintenant détecté immédiatement, avec le bon message et le bouton de reconnexion, au lieu d'un échec silencieux",
