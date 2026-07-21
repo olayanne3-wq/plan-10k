@@ -1963,6 +1963,37 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
       return;
     }
 
+    // Semaine test semi-Cooper (21/07/2026) — plan.allures est null tant
+    // que le test n'est pas fait (cf. generatePlanFormeAvecTest,
+    // plan-forme.js), donc Object.entries(plan.allures) plus bas
+    // planterait exactement comme le cas marche-course ci-dessus l'a déjà
+    // fait avant son propre correctif du 15/07 (bouton "Générer" qui
+    // semblait ne rien faire, erreur JS silencieuse). Sortie anticipée
+    // avec un message explicite, plutôt que de repasser par le chemin
+    // Mode Forme classique plus bas qui suppose toujours des allures
+    // connues.
+    if (plan.mode === 'forme' && plan.enAttenteTest) {
+      document.getElementById('resultsAmpleur').textContent =
+        `Mode forme — test semi-Cooper à faire avant de connaître tes allures — ${plan.warnings.length} avertissement(s).`;
+      document.getElementById('resultsWarnCount').textContent = `${plan.warnings.length} alerte(s)`;
+      document.getElementById('resDuree').textContent = `Bloc de ${plan.tailleBlocSemaines} semaines (glissant)`;
+      document.getElementById('resPhases').textContent = 'Mode forme — pas de phases';
+      document.getElementById('resPlafond').textContent = '—';
+      document.getElementById('resFcMax').textContent = plan.zoneFC
+        ? `${plan.zoneFC.fcMax} bpm max (${plan.zoneFC.methode === 'mesuree' ? 'mesurée' : 'estimée, formule de Tanaka'})`
+        : 'Renseigne ton année de naissance ou ta FC max connue pour voir cette zone';
+      document.getElementById('resAllures').innerHTML =
+        '<div class="bib-row"><span class="k">Allures</span><span class="v" style="opacity:.7;">Pas encore établies — fais ton test semi-Cooper (6 minutes) dès la première semaine pour les débloquer</span></div>';
+
+      rafraichirPlanComplet();
+
+      const warnDivTest = document.getElementById('resWarnings');
+      warnDivTest.innerHTML = plan.warnings.map(w =>
+        `<div class="flag" style="margin-top:10px;"><span class="ico">⚠️</span><span>${w.message}</span></div>`
+      ).join('') || '<div class="flag" style="margin-top:10px;"><span class="ico">✅</span><span>Aucun avertissement.</span></div>';
+      return;
+    }
+
     // Mode Forme (13 juillet 2026) : pas de phases/dureeSemaines/ampleurObjectif
     // (notions propres au plan course, cf. plan-forme.js) — repli textuel
     // plutôt qu'un plantage sur plan.phases.map(...) undefined.
