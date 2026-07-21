@@ -7204,7 +7204,19 @@ function renderSettings() {
   // en lecture directe Supabase (RLS "Users can view their own subscription",
   // policy select où auth.uid()=user_id) — pas de route API dédiée, cohérent
   // avec le reste de l'app qui lit déjà Supabase directement côté client.
-if (typeof window.__abonnementStatutCache__ === "undefined") {
+ if (typeof window.__abonnementStatutCache__ === "undefined") {
+    window.__abonnementStatutCache__ = null;
+  }
+  const urlParamsAbonnement = new URLSearchParams(window.location.search);
+  const retourStripeSucces = urlParamsAbonnement.get("stripe") === "succes";
+  if (retourStripeSucces && !window.__abonnementCacheInvalideApresCheckout__) {
+    window.__abonnementCacheInvalideApresCheckout__ = true; // ne le refaire qu'une fois
+    window.__abonnementStatutCache__ = undefined; // force le refetch ci-dessous
+    urlParamsAbonnement.delete("stripe");
+    const nouvelleUrl = window.location.pathname + (urlParamsAbonnement.toString() ? "?"+urlParamsAbonnement.toString() : "");
+    window.history.replaceState({}, "", nouvelleUrl);
+  }
+  if (typeof window.__abonnementStatutCache__ === "undefined") {
     window.__abonnementStatutCache__ = null;
     (async () => {
       if (!window.__UTILISATEUR__?.id || !LkAuth?.supabase) { window.__abonnementStatutCache__ = 'none'; return; }
