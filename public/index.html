@@ -1037,6 +1037,84 @@ function sauvegarderProfilCoureur() {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// SIGNALEMENT DE PROBLÈME — bouton "🐛" dans les headers (20/07/2026)
+// Complète Sentry (qui capture les erreurs techniques automatiquement) pour
+// les bugs SILENCIEUX — quand quelque chose se passe mal sans qu'aucune
+// exception JS ne se déclenche (ex. mauvaise valeur affichée, comportement
+// inattendu). L'utilisateur décrit ce qu'il observe ; le rapport part vers
+// Sentry avec le contexte technique utile déjà attaché automatiquement
+// (user_id, vue actuelle, plan actif) — pas besoin qu'il sache ouvrir sa
+// console ou nous copier des infos techniques lui-même.
+// ══════════════════════════════════════════════════════════════════════════════
+function boutonSignalerProbleme() {
+  return el("button", {
+    title: "Signaler un problème",
+    style: {
+      background: "none", border: "none", cursor: "pointer", padding: "4px",
+      display: "flex", alignItems: "center", fontSize: "18px", lineHeight: "1",
+      color: "var(--text2)"
+    },
+    onClick: ouvrirSignalementProbleme
+  }, "🐛");
+}
+
+function ouvrirSignalementProbleme() {
+  const overlay = el("div", {style:{
+    position:"fixed", inset:"0", background:"rgba(0,0,0,0.5)", zIndex:"1000",
+    display:"flex", alignItems:"center", justifyContent:"center", padding:"20px"
+  }});
+  let description = "";
+  const textarea = el("textarea", {
+    placeholder: "Qu'est-ce qui ne va pas ? Décris ce que tu observes...",
+    style: {
+      width:"100%", minHeight:"120px", padding:"10px", borderRadius:"8px",
+      border:"1px solid var(--border)", background:"var(--bg)", color:"var(--text)",
+      fontSize:"14px", fontFamily:"inherit", resize:"vertical"
+    },
+    onInput: (e) => { description = e.target.value; }
+  });
+  const statutMsg = el("div", {class:"muted", style:{fontSize:"13px", marginTop:"8px", minHeight:"18px"}});
+  const fermer = () => overlay.remove();
+  const envoyer = () => {
+    if (!description.trim()) { statutMsg.textContent = "Décris le problème avant d'envoyer."; return; }
+    try {
+      if (typeof Sentry !== 'undefined' && typeof Sentry.captureMessage === 'function') {
+        Sentry.captureMessage("[Signalement utilisateur] " + description.trim(), {
+          level: "info",
+          extra: {
+            vue: view,
+            planId: window.__PLAN_BRUT__?.id || null,
+            estPlanRepli: !!window.__PLAN_BRUT__?.estPlanRepli,
+            url: window.location.href
+          }
+        });
+        statutMsg.textContent = "Merci, c'est envoyé !";
+        setTimeout(fermer, 1200);
+      } else {
+        statutMsg.textContent = "Envoi indisponible pour le moment, réessaie plus tard.";
+      }
+    } catch (e) {
+      statutMsg.textContent = "Envoi indisponible pour le moment, réessaie plus tard.";
+    }
+  };
+  const modal = el("div", {style:{
+    background:"var(--bg)", borderRadius:"12px", padding:"20px", maxWidth:"420px", width:"100%",
+    border:"1px solid var(--border)"
+  }},
+    el("div", {style:{fontSize:"16px", fontWeight:"700", marginBottom:"12px"}}, "🐛 Signaler un problème"),
+    textarea,
+    statutMsg,
+    el("div", {style:{display:"flex", gap:"8px", marginTop:"14px", justifyContent:"flex-end"}},
+      el("button", {style:{background:"none", border:"1px solid var(--border)", borderRadius:"8px", padding:"8px 16px", cursor:"pointer", color:"var(--text)"}, onClick: fermer}, "Annuler"),
+      el("button", {style:{background:"var(--accent)", border:"none", borderRadius:"8px", padding:"8px 16px", cursor:"pointer", color:"var(--bg)", fontWeight:"700"}, onClick: envoyer}, "Envoyer")
+    )
+  );
+  overlay.appendChild(modal);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) fermer(); });
+  document.body.appendChild(overlay);
+}
+
 // Alias conservés pour compatibilité avec le reste du fichier (encore
 // beaucoup d'usages de runnerWeight/runnerHeight/runnerFcMax/runnerPps
 // directement) — lisent/écrivent maintenant profilCoureur en coulisses,
@@ -3192,6 +3270,7 @@ function renderDashboard() {
       runByLeaIcon(24,6),
       el("div",{style:{color:"var(--text)",fontSize:"16px",fontWeight:"800"}},"Yoria"),
       el("div",{style:{flex:"1"}}),
+      boutonSignalerProbleme(),
       el("div",{style:{background:"var(--border-soft)",borderRadius:"8px",padding:"4px 10px",color:"var(--accent)",fontSize:"14px",fontWeight:"700"}},"J-"+cd)
     );
     const wrapper=document.createElement("div");
@@ -7726,6 +7805,7 @@ function render() {
       el("div",{style:{color:"var(--text)",fontSize:"17px",fontWeight:"700",lineHeight:"1"}},titles[vueEffective]||""),
       vueEffective==="weekDetail"?el("div",{class:"muted",style:{fontSize:"13px",marginTop:"1px"}},phaseOf(selectedWeek).label):null
     ),
+    boutonSignalerProbleme(),
     ESTMODEFORME ? null : el("div",{style:{background:"var(--border-soft)",borderRadius:"8px",padding:"4px 10px",color:"var(--accent)",fontSize:"15px",fontWeight:"700"}},"J–"+countdown())
   );
 
