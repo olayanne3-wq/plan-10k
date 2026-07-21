@@ -267,25 +267,23 @@ function generatePlanFormeMarcheCourse(profil, params) {
 
 const TAILLE_BLOC_SEMAINES = 4;
 
-export function generatePlanForme(profil, params) {
-  if (profil.niveau === 'grand-debutant') {
-    return generatePlanFormeMarcheCourse(profil, params);
-  }
-
-  const refTimeSeconds = parseTimeToSeconds(params.tempsReference);
-  const refDistanceKm = { '5K': 5, '10K': 10, 'Semi': 21.1, 'Marathon': 42.2 }[params.refDistance ?? '10K'];
-
-  const allSeconds = computeAlluresForme({ refTimeSeconds, refDistanceKm });
-  const allures = Object.fromEntries(Object.entries(allSeconds).map(([k, v]) => [k, formatPace(v)]));
-
-  const accent = params.accent ?? 'polyvalent';
-  const nbSemaines = params.nbSemainesBloc ?? TAILLE_BLOC_SEMAINES;
-
+/**
+ * Génère un tableau de semaines Mode Forme classique (EF/longue/qualité,
+ * volume progressif), à partir d'un numéro de semaine donné — factorisé le
+ * 21/07/2026 pour être réutilisable à la fois par generatePlanForme()
+ * (génération complète depuis semaine 1) et completerBlocApresTest()
+ * (continuation depuis semaine 2, une fois le résultat du test connu).
+ * semaineDebut/semaineFin sont des numéros absolus dans le bloc (1-based) —
+ * computeVolumeFormeSemaine() utilise ce numéro pour la progression et la
+ * détection de décharge, donc respecter la bonne numérotation ici est
+ * important même si on ne génère qu'une partie du bloc.
+ */
+function genererSemainesForme({ profil, allSeconds, accent, volumeActuel, semaineDebut, semaineFin, indexRotationDebut = 0 }) {
   const semaines = [];
   const warnings = [];
-  let indexRotation = 0;
+  let indexRotation = indexRotationDebut;
 
-  for (let semaineNum = 1; semaineNum <= nbSemaines; semaineNum++) {
+  for (let semaineNum = semaineDebut; semaineNum <= semaineFin; semaineNum++) {
     const { assignment, warnings: warningsPlacement } = placerSemaine({
       joursDisponibles: profil.joursDisponiblesHabituels,
       niveau: profil.niveau,
@@ -294,7 +292,7 @@ export function generatePlanForme(profil, params) {
       forcerAucuneQualite: false
     });
 
-    const { volumeKm, estDecharge } = computeVolumeFormeSemaine({ volumeDepart: params.volumeActuel, semaineNum });
+    const { volumeKm, estDecharge } = computeVolumeFormeSemaine({ volumeDepart: volumeActuel, semaineNum });
 
     let kmQualiteTotal = 0;
     for (const seance of Object.values(assignment)) {
@@ -328,10 +326,6 @@ export function generatePlanForme(profil, params) {
         seance.kmEstime = kmEstime;
         if (warning) warnings.push({ ...warning, message: `S${semaineNum} (jour ${jour}) : ${warning.message}` });
       } else if (seance.type === 'longue') {
-        // pas de notion de phase ni de segment allure course en Forme :
-        // genererContenuLongue avec phase indéfinie retombe sur la sortie
-        // longue simple à allure EF (avecSegmentCourse ne se déclenche que
-        // pour Semi/Marathon en phase Specifique/Affutage, jamais ici)
         const { contenu, kmEstime, warning } = genererContenuLongue({ distance: undefined, phase: undefined, alluresSec: allSeconds, kmCible: kmLongue });
         seance.contenu = contenu;
         seance.kmEstime = kmEstime;
@@ -350,6 +344,29 @@ export function generatePlanForme(profil, params) {
   }
 
   warnings.push(...semaines.flatMap(s => s.warnings));
+  return { semaines, warnings, indexRotationSuivant: indexRotation };
+}
+
+export function generatePlanForme(profil, params) {
+  if (profil.niveau === 'grand-debutant') {
+    return generatePlanFormeMarcheCourse(profil, params);
+  }
+
+  const refTimeSeconds = parseTimeToSeconds(params.tempsReference);
+  const refDistanceKm = { '5K': 5, '10K': 10, 'Semi': 21.1, 'Marathon': 42.2 }[params.refDistance ?? '10K'];
+
+  const allSeconds = computeAlluresForme({ refTimeSeconds, refDistanceKm });
+  const allures = Object.fromEntries(Object.entries(allSeconds).map(([k, v]) => [k, formatPace(v)]));
+
+  const accent = params.accent ?? 'polyvalent';
+  const nbSemaines = params.nbSemainesBloc ?? TAILLE_BLOC_SEMAINES;
+
+  const { semaines, warnings } = genererSemainesForme({
+    profil, allSeconds, accent,
+    volumeActuel: params.volumeActuel,
+    semaineDebut: 1,
+    semaineFin: nbSemaines
+  });
 
   const plan = {
     mode: 'forme',
@@ -513,5 +530,59 @@ export function generatePlanFormeAvecTest(profil, params) {
     })(),
     semaines: [semaine1],
     warnings: warningsPlacement
+  };
+}
+
+/**
+ * Complète un plan Forme partiel (enAttenteTest: true, une seule semaine)
+ * une fois le résultat du test semi-Cooper connu — génère les semaines 2 à
+ * N avec les vraies allures calculées, et les fusionne avec la semaine 1
+ * déjà existante (test + footings libres, non régénérée, cf. principe
+ * transverse de l'app : ne jamais modifier rétroactivement une semaine déjà
+ * passée/déjà réalisée — la semaine 1 contient le test que le coureur a
+ * déjà fait, elle ne doit plus bouger).
+ *
+ * resultatTest : { refTimeSeconds, refDistanceKm } — sortie de
+ * estimerReferenceDepuisSemiCooper() (index.html, au moment de la
+ * validation du résultat, cf. lk_resultat_test_forme).
+ */
+export function completerBlocApresTest(planPartiel, profil, resultatTest) {
+  if (!planPartiel.enAttenteTest) {
+    throw new Error("Ce plan n'est pas en attente de test — rien à compléter.");
+  }
+
+  const allSeconds = computeAlluresForme({
+    refTimeSeconds: resultatTest.refTimeSeconds,
+    refDistanceKm: resultatTest.refDistanceKm
+  });
+  const allures = Object.fromEntries(Object.entries(allSeconds).map(([k, v]) => [k, formatPace(v)]));
+
+  const nbSemaines = planPartiel.tailleBlocSemaines ?? TAILLE_BLOC_SEMAINES;
+  const volumeActuel = profil.volumeActuel; // fourni par l'appelant (index.html), lu depuis le wizard d'origine ou un repli raisonnable
+
+  const { semaines: semainesSuivantes, warnings } = genererSemainesForme({
+    profil,
+    allSeconds,
+    accent: planPartiel.accent,
+    volumeActuel,
+    semaineDebut: 2,
+    semaineFin: nbSemaines
+  });
+
+  return {
+    ...planPartiel,
+    enAttenteTest: false,
+    allures,
+    zoneFC: planPartiel.zoneFC ?? (() => {
+      const fcMax = profil.fcMaxConnue ?? (profil.anneeNaissance ? computeFcMaxTanaka(profil.anneeNaissance) : null);
+      if (!fcMax) return null;
+      return {
+        methode: profil.fcMaxConnue ? 'mesuree' : 'tanaka',
+        fcMax,
+        zonesParType: computeZonesFC(fcMax)
+      };
+    })(),
+    semaines: [...planPartiel.semaines, ...semainesSuivantes],
+    warnings: [...(planPartiel.warnings ?? []), ...warnings]
   };
 }
