@@ -21,7 +21,12 @@
  */
 
 const VERSIONS = [
-      { ver:"v2.16", title:"Fiabilité du profil et de la charge d'entraînement, premiers outils de suivi qualité", current:true, notes:[
+      { ver:"v2.17", title:"Abonnement Yoria Premium", current:true, notes:[
+        "💳 Nouvel abonnement Yoria Premium (7€/mois ou tarif annuel), depuis Réglages",
+        "🔒 Paiement sécurisé via Stripe, dans ton navigateur habituel",
+        "✅ Statut de l'abonnement visible directement dans Réglages",
+      ]},
+      { ver:"v2.16", title:"Fiabilité du profil et de la charge d'entraînement, premiers outils de suivi qualité", current:false, notes:[
         "🐛 Bug important corrigé : dans certains cas, le profil (nom, prénom, poids, taille) pouvait s'effacer en partie après avoir changé le niveau ou le sexe juste avant d'enregistrer les réglages — l'enregistrement se fait maintenant toujours en une seule fois, sans perte possible",
         "🐛 L'écran de bienvenue pouvait se redéclencher à tort sur un compte déjà configuré si la connexion au serveur était temporairement instable — corrigé, le profil existant n'est plus jamais écrasé dans ce cas",
         "🐛 Le calcul de fatigue et de charge d'entraînement pouvait donner une valeur aberrante si la fréquence cardiaque de repos n'était pas renseignée dans le profil — corrigé avec une valeur de repli cohérente",
