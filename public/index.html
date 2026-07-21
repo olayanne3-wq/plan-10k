@@ -3080,6 +3080,74 @@ function renderDashboard() {
     );
   })();
 
+  // ── Complétion du plan après test semi-Cooper (21/07/2026) ───────────────
+  // Semi-automatique, même pattern que blocSuivantEl juste au-dessus — le
+  // plan reste en enAttenteTest:true (une seule semaine, cf. plan-forme.js
+  // generatePlanFormeAvecTest) jusqu'à ce que ce bandeau soit confirmé,
+  // même si lk_resultat_test_forme existe déjà (le test peut être validé
+  // sans recharger la page immédiatement après).
+  const completerTestEl = (() => {
+    if (!window.__PLAN_BRUT__?.enAttenteTest) return null;
+    const resultatTest = load(clePourPlan("lk_resultat_test_forme"), null);
+    if (!resultatTest) return null; // test pas encore fait/validé
+
+    const completerPlan = async () => {
+      const boutonClique = document.getElementById("completer-test-btn");
+      if (boutonClique) { boutonClique.disabled = true; boutonClique.textContent = "Génération..."; }
+      try {
+        const planCourant = window.__PLAN_BRUT__;
+        const premiereSemaine = planCourant.semaines?.[0];
+        const joursDisponibles = premiereSemaine
+          ? Object.keys(premiereSemaine.assignment).map(Number)
+          : [1, 3, 5];
+
+        let profilStocke;
+        try { profilStocke = JSON.parse(localStorage.getItem('lk_profil_coureur')); } catch { profilStocke = null; }
+
+        const profil = {
+          niveau: profilStocke?.niveau || 'intermediaire',
+          anneeNaissance: profilStocke?.anneeNaissance || undefined,
+          fcMaxConnue: profilStocke?.fcMax || undefined,
+          joursDisponiblesHabituels: joursDisponibles,
+          renforcementMusculaire: false,
+          // Volume de départ : pas de trace fiable de ce qui a été saisi au
+          // wizard pour ce plan (mêmes limites que blocSuivantEl un peu
+          // plus haut — profilOrigine/paramsOrigine non stockés sur le plan
+          // résultant). Repli à 20km/semaine, valeur prudente pour démarrer.
+          volumeActuel: 20
+        };
+
+        const nouveauPlan = completerBlocApresTest(planCourant, profil, resultatTest);
+        nouveauPlan.id = planCourant.id;
+        nouveauPlan.nom = planCourant.nom;
+        nouveauPlan.statuses = planCourant.statuses;
+
+        await sauvegarderPlan(nouveauPlan);
+        window.location.reload();
+      } catch (e) {
+        alert("La génération de la suite de ton plan a échoué : " + e.message);
+        console.error(e);
+      } finally {
+        if (boutonClique) { boutonClique.disabled = false; boutonClique.textContent = "Générer la suite de mon plan"; }
+      }
+    };
+
+    return el("div",{style:{background:"rgba(var(--accent-rgb),0.07)",border:"1px solid rgba(var(--accent-rgb),0.2)",borderRadius:"12px",padding:"14px 16px",marginBottom:"16px"}},
+      el("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"10px"}},
+        el("span",{style:{fontSize:"20px"}},"🎯"),
+        el("div",{},
+          el("div",{style:{color:"var(--text)",fontSize:"14px",fontWeight:"600"}},"Ton résultat est prêt"),
+          el("div",{class:"muted",style:{fontSize:"13px"}},"VMA estimée : "+resultatTest.vmaKmh.toFixed(1)+" km/h")
+        )
+      ),
+      el("button",{id:"completer-test-btn",style:{
+          width:"100%",background:"var(--accent)",border:"none",borderRadius:"8px",padding:"11px",
+          color:"var(--bg)",fontSize:"14px",fontWeight:"700",cursor:"pointer"
+        }, onClick: completerPlan
+      },"Générer la suite de mon plan")
+    );
+  })();
+
 
   const done=ALL_SESSIONS.filter(s=>statuses[s.uid]==="✅").length;
   const missed=ALL_SESSIONS.filter(s=>statuses[s.uid]==="❌").length;
@@ -4098,7 +4166,7 @@ function renderDashboard() {
   // principal (décision d'emplacement tranchée le 6 juillet 2026).
   const selecteurPlanEl = renderSelecteurPlan();
 
-  return el("div",{style:{padding:"0 16px 100px"}},dashHeaderEl,selecteurPlanEl,progressionMarcheCourseEl,blocSuivantEl,adaptationEl,moteurDecisionEl,prochainPalierEl,ESTMODEFORME?null:heroPred,todayEl||"",bilanEl,phaseEl,stravaSection);
+  return el("div",{style:{padding:"0 16px 100px"}},dashHeaderEl,selecteurPlanEl,progressionMarcheCourseEl,blocSuivantEl,completerTestEl,adaptationEl,moteurDecisionEl,prochainPalierEl,ESTMODEFORME?null:heroPred,todayEl||"",bilanEl,phaseEl,stravaSection);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
