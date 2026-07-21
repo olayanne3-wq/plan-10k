@@ -392,7 +392,7 @@ async function createFreeStripeSubscription(config, customerId) {
   const params = new URLSearchParams();
   params.append("customer", customerId);
   params.append("items[0][price]", config.stripePriceId);
-  params.append("coupon", config.stripeFreeCouponId);
+  params.append("discounts[0][coupon]", config.stripeFreeCouponId);
 
   const response = await fetch(
     "https://api.stripe.com/v1/subscriptions",
