@@ -1,6 +1,22 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+<!-- Sentry (suivi d'erreurs, ajouté le 20/07/2026 pour les beta testeurs).
+     window.sentryOnLoad DOIT être défini avant le tag du Loader Script
+     ci-dessous (doc officielle Sentry) — le Loader Script appelle déjà
+     Sentry.init() automatiquement avec le vrai DSN dès son chargement ;
+     cette fonction permet juste d'ajouter des options en plus (release)
+     sans avoir à connaître/redéclarer le DSN nous-mêmes. setUser() est
+     fait plus tard dans ce fichier, une fois l'utilisateur connu (cf.
+     window.__AUTH_PRET__). -->
+<script>
+window.sentryOnLoad = function () {
+  Sentry.init({
+    environment: "production",
+  });
+};
+</script>
+<script src="https://js-de.sentry-cdn.com/1598be66558d46e63cc4443c635738e7.min.js" crossorigin="anonymous"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="mobile-web-app-capable" content="yes">
@@ -151,6 +167,21 @@ input[type=text], input[type=number], input[type=password] {
   // Chantier v2.5 migration, 13 juillet 2026 — voir inventaire §8bis.
   window.__AUTH_PRET__ = LkAuth.monterEcranAuth('ecran-auth-hote').then(async function (user) {
     window.__UTILISATEUR__ = user;
+    // Sentry (20/07/2026) — le Loader Script (cf. <head>) initialise déjà
+    // Sentry automatiquement avec le vrai DSN dès son chargement (config
+    // window.sentryOnLoad définie en tête de <head>, cf. juste après
+    // <!DOCTYPE html>). Ici on attache seulement l'utilisateur dès qu'il
+    // est connu — pas de ré-appel à Sentry.init(), qui écraserait la
+    // config déjà faite par le Loader Script. typeof Sentry !== 'undefined'
+    // : ne jamais planter le login si Sentry est bloqué (adblocker) ou pas
+    // encore chargé à cet instant précis.
+    try {
+      if (typeof Sentry !== 'undefined') {
+        Sentry.setUser({ id: user.id });
+      }
+    } catch (e) {
+      console.warn('Sentry setUser non déclenché :', e.message);
+    }
     // Migration rétroactive (one-shot par appareil) AVANT le préchargement :
     // pousse vers Supabase les données déjà présentes en localStorage
     // depuis avant la mise en place de cette synchronisation, pour ne
