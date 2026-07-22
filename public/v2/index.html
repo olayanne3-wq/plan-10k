@@ -407,6 +407,9 @@
   .day.selected{ border-color:var(--pace); background:var(--pace-soft); }
   .day.selected .d{ color:var(--pace); }
   .day.selected span:last-child{ color:var(--pace); }
+  .day.longue{ border-color:#d99a1f; background:rgba(217,154,31,0.12); border-width:2px; }
+  .day.longue .d{ color:#d99a1f; }
+  .day.longue span:last-child{ color:#d99a1f; }
 
   .count-badge{
     display:inline-flex; align-items:center; gap:6px;
@@ -1355,6 +1358,7 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
       <p class="sub">Sélectionne tes créneaux possibles, le plan placera les séances clés dessus.</p>
       <div class="count-badge">● <span id="dayCount">3</span> séances / semaine</div>
       <div class="days-grid" id="daysGrid"></div>
+      <p class="sub" style="margin-top:10px; font-size:13px;">Reclique sur un jour sélectionné pour en faire ta sortie longue</p>
 
       <div class="block-label" style="margin-top:22px;">Renforcement musculaire</div>
       <div class="toggle-row">
@@ -1571,10 +1575,25 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
       el.className = 'day' + (selectedDefault.includes(i) ? ' selected' : '');
       el.dataset.dayIndex = i;
       el.innerHTML = `<span class="d">${d}</span><span>●</span>`;
-      el.onclick = () => { el.classList.toggle('selected'); updateDayCount(); };
+      el.onclick = () => { toggleDayCycle(el, grid); updateDayCount(); };
       grid.appendChild(el);
     });
     updateDayCount();
+  }
+
+  // Cycle à 3 états par case : non sélectionné -> sélectionné -> sélectionné+longue -> non sélectionné.
+  // Une seule case "longue" à la fois par grille (retire le statut des autres avant de l'affecter).
+  function toggleDayCycle(el, grid){
+    const estSelectionne = el.classList.contains('selected');
+    const estLongue = el.classList.contains('longue');
+    if (!estSelectionne) {
+      el.classList.add('selected');
+    } else if (!estLongue) {
+      grid.querySelectorAll('.day.longue').forEach(d => d.classList.remove('longue'));
+      el.classList.add('longue');
+    } else {
+      el.classList.remove('selected', 'longue');
+    }
   }
 
   function updateDayCount(){
@@ -1872,6 +1891,8 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     const longFormat = distanceMeta[currentDist].unit === "h:min:sec";
     const joursDisponibles = [...document.querySelectorAll('#daysGrid .day.selected')]
       .map(el => parseInt(el.dataset.dayIndex));
+    const jourLongueEl = document.querySelector('#daysGrid .day.longue');
+    const jourLongueChoisi = jourLongueEl ? parseInt(jourLongueEl.dataset.dayIndex) : null;
 
     const contraintesSelected = [...document.querySelectorAll('.opt[data-group="contraintes"].selected')]
       .map(el => el.dataset.value)
@@ -1897,6 +1918,10 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
       anneeNaissance: profilStocke?.anneeNaissance || undefined,
       fcMaxConnue: profilStocke?.fcMax || undefined,
       joursDisponiblesHabituels: joursDisponibles,
+      // Choix explicite du jour de sortie longue (21/07/2026) — null si le
+      // coureur n'a pas re-cliqué pour en désigner un, auquel cas
+      // placerSemaine() garde son placement automatique actuel.
+      jourLongueChoisi: jourLongueChoisi,
       renforcementMusculaire: renfoOn,
       // Palier de départ toujours 0 à la création d'un plan marche-course —
       // la progression se fait ensuite depuis le dashboard, pas ici.
