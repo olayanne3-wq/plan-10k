@@ -232,7 +232,46 @@ doit être explicitement propagé dans cette fonction pour être visible côté
 `index.html` — sinon silencieusement perdu, sans erreur (bug rencontré le
 21/07/2026 : `estTest`/`sousType` du test semi-Cooper jamais propagés,
 rendant le champ de saisie de résultat invisible malgré un plan brut
-correct).
+correct). Mapping `FAMILLE_VERS_TYPE_V1` doit couvrir tout nouveau
+`sousType` de séance qualité (ex. `test-semi-cooper` → `TEST`), sinon
+repli silencieux vers `SEUIL`.
+
+**Test semi-Cooper pour plan course (22/07/2026)** — même principe que
+Mode Forme (`generatePlanAvecTestSemiCooper`/`completerPlanApresTestSemiCooper`,
+flux "Je n'ai pas de référence" côté wizard), mais la suite du plan dépend
+de `dateCourse` : `completerPlanApresTestSemiCooper` ré-appelle
+`generatePlan()` normalement avec `dateDebut` décalé de 7 jours,
+`computePhases` recalcule alors `totalSemaines` depuis le temps réellement
+restant jusqu'à la course (pas un bloc de taille fixe comme en Forme).
+
+- **Placement du test** : sur le premier jour *utile* de la semaine (date
+  réelle ≥ `dateDebut`), pas simplement le plus petit jourIndex de la
+  semaine calendaire — sinon le test peut tomber sur un jour neutralisé
+  par `traduirePlanVersFormatV1` (jour antérieur à `dateDebut`, si le plan
+  démarre en cours de semaine), donc jamais affiché côté dashboard.
+- **`estimerReferenceDepuisSemiCooper`** : VMA (km/h) = distance en 6min ÷
+  100 (protocole demi-Cooper), puis conversion directe vers un temps 10K
+  équivalent via le ratio documenté de la littérature (~90% de la VMA
+  tenue sur 10K, `RATIO_VMA_VERS_10K`). Ne passe plus par `PACE_RATIOS.I`
+  (calibré sur des séances VMA classiques avec récupération, pas
+  équivalent à un effort continu de 6 minutes — chaîner les deux ratios
+  sous-estimait fortement le 10K équivalent, bug corrigé le 22/07/2026).
+- **`objectif`** recalculé par Riegel depuis le vrai résultat du test
+  (jamais la valeur par défaut du champ neutralisé du wizard) — sinon
+  fausse l'allure C, `categoriserAmpleurObjectif` et la stratégie de
+  course affichée.
+- **`paramsOrigine`/`profilOrigine`** conservés sur le plan complété (pas
+  mis à `undefined`) avec les vraies valeurs finales — `index.html` lit
+  `paramsOrigine.tempsReference` pour l'affichage "Estimation"
+  (`BASE_TIME_REFERENCE`), avec un repli codé en dur sur 3021s (50'21")
+  si absent.
+- **Footings de la semaine 1** recalculés en allure EF réelle une fois le
+  test complété (40min à allure EF, via `genererContenuEF`) — jamais le
+  jour du test lui-même (déjà réalisé, principe transverse de l'app).
+- **Jour "🏁 Jour J — Course !"** ne doit jamais s'afficher sur un plan
+  encore `enAttenteTest` (une seule semaine → risque de la traiter comme
+  "dernière semaine du plan" = semaine de course) — `jourCourseIndex` mis
+  à `null` dans ce cas côté wizard.
 
 ## 8. Moteur de décision
 
@@ -252,8 +291,21 @@ correct).
 4. **TrendAnalyzer** — 5 détecteurs de signaux sur plusieurs semaines
 5. **RuleEngine** — catalogue de règles actif :
    - R-006 (pic de séance), R-024s (fatigue élevée), R-040 (désengagement),
-     R-050 (ACWR élevé), R-060 (tendance fatigue sur 3 mesures), R-070
-     (séances ratées consécutives)
+     R-050 (ACWR élevé), R-070 (séances ratées consécutives)
+   - **R-060 (tendance fatigue en hausse)** — méthode revue le 22/07/2026 :
+     échantillonnage quotidien sur 8 jours (J à J-7) comparé par moitiés
+     (moyenne J-7..J-4 vs J-3..J), seuil écart ≥6, au lieu de l'ancienne
+     méthode à 3 points (J/J-4/J-7, croissance stricte, seuil ≥8).
+     Raison : avec 3 points, une seule séance isolée bien placée pouvait
+     satisfaire par hasard la croissance stricte et déclencher une fausse
+     alerte — particulièrement probable pour un coureur à faible fréquence
+     (2-3 séances/semaine), où la fatigue reste "en plateau" entre deux
+     séances (le ratio ACWR ne varie qu'aux dates avec activité). La
+     comparaison par moitiés amortit ce cas (une moyenne sur 4 jours n'est
+     pas basculée par un seul point) tout en détectant aussi bien les
+     vraies tendances progressives. Ne touche à aucune logique de
+     `calculerCharge()`/ACWR (Module 1) — R-060 échantillonne seulement à
+     des dates différentes la métrique `fatigue` déjà calculée là-bas.
    - R-062 (fatigue persistante 3 semaines, priorité 82)
    - R-080 (déficit volume durable, 3 semaines ≤−10% vs plan, priorité 52)
 
@@ -262,6 +314,12 @@ clic explicite uniquement, `reduire_charge` cible EF/LONGUE/RECUP
 uniquement (jamais les séances de qualité — algorithme dédié nécessaire
 pour ça, non fait). Garde-fous anti-cumul : −30% max par décision, plafond
 cumulé 25%/14j glissants (journal `planBrut.historiqueReductionsMoteur`).
+**Titre de la carte** distingue désormais deux cas (22/07/2026) : "Yoria
+te propose un ajustement" uniquement quand une vraie action est possible
+(`reduire_charge`, bouton Appliquer visible) ; "Yoria a repéré un signal à
+surveiller" pour les décisions purement informatives (`alerter_*`, R-060/
+R-062, seul "Ignorer" disponible) — l'ancien titre unique était trompeur
+pour ce second cas.
 
 Coach IA branché sur le moteur : lit `RunnerState`/`EngineDecision` du jour,
 ne recalcule jamais un ratio séparé, peut commenter la décision mais jamais
@@ -278,15 +336,19 @@ sans règle d'alerte (pas de seuils validés pour coureurs récréatifs).
 - R-062/R-070/R-080 jamais observées sur données réelles de Laurent — à
   surveiller
 
-**Bug à investiguer (noté 21/07/2026)** : la carte "Yoria te propose un
-ajustement" a affiché "Seulement 0 séance(s) sur les 14 derniers jours" de
-façon apparemment incorrecte, juste après une session de correction de
-bugs de timing (race condition `__AUTH_PRET__`, profil dupliqué). À
-vérifier : le moteur a-t-il tourné sur un historique de séances incomplet
-à cause de ces bugs, ou est-ce un bug distinct dans le calcul lui-même
-(EngagementCalculator/R-040).
+**Bug "0 séance sur 14 jours" (résolu le 22/07/2026)** : cause la plus
+probable identifiée — `autoSync()` (auto-synchro Strava) ne se
+redéclenchait que si `lastSyncTime` datait de plus d'1h, sans jamais
+vérifier si `stravaActivities` était réellement peuplé. Si ces deux
+données se retrouvaient incohérentes entre elles (ex. lors d'une
+interruption de session), le moteur tournait silencieusement sur un
+historique vide, potentiellement longtemps. Corrigé : l'auto-synchro se
+déclenche aussi si `stravaActivities` est vide, même si la sync est
+récente. Hypothèse cohérente avec le code, pas reproduite explicitement
+en conditions réelles — à surveiller si le message réapparaît malgré ce
+fix.
 
-## 9. Saisie manuelle et RPE
+## 9. Saisie manuelle, RPE et statuts de séance
 
 **Saisie manuelle** : bouton "Annuler" (réinitialise + relance sync Strava),
 champ "durée totale" pour séances de qualité, exclusion Strava complète
@@ -296,6 +358,40 @@ quand saisie manuelle existe (injection `ActivitySample` synthétique).
 (🙂😐😓😣🥵) mappés CR-10, visible dès qu'un statut ✅/⚠️/❌ est posé,
 pondération TRIMP +12% si RPE ≥ 8. Libellé affiché en dur sous l'icône
 sélectionnée après clic (pas de tooltip seul, ne marche pas sur mobile).
+
+**Statuts de séance** (`SOPTS`) : `—` / `✅` / `❌` / `⚠️` / `😴`, indexés
+par `uid` (`week-slotIdx`) dans `statuses`. Une séance ne peut plus être
+supprimée du plan (bouton retiré le 22/07/2026, demande explicite de
+Laurent) — seul un statut la caractérise. `hiddenSessions`/`showRestoreMenu`
+restent dans le code pour compatibilité avec les séances masquées avant ce
+changement, sans nouveau point d'entrée.
+
+**`statutEffectif` (22/07/2026)** — calculé de façon centralisée dans
+`recalculerAllSessions()`, disponible sur chaque objet `ALL_SESSIONS` :
+égal au vrai statut saisi (`statuses[uid]`) s'il existe, sinon `"😴"`
+automatiquement pour tout jour **déjà passé** (`date < today()`, jamais le
+jour même) sans saisie. Jamais écrit dans `statuses[uid]` lui-même — reste
+purement un calcul d'affichage, ne peut jamais écraser une vraie saisie
+tardive. Avant ce changement, un calcul équivalent n'existait que
+localement dans `renderWeekDetail()` (le badge de statut), invisible du
+reste de l'app — stats, moteur de décision et garde-fous du swap
+continuaient de lire `statuses[uid]` brut, ignorant les séances
+auto-repos. Point de vigilance : `recalculerAllSessions()` est appelée une
+première fois avant que `statuses` (`let`, déclarée plus loin dans le
+fichier) soit initialisée — accès protégé par un vrai `try/catch` (pas
+`typeof`, qui ne protège pas d'une temporal dead zone `let`/`const` du même
+scope — cause d'un bug d'écran blanc corrigé le 22/07/2026).
+
+**Échange de séances (swap, `swappedSessions[uid] = uidB` bidirectionnel)**
+— étendu le 22/07/2026 : `getAvailableSlots()` propose désormais tous les
+jours de la semaine comme cible, pas seulement les jours repos/masqués
+(demande explicite de Laurent : "swap 2 séances existantes, même si ce
+n'est pas un repos"). Bloqué dans les deux sens (source et destination) si
+la séance a un statut posé, une note, un RPE, une saisie manuelle, **ou**
+si le jour est passé sans saisie (`statutEffectif` = 😴 implicite) — ces
+données restent indexées par `uid` (position calendaire), pas par le
+contenu de la séance, donc un swap les laisserait accrochées au mauvais
+jour après échange.
 
 ## 10. Import FIT
 
@@ -514,8 +610,9 @@ calcul si le temps donné venait d'une autre distance) — sélecteur compact
 | Saisie plaisir par séance (PACES-S) | 🔜 Reporté |
 | Republier piste "V2" Play Console | 🔜 Pas urgent, Alpha suffit pour Laurent |
 | Passage Stripe en clés live (commercialisation réelle) | 🔜 Quand prêt à lancer publiquement |
-| Bug carte moteur "0 séance sur 14 jours" | 🔜 À investiguer, cf. §8 |
 | Validation empirique de `RATIO_VMA_VERS_10K` (0.90) et `PACE_RATIOS.E` (1.225) | 🔜 Corrigés le 22/07/2026 sur base théorique (littérature demi-Cooper) faute de vraies données — à revalider avec le premier vrai test semi-Cooper couru par Laurent (pas simulé) une fois disponible. |
+| Refonte swap : écrire directement dans `plan_actif` au lieu de `swappedSessions` séparé | 🔜 Discuté le 22/07/2026 (suggestion de Laurent) — éliminerait la classe de bug déjà rencontrée (oublier d'appliquer le swap à un nouvel endroit). Complexité identifiée avant de s'y lancer : annulation d'un swap (garder une trace de l'état d'origine), interaction avec les régénérations de plan (bloc suivant, adaptation, complétion post-test — risque d'écraser silencieusement un swap), séparation `plans_actif`/`plans_original`, chemin de sauvegarde (bloquant `LkSync` vs `save()` fire-and-forget actuel), interaction avec le moteur de décision (`reduire_charge` sur une séance swappée) et le jour du test semi-Cooper. Pas commencé. |
+| `statutEffectif` : étendre aux autres lecteurs de `statuses[uid]` | 🔜 Centralisé dans `ALL_SESSIONS`/`recalculerAllSessions()` et la garde du swap (22/07/2026), mais plusieurs autres lectures directes de `statuses[uid]` dans `index.html` (stats détaillées §Stats, moteur de décision R-040/R-070, prédicteur) ne tiennent pas encore compte du 😴 automatique — à auditer et étendre au cas par cas, pas fait en une passe pour limiter le risque de régression. |
 
 Pour l'historique des versions livrées et des correctifs, voir
 `changelog.classic.js`. Pour le détail méthodologique des séances, voir
