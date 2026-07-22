@@ -1281,7 +1281,7 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
       </div>
       <div class="flag" style="margin-top:16px;">
         <span class="ico">✅</span>
-        <span id="feasibilityText">Objectif réaliste sur 11 semaines pour un profil intermédiaire.</span>
+        <span id="feasibilityText">À déterminer une fois les temps renseignés.</span>
       </div>
       <div class="flag" id="courseTestFlag" style="display:none; margin-top:16px;">
         <span class="ico">🎯</span>
@@ -1388,8 +1388,8 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
         <span class="bib-num">N° 0142</span>
         <div class="bib-row"><span class="k">Distance</span><span class="v accent" id="bibDist">10K</span></div>
         <div class="bib-row"><span class="k">Niveau</span><span class="v" id="bibNiveau">Intermédiaire</span></div>
-        <div class="bib-row"><span class="k">Temps actuel</span><span class="v" id="bibRef">50:21</span></div>
-        <div class="bib-row"><span class="k">Objectif</span><span class="v accent" id="bibObj">48:30</span></div>
+        <div class="bib-row"><span class="k">Temps actuel</span><span class="v" id="bibRef">À déterminer</span></div>
+        <div class="bib-row"><span class="k">Objectif</span><span class="v accent" id="bibObj">À déterminer</span></div>
         <div class="bib-row"><span class="k">Durée du plan</span><span class="v" id="bibWeeks">11 semaines</span></div>
         <div class="bib-row"><span class="k">Séances / semaine</span><span class="v" id="bibNbSeances">3</span></div>
         <div class="bib-row"><span class="k">Contraintes</span><span class="v" id="bibConstraints">Aucune</span></div>
@@ -1525,10 +1525,10 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
   }
 
   const distanceMeta = {
-    "5":   { label:"5K",       name:"Ton dernier 5K",   refDefault:{h:0,m:22,s:30}, objDefault:{h:0,m:21,s:0},  unit:"min:sec" },
-    "10":  { label:"10K",      name:"Ton dernier 10K",  refDefault:{h:0,m:50,s:21}, objDefault:{h:0,m:48,s:30}, unit:"min:sec" },
-    "21.1":{ label:"Semi",     name:"Ton dernier semi", refDefault:{h:1,m:52,s:0},  objDefault:{h:1,m:47,s:0},  unit:"h:min:sec" },
-    "42.2":{ label:"Marathon", name:"Ton dernier marathon", refDefault:{h:4,m:5,s:0}, objDefault:{h:3,m:50,s:0}, unit:"h:min:sec" }
+    "5":   { label:"5K",       name:"Ton dernier 5K",   refDefault:null, objDefault:null,  unit:"min:sec" },
+    "10":  { label:"10K",      name:"Ton dernier 10K",  refDefault:null, objDefault:null, unit:"min:sec" },
+    "21.1":{ label:"Semi",     name:"Ton dernier semi", refDefault:null,  objDefault:null,  unit:"h:min:sec" },
+    "42.2":{ label:"Marathon", name:"Ton dernier marathon", refDefault:null, objDefault:null, unit:"h:min:sec" }
   };
   let currentDist = "10";
   // Distance de référence pour le temps saisi en Mode Forme (21/07/2026) —
@@ -2938,9 +2938,10 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     try {
       const longFormat = distanceMeta[currentDist].unit === "h:min:sec";
       const refSeconds = Engine.parseTimeToSeconds(readTimeFields('t', longFormat));
+      if (refSeconds <= 0) throw new Error('reference vide');
       const km = Engine.KM_BY_DISTANCE[DISTANCE_MAP[currentDist]];
       document.getElementById('paceHelper').textContent = Engine.formatPace(refSeconds / km) ;
-    } catch (e) { /* champs incomplets */ }
+    } catch (e) { document.getElementById('paceHelper').textContent = 'À déterminer'; }
   }
 
   function updateGainHelper(){
@@ -2948,6 +2949,7 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
       const longFormat = distanceMeta[currentDist].unit === "h:min:sec";
       const refSeconds = Engine.parseTimeToSeconds(readTimeFields('t', longFormat));
       const objSeconds = Engine.parseTimeToSeconds(readTimeFields('o', longFormat));
+      if (refSeconds <= 0 || objSeconds <= 0) throw new Error('champs incomplets');
       const diff = refSeconds - objSeconds; // positif si l'objectif est plus rapide
       const pct = (diff / refSeconds) * 100;
       const sign = diff >= 0 ? '−' : '+';
@@ -2955,7 +2957,7 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
       const m = Math.floor(absDiff / 60);
       const s = absDiff % 60;
       document.getElementById('gainHelper').textContent = `${sign}${m}'${String(s).padStart(2,'0')}" (${sign}${Math.abs(pct).toFixed(1)}%)`;
-    } catch (e) { /* champs incomplets */ }
+    } catch (e) { document.getElementById('gainHelper').textContent = 'À déterminer'; }
   }
 
   function updateFeasibilityText(){
@@ -2963,6 +2965,13 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
       const longFormat = distanceMeta[currentDist].unit === "h:min:sec";
       const refSeconds = Engine.parseTimeToSeconds(readTimeFields('t', longFormat));
       const objSeconds = Engine.parseTimeToSeconds(readTimeFields('o', longFormat));
+      if (refSeconds <= 0 || objSeconds <= 0) {
+        document.getElementById('feasibilityText').textContent = 'À déterminer une fois les temps renseignés.';
+        const flagElVide = document.getElementById('feasibilityText').closest('.flag');
+        const icoElVide = flagElVide ? flagElVide.querySelector('.ico') : null;
+        if (icoElVide) icoElVide.textContent = 'ℹ️';
+        return;
+      }
       // 20/07/2026 : l'étape "Niveau" du wizard a été retirée — le niveau
       // se lit désormais depuis le profil stocké (Réglages), comme partout
       // ailleurs dans ce fichier (collectParamsFromWizard, estGrandDebutant).
@@ -3040,13 +3049,18 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     document.getElementById('tUnit').textContent = meta.unit;
     document.getElementById('oUnit').textContent = meta.unit;
 
-    document.getElementById('tHour').value = meta.refDefault.h;
-    document.getElementById('tMin').value = String(meta.refDefault.m).padStart(2,'0');
-    document.getElementById('tSec').value = String(meta.refDefault.s).padStart(2,'0');
+    // 22/07/2026 : refDefault/objDefault sont désormais null (plus de
+    // fausses valeurs plausibles type "50:21") — le champ est vidé, sauf
+    // si preremplirDepuisProfilCoureur() (appelée juste après, ligne
+    // ~3025) trouve un vrai record enregistré, auquel cas elle écrasera
+    // ces valeurs vides avec la vraie donnée du coureur.
+    document.getElementById('tHour').value = meta.refDefault?.h ?? '';
+    document.getElementById('tMin').value = meta.refDefault ? String(meta.refDefault.m).padStart(2,'0') : '';
+    document.getElementById('tSec').value = meta.refDefault ? String(meta.refDefault.s).padStart(2,'0') : '';
 
-    document.getElementById('oHour').value = meta.objDefault.h;
-    document.getElementById('oMin').value = String(meta.objDefault.m).padStart(2,'0');
-    document.getElementById('oSec').value = String(meta.objDefault.s).padStart(2,'0');
+    document.getElementById('oHour').value = meta.objDefault?.h ?? '';
+    document.getElementById('oMin').value = meta.objDefault ? String(meta.objDefault.m).padStart(2,'0') : '';
+    document.getElementById('oSec').value = meta.objDefault ? String(meta.objDefault.s).padStart(2,'0') : '';
 
     document.getElementById('bibDist').textContent = meta.label;
     updateBibTimesAndAllure();
@@ -3062,14 +3076,20 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     const longFormat = distanceMeta[currentDist].unit === "h:min:sec";
     const refStr = readTimeFields('t', longFormat);
     const objStr = readTimeFields('o', longFormat);
-    document.getElementById('bibRef').textContent = refStr;
-    document.getElementById('bibObj').textContent = objStr;
+    // 22/07/2026 : les champs n'ont plus de valeur par défaut en dur — un
+    // champ vide donne "0:00" via readTimeFields, affiché tel quel c'est
+    // trompeur (ressemble à une vraie valeur saisie). Repli explicite.
+    document.getElementById('bibRef').textContent = Engine.parseTimeToSeconds(refStr) > 0 ? refStr : 'À déterminer';
+    document.getElementById('bibObj').textContent = Engine.parseTimeToSeconds(objStr) > 0 ? objStr : 'À déterminer';
     try {
       const refSeconds = Engine.parseTimeToSeconds(refStr);
+      if (refSeconds <= 0) throw new Error('reference vide');
       const refKm = Engine.KM_BY_DISTANCE[DISTANCE_MAP[currentDist]];
       const paceRef10k = Engine.paceFromTime(Engine.riegelPredict(refSeconds, refKm, 10), 10);
       document.getElementById('bibAllureEF').textContent = Engine.formatPace(paceRef10k * Engine.PACE_RATIOS.E);
-    } catch (e) { /* champs incomplets, on laisse tel quel */ }
+    } catch (e) {
+      document.getElementById('bibAllureEF').textContent = 'À déterminer';
+    }
   }
 
   function showStep(n){
