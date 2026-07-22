@@ -257,6 +257,35 @@
   }
 
   // --------------------------------------------------------------------------
+  // MÉTHODE REVUE le 22/07/2026 (discussion avec Laurent, simulations à
+  // l'appui) — remplace l'ancienne méthode à 3 points (J/J-4/J-7,
+  // croissance stricte) par un échantillonnage quotidien sur 8 jours
+  // (J à J-7) comparé par moitiés (moyenne J-7..J-4 vs moyenne J-3..J).
+  //
+  // Raison du changement : avec seulement 3 points, une SEULE séance
+  // isolée bien placée (ex. grosse séance qualité le jour même) peut
+  // satisfaire par hasard la condition "J-7 < J-4 < J" et déclencher une
+  // fausse alerte de tendance — d'autant plus probable avec un coureur à
+  // faible fréquence (2-3 séances/semaine), où la fatigue reste "collée"
+  // en plateau entre deux séances (elle ne varie qu'aux dates où une
+  // activité existe, le ratio ACWR ne bougeant pas les jours de repos).
+  // Simulations menées sur des séries synthétiques (2/3/5+ séances par
+  // semaine, séance isolée sur J, bruit sans vraie tendance, vraie hausse
+  // progressive) : la comparaison par moitiés amortit correctement les cas
+  // de séance isolée (une moyenne sur 4 jours n'est pas basculée par un
+  // seul point), tout en détectant les vraies tendances progressives aussi
+  // bien que l'ancienne méthode. Seuil recalibré à 6 (au lieu de 8) car
+  // l'écart est désormais mesuré entre deux MOYENNES de 4 jours (déjà
+  // lissées), pas entre deux points bruts — un écart de 6 sur des moyennes
+  // est un signal aussi net qu'un écart de 8 sur des points isolés (cf.
+  // scénario "hausse lente mais réelle" des simulations, qui n'était
+  // détecté qu'à partir de ce seuil).
+  //
+  // Ne touche à AUCUNE logique de calculerCharge()/ACWR (Module 1,
+  // decision-engine-runner-state.classic.js) — R-060 ne fait qu'échantillonner
+  // à des dates différentes la même métrique "fatigue" déjà calculée là-bas,
+  // seule la façon de LIRE cette série de valeurs change ici.
+  // --------------------------------------------------------------------------
   function evaluerTendanceFatigue(activitySamples, dateReference, coureurOptions) {
     if (!Array.isArray(activitySamples) || activitySamples.length === 0) return null;
     if (!global.DecisionEngineRunnerState || typeof global.DecisionEngineRunnerState.calculerRunnerState !== 'function') {
@@ -267,9 +296,8 @@
     const dateRef = new Date(dateReference);
     const joursMs = 24 * 60 * 60 * 1000;
 
-    // 3 points : J (aujourd'hui), J-4, J-7 — espacement volontairement inégal
-    // pour capter une tendance sur ~1 semaine sans se limiter à un pas fixe
-    const dates = [0, 4, 7].map(decalage => new Date(dateRef.getTime() - decalage * joursMs));
+    // 8 points quotidiens : J (aujourd'hui) à J-7 inclus.
+    const dates = [0, 1, 2, 3, 4, 5, 6, 7].map(decalage => new Date(dateRef.getTime() - decalage * joursMs));
 
     const points = dates.map(d => {
       const rs = global.DecisionEngineRunnerState.calculerRunnerState(activitySamples, {
@@ -281,25 +309,30 @@
       return { date: d.toISOString().slice(0, 10), fatigue: rs.fatigue, confiance: rs.confiance };
     });
 
-    // Les 3 points doivent être exploitables (fatigue calculable)
+    // Les 8 points doivent être exploitables (fatigue calculable)
     if (points.some(p => p.fatigue === null || p.fatigue === undefined)) return null;
 
-    const [fJ, fJ4, fJ7] = points.map(p => p.fatigue);
+    // points[0]=J ... points[7]=J-7 → réordonné chronologiquement pour la
+    // lisibilité (J-7 en premier), même convention que l'ancienne méthode.
+    const fatigueChronologique = [...points].reverse().map(p => p.fatigue);
+    const premiereMoitie = fatigueChronologique.slice(0, 4); // J-7..J-4
+    const deuxiemeMoitie = fatigueChronologique.slice(4, 8);  // J-3..J
 
-    // Tendance strictement croissante en remontant dans le temps : J7 < J4 < J
-    const croissanceStricte = fJ7 < fJ4 && fJ4 < fJ;
-    if (!croissanceStricte) return null;
+    const moyenne = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+    const moy1 = moyenne(premiereMoitie);
+    const moy2 = moyenne(deuxiemeMoitie);
+    const ecart = moy2 - moy1;
 
     // Si un point a déjà franchi le seuil dur, R-024s couvre déjà le cas —
-    // R-060 ne sert qu'à capter la montée AVANT ce seuil
-    if (fJ >= 75 || fJ4 >= 75 || fJ7 >= 75) return null;
+    // R-060 ne sert qu'à capter la montée AVANT ce seuil.
+    const maxJour = Math.max(...fatigueChronologique);
+    if (maxJour >= 75) return null;
 
-    // Écart minimal pour ne pas réagir à du bruit (±1-2 points sans
-    // signification) : au moins 8 points de fatigue entre J-7 et J
-    const ecartTotal = fJ - fJ7;
-    if (ecartTotal < 8) return null;
+    // Seuil recalibré à 6 (cf. commentaire ci-dessus) — écart entre deux
+    // moyennes de 4 jours, pas entre points bruts.
+    if (ecart < 6) return null;
 
-    const confianceMoyenne = Math.round((points[0].confiance + points[1].confiance + points[2].confiance) / 3);
+    const confianceMoyenne = Math.round(points.reduce((s, p) => s + p.confiance, 0) / points.length);
 
     return {
       id: 'R-060',
@@ -307,9 +340,9 @@
       categorie: 'securite',
       priorite: 80, // sécurité, sous R-050 (85) : signal plus précoce donc moins urgent que les seuils déjà franchis
       type: 'alerter_tendance_fatigue',
-      justification: `Fatigue en hausse continue sur les 7 derniers jours : ${fJ7} → ${fJ4} → ${fJ}. Aucun seuil critique franchi, mais la tendance mérite une vigilance avant la prochaine séance de qualité.`,
+      justification: `Fatigue en hausse sur les 7 derniers jours : ${Math.round(moy1)} → ${Math.round(moy2)} de moyenne (première moitié de semaine vs seconde). Aucun seuil critique franchi, mais la tendance mérite une vigilance avant la prochaine séance de qualité.`,
       confianceMax: Math.min(confianceMoyenne, 65),
-      donnees: { pointsFatigue: points, ecartTotal },
+      donnees: { pointsFatigue: points, moyennePremiereMoitie: Math.round(moy1 * 10) / 10, moyenneDeuxiemeMoitie: Math.round(moy2 * 10) / 10, ecart: Math.round(ecart * 10) / 10 },
     };
   }
 
