@@ -519,23 +519,46 @@
   .strava-unit{ font-size:13px; color:rgba(var(--text-rgb),0.5); }
   .manual-volume .time-input{ justify-content:flex-start; padding:20px 18px; }
 
-  /* Refonte étape volume (22/07/2026) — carte unique, réutilise
-     .strava-card comme conteneur visuel pour tous les états. */
+  /* Refonte étape volume (22/07/2026) — design épuré : icône + libellé
+     court en haut, chiffre en gros, actions en boutons discrets côte à
+     côte plutôt qu'en liens texte empilés. */
   .volume-card-inner{
-    border:1px solid var(--line);
-    border-radius:16px;
-    padding:18px;
     background:rgba(var(--text-rgb),0.03);
+    border-radius:16px;
+    padding:20px 18px;
   }
   .volume-card-inner .time-input{ justify-content:flex-start; padding:20px 18px; }
   .volume-status{
     display:flex; align-items:center; gap:8px;
     font-family:'Inter',sans-serif;
-    font-size:14px;
-    color:rgba(var(--text-rgb),0.65);
+    font-size:13px;
+    color:rgba(var(--text-rgb),0.55);
+    margin-bottom:14px;
   }
   .volume-status-warn{ color:var(--warn, #c9762a); }
   .volume-spin{ font-style:normal; }
+  .volume-big{
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
+    font-size:38px;
+    font-weight:700;
+    color:var(--paper);
+    display:flex; align-items:baseline; gap:8px;
+    margin-bottom:16px;
+  }
+  .volume-big .unit{ font-size:14px; font-weight:400; color:rgba(var(--text-rgb),0.5); }
+  .volume-actions{ display:flex; gap:8px; }
+  .volume-actions .btn-ghost{
+    flex:1;
+    padding:10px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:rgba(var(--text-rgb),0.65);
+    font-family:'Inter',sans-serif;
+    font-size:12px;
+    cursor:pointer;
+  }
+  .volume-actions .btn-ghost:hover{ background:rgba(var(--text-rgb),0.05); }
 
   /* Date picker + computed duration */
   .date-field{
@@ -1794,9 +1817,11 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     if (state.mode === 'connexion') {
       conteneur.innerHTML = `
         <div class="volume-card-inner">
-          <p class="sub" style="margin-bottom:12px;">Connecte Strava pour pré-remplir ce chiffre automatiquement (médiane des 8 dernières semaines), plutôt que de l'estimer toi-même.</p>
-          <button class="btn-mini" onclick="${suffixeConnecter}()">📡 Connecter Strava</button>
-          <span class="alt-toggle" onclick="${suffixeToggle}('manuel')" style="display:block; margin-top:10px;">Ou indique ton volume manuellement</span>
+          <div class="volume-status"><span>📡</span><span>Pas encore connecté</span></div>
+          <div class="volume-actions">
+            <button class="btn-ghost" onclick="${suffixeConnecter}()">Connecter Strava</button>
+            <button class="btn-ghost" onclick="${suffixeToggle}('manuel')">Indiquer manuellement</button>
+          </div>
         </div>`;
       return;
     }
@@ -1804,11 +1829,11 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     if (state.mode === 'authInvalide') {
       conteneur.innerHTML = `
         <div class="volume-card-inner">
-          <div class="volume-status volume-status-warn">
-            <span>⚠️</span><span>Connexion Strava expirée</span>
+          <div class="volume-status volume-status-warn"><span>⚠️</span><span>Connexion Strava expirée</span></div>
+          <div class="volume-actions">
+            <button class="btn-ghost" onclick="${suffixeConnecter}()">Reconnecter</button>
+            <button class="btn-ghost" onclick="${suffixeToggle}('manuel')">Indiquer manuellement</button>
           </div>
-          <button class="btn-mini" style="margin-top:10px;" onclick="${suffixeConnecter}()">🔄 Reconnecter Strava</button>
-          <span class="alt-toggle" onclick="${suffixeToggle}('manuel')" style="display:block; margin-top:10px;">Ou indique ton volume manuellement</span>
         </div>`;
       return;
     }
@@ -1816,10 +1841,10 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     if (state.mode === 'erreur') {
       conteneur.innerHTML = `
         <div class="volume-card-inner">
-          <div class="volume-status">
-            <span>ℹ️</span><span>Pas d'historique Strava suffisant</span>
+          <div class="volume-status"><span>ℹ️</span><span>Pas d'historique suffisant</span></div>
+          <div class="volume-actions">
+            <button class="btn-ghost" onclick="${suffixeToggle}('manuel')">Indiquer manuellement</button>
           </div>
-          <span class="alt-toggle" onclick="${suffixeToggle}('manuel')" style="display:block; margin-top:10px;">Indiquer mon volume manuellement</span>
         </div>`;
       return;
     }
@@ -1827,11 +1852,12 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     if (state.mode === 'manuel') {
       conteneur.innerHTML = `
         <div class="volume-card-inner">
-          <div class="time-input">
+          <div class="volume-status"><span>✏️</span><span>Saisie manuelle</span></div>
+          <div class="time-input" style="margin-bottom:14px;">
             <input type="text" maxlength="3" value="${state.valeur ?? 30}" id="${idInput}" style="width:3ch;">
             <span class="unit">km / semaine</span>
           </div>
-          ${state.stravaDisponible ? `<span class="alt-toggle" onclick="${suffixeToggle}('strava')">Revenir à l'estimation Strava</span>` : ''}
+          ${state.stravaDisponible ? `<div class="volume-actions"><button class="btn-ghost" onclick="${suffixeToggle}('strava')">Revenir à l'estimation Strava</button></div>` : ''}
         </div>`;
       return;
     }
@@ -1839,13 +1865,12 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     // mode 'strava' — connecté, valeur chargée
     conteneur.innerHTML = `
       <div class="volume-card-inner">
-        <div class="strava-head">
-          <span class="strava-badge">📡 Depuis Strava</span>
-          <span class="strava-period">Médiane, 8 dernières semaines</span>
+        <div class="volume-status"><span>📡</span><span>Depuis Strava, médiane 8 semaines</span></div>
+        <div class="volume-big"><span>${state.valeur}</span><span class="unit">km / semaine</span></div>
+        <div class="volume-actions">
+          <button class="btn-ghost" onclick="${suffixeToggle}('manuel')">Corriger</button>
+          <button class="btn-ghost" onclick="${suffixeDeco}()">Déconnecter</button>
         </div>
-        <div class="strava-value"><span>${state.valeur}</span><span class="strava-unit">km / semaine</span></div>
-        <span class="alt-toggle" onclick="${suffixeToggle}('manuel')">Ce chiffre ne te semble pas juste ? Corriger manuellement</span>
-        <span class="alt-toggle" onclick="${suffixeDeco}()" style="display:block; margin-top:4px; opacity:0.6;">Déconnecter Strava</span>
       </div>`;
   }
 
