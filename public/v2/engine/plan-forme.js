@@ -489,14 +489,40 @@ export function generatePlanFormeAvecTest(profil, params) {
     jourLongueChoisi: profil.jourLongueChoisi ?? null
   });
 
-  for (const [, seance] of Object.entries(assignment)) {
-    if (seance.type === 'qualite') {
+  // Placement du test sur le PREMIER jour UTILE de la semaine (22/07/2026,
+  // même correctif que generatePlanAvecTestSemiCooper dans
+  // plan-generator.js) — pas forcément le jour "qualité" désigné par
+  // placerSemaine(). "Utile" = le plus petit jourIndex dont la date réelle
+  // (lundi de la semaine + jourIndex) tombe à partir de dateDebut : si le
+  // plan démarre en cours de semaine, traduirePlanVersFormatV1 (v1-bridge.js)
+  // neutralise en "REPOS" tout jour antérieur à dateDebut — un test placé
+  // sur un tel jour ne serait jamais affiché côté dashboard.
+  const dateDebutPlan = new Date(params.dateDebut + 'T00:00:00Z');
+  const jourSemaineISODebut = (dateDebutPlan.getUTCDay() + 6) % 7;
+  const lundiDeLaSemaine = new Date(dateDebutPlan);
+  lundiDeLaSemaine.setUTCDate(dateDebutPlan.getUTCDate() - jourSemaineISODebut);
+
+  const joursUtiles = Object.keys(assignment)
+    .map(Number)
+    .filter(j => {
+      const dateJour = new Date(lundiDeLaSemaine);
+      dateJour.setUTCDate(lundiDeLaSemaine.getUTCDate() + j);
+      return dateJour >= dateDebutPlan;
+    });
+  const premierJour = joursUtiles.length > 0
+    ? Math.min(...joursUtiles)
+    : Math.min(...Object.keys(assignment).map(Number));
+
+  for (const [jour, seance] of Object.entries(assignment)) {
+    if (Number(jour) === premierJour) {
       const { sousType, contenu, kmEstime, structureIntervalles } = genererContenuTestSemiCooper();
+      seance.type = 'qualite';
       seance.sousType = sousType;
       seance.contenu = contenu;
       seance.kmEstime = kmEstime;
       seance.structureIntervalles = structureIntervalles;
       seance.estTest = true;
+      delete seance.indexQualite;
     } else if (seance.type === 'ef' || seance.type === 'longue') {
       const { contenu, kmEstime } = genererContenuFootingLibre();
       seance.contenu = contenu;
@@ -571,6 +597,28 @@ export function completerBlocApresTest(planPartiel, profil, resultatTest) {
     semaineFin: nbSemaines
   });
 
+  // Recalcul des footings de la semaine 1 (22/07/2026, même correctif que
+  // completerPlanApresTestSemiCooper dans plan-generator.js) — jusqu'ici,
+  // semaine 1 restait figée avec "Footing libre" même après complétion du
+  // test, alors que les vraies allures sont désormais connues. Seul le jour
+  // du test (estTest:true) n'est jamais touché (déjà réalisé). Durée fixe
+  // 40min : pas de volumeCibleKm connu pour cette semaine de test.
+  const DUREE_FOOTING_SEMAINE_TEST_MIN = 40;
+  const semaine1Recalculee = {
+    ...planPartiel.semaines[0],
+    assignment: Object.fromEntries(
+      Object.entries(planPartiel.semaines[0].assignment).map(([jour, seance]) => {
+        if (seance.estTest) return [jour, seance];
+        if (seance.type === 'ef' || seance.type === 'longue') {
+          const kmCible = (DUREE_FOOTING_SEMAINE_TEST_MIN * 60) / allSeconds.E;
+          const { contenu, kmEstime } = genererContenuEF({ alluresSec: allSeconds, kmCible });
+          return [jour, { ...seance, contenu, kmEstime }];
+        }
+        return [jour, seance];
+      })
+    )
+  };
+
   return {
     ...planPartiel,
     enAttenteTest: false,
@@ -584,7 +632,7 @@ export function completerBlocApresTest(planPartiel, profil, resultatTest) {
         zonesParType: computeZonesFC(fcMax)
       };
     })(),
-    semaines: [...planPartiel.semaines, ...semainesSuivantes],
+    semaines: [semaine1Recalculee, ...semainesSuivantes],
     warnings: [...(planPartiel.warnings ?? []), ...warnings]
   };
 }
