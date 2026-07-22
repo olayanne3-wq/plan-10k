@@ -1107,14 +1107,24 @@ export function generatePlanAvecTestSemiCooper(profil, params) {
     jourLongueChoisi: profil.jourLongueChoisi ?? null
   });
 
-  for (const [, seance] of Object.entries(assignment)) {
-    if (seance.type === 'qualite') {
+  // Placement du test sur le PREMIER jour disponible de la semaine
+  // (22/07/2026, demande explicite de Laurent) — pas forcément le jour
+  // "qualité" désigné par placerSemaine() (son algorithme d'espacement
+  // n'a aucun sens ici, cette semaine n'a qu'une seule vraie séance
+  // structurée). Le jour d'origine (quel que soit son type — ef, longue,
+  // qualite) est réassigné explicitement au type test.
+  const premierJour = Math.min(...Object.keys(assignment).map(Number));
+
+  for (const [jour, seance] of Object.entries(assignment)) {
+    if (Number(jour) === premierJour) {
       const { sousType, contenu, kmEstime, structureIntervalles } = genererContenuTestSemiCooper();
+      seance.type = 'qualite';
       seance.sousType = sousType;
       seance.contenu = contenu;
       seance.kmEstime = kmEstime;
       seance.structureIntervalles = structureIntervalles;
       seance.estTest = true;
+      delete seance.indexQualite;
     } else if (seance.type === 'ef' || seance.type === 'longue') {
       const { contenu, kmEstime } = genererContenuFootingLibrePreTest();
       seance.contenu = contenu;
@@ -1208,12 +1218,45 @@ export function completerPlanApresTestSemiCooper(planPartiel, resultatTest) {
   // (test) déjà existante.
   const semainesRenumerotees = planSuite.semaines.map(s => ({ ...s, semaineNum: s.semaineNum + 1 }));
 
+  // Recalcul des footings de la semaine 1 (22/07/2026) — jusqu'ici,
+  // semaine 1 restait figée avec "Footing libre, à l'écoute des
+  // sensations" (genererContenuFootingLibrePreTest) même après la
+  // complétion du test, alors que les vraies allures sont désormais
+  // connues. Seul le jour du test (estTest:true) n'est jamais touché — le
+  // coureur l'a déjà réalisé, conforme au principe transverse de l'app
+  // (ne jamais modifier rétroactivement une séance déjà passée). Durée
+  // fixe à 40min (valeur raisonnable sous le plafond EF de 75min,
+  // cf. DUREE_MAX_EF_MIN) : pas de volumeCibleKm connu pour cette semaine
+  // (jamais eu de cible hebdo, semaine de test), donc pas de vraie
+  // progression de volume à respecter ici, juste une allure correcte.
+  const allSecondsPreTest = planSuite.allures ? computeAllures({
+    refTimeSeconds: parseTimeToSeconds(paramsSuite.tempsReference),
+    refDistanceKm: KM_BY_DISTANCE[paramsSuite.refDistance ?? paramsSuite.distance],
+    objectifTimeSeconds: parseTimeToSeconds(paramsSuite.objectif),
+    distanceCibleKm: distanceCibleKm
+  }) : null;
+  const DUREE_FOOTING_SEMAINE_TEST_MIN = 40;
+  const semaine1Recalculee = {
+    ...planPartiel.semaines[0],
+    assignment: Object.fromEntries(
+      Object.entries(planPartiel.semaines[0].assignment).map(([jour, seance]) => {
+        if (seance.estTest || !allSecondsPreTest) return [jour, seance];
+        if (seance.type === 'ef' || seance.type === 'longue') {
+          const kmCible = (DUREE_FOOTING_SEMAINE_TEST_MIN * 60) / allSecondsPreTest.E;
+          const { contenu, kmEstime } = genererContenuEF({ alluresSec: allSecondsPreTest, kmCible });
+          return [jour, { ...seance, contenu, kmEstime }];
+        }
+        return [jour, seance];
+      })
+    )
+  };
+
   return {
     ...planSuite,
     enAttenteTest: false,
     dateDebut: planPartiel.dateDebut, // date de début réelle du plan complet, pas celle de la suite
     dureeSemaines: (planSuite.dureeSemaines ?? 0) + 1,
-    semaines: [planPartiel.semaines[0], ...semainesRenumerotees],
+    semaines: [semaine1Recalculee, ...semainesRenumerotees],
     warnings: [...(planPartiel.warnings ?? []), ...(planSuite.warnings ?? [])],
     // BUG corrigé le 22/07/2026 : mettre ces deux champs à undefined ici
     // cassait BASE_TIME_REFERENCE côté index.html (app principale), qui lit
