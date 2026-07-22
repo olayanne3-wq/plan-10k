@@ -1399,36 +1399,11 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
         <div class="bib-row"><span class="k">Zone FC</span><span class="v" id="resFcMax">—</span></div>
       </div>
 
-      <!-- Actions principales : les deux plus utilisées, toujours visibles -->
+      <!-- Actions principales : toujours visibles -->
       <div style="display:flex; gap:10px; margin-top:16px;">
         <button class="btn-mini" style="flex:1; border-color:var(--signal); color:var(--signal);" onclick="exporterPDF()">📄 PDF</button>
-        <button class="btn-mini" style="flex:1;" onclick="toggleSauvegarde()">☁️ Sauvegarder</button>
       </div>
-
-      <div id="blocSauvegarde" style="display:none; margin-top:10px;">
-        <div class="date-field">
-          <input type="password" id="githubTokenInput" placeholder="Token GitHub (pour sauvegarder)" style="font-size:14px; padding:14px;">
-        </div>
-        <p class="sub" style="margin-top:8px; margin-bottom:12px; font-size:12px;">
-          Un token GitHub personnel (scope "gist") suffit — <a href="https://github.com/settings/tokens" target="_blank" style="color:var(--pace);">en générer un ici</a>. Reste stocké uniquement dans ton navigateur, jamais transmis ailleurs qu'à GitHub.
-        </p>
-        <div class="date-field" style="margin-bottom:10px;">
-          <input type="text" id="nomPlanInput" placeholder="Nom du plan (optionnel, ex. « Plan Gem'Aubagne »)" style="font-size:14px; padding:14px;">
-        </div>
-        <button class="btn-mini" onclick="sauvegarderPlanUI()">Confirmer la sauvegarde</button>
-        <div id="sauvegardeMsg" style="margin-top:8px; font-size:13px;"></div>
-
-        <!-- Synchronisation entre appareils retirée du wizard le 11 juillet
-             2026 — Laurent a demandé qu'il n'y ait plus qu'UN SEUL vrai
-             mécanisme de synchronisation, dans l'app principale (index.html,
-             section "Configurer sur un autre appareil"), pas un mécanisme
-             séparé et redondant ici. La confusion entre les deux
-             emplacements (Laurent cherchait le bouton "Copier le lien" dans
-             l'app principale, alors qu'il ne vivait que dans le wizard) a
-             révélé que deux mécanismes distincts pour synchroniser deux
-             Gists différents (v2_gist_id ici, lk_gist_id dans l'app) était
-             une vraie source de confusion, pas juste un défaut d'affichage. -->
-      </div>
+      <div id="sauvegardeMsg" style="margin-top:8px; font-size:13px;"></div>
 
       <!-- Actions avancées : repliées par défaut, moins utilisées au quotidien -->
       <div style="margin-top:14px;">
@@ -1473,10 +1448,9 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
   import * as PlanGenerator from '/v2/engine/plan-generator.js';
   import * as PlanForme from '/v2/engine/plan-forme.js';
   import * as Strava from '/v2/engine/strava.js';
-  import * as GistSync from '/v2/engine/gist-sync.js';
   import * as PdfExport from '/v2/engine/pdf-export.js';
   import * as Weather from '/v2/engine/weather.js';
-  window.Engine = { ...PlanGenerator, ...PlanForme, ...Strava, ...GistSync, ...PdfExport, ...Weather };
+  window.Engine = { ...PlanGenerator, ...PlanForme, ...Strava, ...PdfExport, ...Weather };
   // Signale explicitement que window.Engine est prêt : un <script type="module">
   // s'exécute de façon asynchrone/différée par rapport à un <script> classique
   // placé après lui dans le document, donc rien ne garantit que window.Engine
@@ -2315,107 +2289,15 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
   // Engine forcément défini puisque ces fonctions ne sont utilisées que
   // sur interaction utilisateur, bien après le chargement de la page).
   // ===========================================================================
-  const getGithubToken = (...args) => Engine.getGithubToken(...args);
-  const setGithubToken = (...args) => Engine.setGithubToken(...args);
-  const getV2GistId = (...args) => Engine.getV2GistId(...args);
-  const setV2GistId = (...args) => Engine.setV2GistId(...args);
-  const chargerPlans = (...args) => Engine.chargerPlans(...args);
-  const sauvegarderPlan = (...args) => Engine.sauvegarderPlan(...args);
-  const supprimerPlan = (...args) => Engine.supprimerPlan(...args);
-  const renommerPlan = (...args) => Engine.renommerPlan(...args);
-
 
   let dernierPlanGenere = null;
 
-  async function sauvegarderPlanUI() {
-    const msgEl = document.getElementById('sauvegardeMsg');
-    const tokenSaisi = document.getElementById('githubTokenInput').value.trim();
-    if (tokenSaisi) setGithubToken(tokenSaisi);
-
-    if (!dernierPlanGenere) {
-      msgEl.textContent = "Génère d'abord un plan.";
-      msgEl.style.color = 'var(--signal)';
-      return;
-    }
-    if (!getGithubToken()) {
-      msgEl.textContent = "Renseigne d'abord un token GitHub ci-dessus.";
-      msgEl.style.color = 'var(--signal)';
-      return;
-    }
-
-    const nomSaisi = document.getElementById('nomPlanInput')?.value.trim();
-    if (nomSaisi) dernierPlanGenere.nom = nomSaisi;
-
-    msgEl.textContent = 'Sauvegarde en cours…';
-    msgEl.style.color = 'rgba(var(--text-rgb),0.5)';
-    try {
-      await sauvegarderPlan(dernierPlanGenere);
-      // Sync Supabase — ajouté le 13 juillet 2026. Le Gist reste la
-      // sauvegarde principale (inchangé) ; on crée aussi la ligne dans
-      // la table `plans` pour que ce plan existe côté Supabase dès sa
-      // création, avant même la première coche de séance côté app.
-      // Best-effort : un échec ici n'empêche pas la sauvegarde Gist
-      // (déjà réussie) d'être considérée comme un succès pour l'utilisateur.
-      if (window.__UTILISATEUR__ && window.LkSync && dernierPlanGenere.id) {
-        try {
-          await window.LkSync.assurerPlanExiste(window.__UTILISATEUR__.id, dernierPlanGenere.id, dernierPlanGenere);
-        } catch (eSupabase) {
-          console.warn('Sync Supabase du plan échouée (Gist OK, non bloquant) :', eSupabase.message);
-        }
-      }
-      msgEl.textContent = '✅ Plan sauvegardé dans le cloud.';
-      msgEl.style.color = 'var(--pace)';
-      await afficherPlansSauvegardes();
-    } catch (e) {
-      // L'erreur de chevauchement de dates (doc convergence-v1-v2.md,
-      // section 7ter) a son propre message déjà explicite — ne pas y
-      // ajouter une suggestion sur le token qui n'a pas de sens ici.
-      const estErreurChevauchement = e.message.includes('chevauche un plan déjà sauvegardé');
-      msgEl.textContent = '❌ ' + e.message + (estErreurChevauchement ? '' : ' (vérifie que le token a bien le scope "gist")');
-      msgEl.style.color = 'var(--signal)';
-      console.error(e);
-    }
-  }
-
   // Synchronisation entre appareils retirée du wizard le 11 juillet 2026 —
   // Laurent a demandé qu'il n'y ait plus qu'UN SEUL vrai mécanisme, dans
-  // l'app principale (index.html), qui synchronise maintenant TOUT en un
-  // seul lien (token + lk_gist_id + v2_gist_id). Le wizard peut toujours
-  // recevoir token/gistV2 en paramètres d'URL si un lien généré par une
-  // ancienne version circule encore, mais ne génère plus lui-même de QR
-  // code/lien — cf. appliquerSyncDepuisUrl() ci-dessous, conservée pour la
-  // compatibilité de lecture uniquement.
+  // l'app principale (index.html), via un compte Supabase — plus besoin de
+  // token/lien à synchroniser manuellement dans le wizard.
 
-  // Récupère token + gistV2 depuis l'URL si présents (lien ouvert depuis un
-  // QR code scanné sur un autre appareil, généré par l'app principale
-  // maintenant). Doit attendre que window.Engine soit chargé (événement
-  // engineReady) avant d'appeler setGithubToken/setV2GistId : ces wrappers
-  // font le lookup Engine.xxx au moment de l'appel, donc une exécution
-  // immédiate (avant que le <script type="module"> précédent n'ait fini de
-  // charger) planterait sur "Cannot read property of undefined" — même
-  // risque déjà documenté pour initialiserApresChargementEngine() un peu
-  // plus bas dans ce fichier.
-  function appliquerSyncDepuisUrl() {
-    const params = new URLSearchParams(window.location.search);
-    const urlToken = params.get('token');
-    const urlGistV2 = params.get('gistV2');
-    if (urlToken) setGithubToken(urlToken);
-    if (urlGistV2) setV2GistId(urlGistV2);
-    if (urlToken || urlGistV2) {
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }
-  if (window.Engine) {
-    appliquerSyncDepuisUrl();
-  } else {
-    document.addEventListener('engineReady', appliquerSyncDepuisUrl, { once: true });
-  }
-
-  // Préremplir le champ token s'il est déjà connu (ex. déjà configuré ailleurs)
-  // et proposer les plans déjà sauvegardés, s'il y en a
-  // Préremplir le champ token s'il est déjà connu (ex. déjà configuré ailleurs)
-  // et proposer les plans déjà sauvegardés, s'il y en a.
-  // Dépend de window.Engine (via getGithubToken/capterRetourStravaOAuth/
+  // Dépend de window.Engine (via capterRetourStravaOAuth/
   // chargerVolumeStrava) : on attend le signal explicite engineReady plutôt
   // que de supposer que le <script type="module"> a fini avant ce point,
   // avec un garde-fou (window.Engine déjà présent) au cas où l'événement
@@ -2432,16 +2314,9 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     // objectif ?" (choix-mode-contenu, comme si aucun plan n'existait) —
     // selon que window.__UTILISATEUR__.id était déjà renseigné ou non au
     // moment du check plus bas (chargerPlansSupabase() sautée si
-    // __UTILISATEUR__ pas encore prêt, et chargerPlans() en repli Gist
-    // v1 retournait aussi [] faute de token GitHub configuré). Corrigé en
-    // attendant explicitement cette promesse avant toute logique qui en
-    // dépend.
+    // __UTILISATEUR__ pas encore prêt). Corrigé en attendant explicitement
+    // cette promesse avant toute logique qui en dépend.
     if (window.__AUTH_PRET__) { try { await window.__AUTH_PRET__; } catch (e) { /* pas grave, __UTILISATEUR__ restera undefined */ } }
-
-    const existant = getGithubToken();
-    const champ = document.getElementById('githubTokenInput');
-    if (existant && champ) champ.value = existant;
-    if (existant) afficherPlansSauvegardes();
 
     // Si capterRetourStravaOAuth() déclenche un reload (retour OAuth Strava),
     // la page va se recharger de toute façon : pas la peine de lancer
@@ -2556,9 +2431,6 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
         }
       } catch (e) { /* pas grave, traité comme "aucun plan" */ }
       if (plans.length === 0) {
-        try { plans = await chargerPlans(); } catch (e) { /* pas de Gist configuré */ }
-      }
-      if (plans.length === 0) {
         document.getElementById('accueil-wizard-contenu').style.display = 'none';
         document.getElementById('choix-mode-contenu').style.display = 'block';
       } else {
@@ -2604,14 +2476,7 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     // consultation-plans-contenu), cf. ouvrirConsultationPlans().
     const conteneur = document.getElementById('resPlansSauvegardesConsultation');
     if (!conteneur) return;
-    // BUG corrigé le 15/07/2026 : cette fonction utilisait encore
-    // chargerPlans() (Gist) seul, jamais mise à jour lors du basculement
-    // vers Supabase comme mécanisme principal (cf. nextStep()/index.html,
-    // même correctif ce jour) — la liste "plans sauvegardés" en haut du
-    // choix de mode restait donc vide malgré un plan bien sauvegardé côté
-    // Supabase, renvoyant l'utilisateur vers "Quel est ton objectif ?"
-    // comme si aucun plan n'existait. Même priorité que le dashboard :
-    // Supabase d'abord, Gist en repli si un token est encore configuré.
+    // Supabase — mécanisme principal (v2.8, 15/07/2026).
     let plans = [];
     try {
       if (window.__UTILISATEUR__?.id && window.LkSync) {
@@ -2619,9 +2484,6 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
       }
     } catch (e) {
       console.warn('Chargement des plans (Supabase) échoué :', e.message);
-    }
-    if (plans.length === 0) {
-      try { plans = await chargerPlans(); } catch (e) { /* pas de Gist configuré, pas grave */ }
     }
     if (!plans.length) { conteneur.innerHTML = ''; return; }
 
@@ -2663,12 +2525,6 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     // — l'ordre affiché diffère de l'ordre de stockage, et l'index changerait
     // après une suppression)
     window.__plansSauvegardes = plans;
-  }
-
-  function toggleSauvegarde() {
-    if (!dernierPlanGenere) { alert("Génère ou charge d'abord un plan."); return; }
-    const bloc = document.getElementById('blocSauvegarde');
-    bloc.style.display = bloc.style.display !== 'none' ? 'none' : 'block';
   }
 
   function toggleActionsAvancees() {
@@ -2746,9 +2602,9 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
       msgEl.style.color = 'var(--pace)';
     }
 
-    if (getGithubToken()) {
+    if (window.__UTILISATEUR__?.id && window.LkSync?.mettreAJourPlanSupabase && planPropre.id) {
       try {
-        await sauvegarderPlan(planPropre);
+        await window.LkSync.mettreAJourPlanSupabase(planPropre.id, planPropre);
         await afficherPlansSauvegardes();
       } catch (e) {
         console.warn('Re-sauvegarde après adaptation échouée :', e.message);
@@ -2823,11 +2679,9 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     document.getElementById('blocModifierObjectif').style.display = 'none';
     msgEl.textContent = '';
 
-    // Re-sauvegarder automatiquement si un token est déjà connu, pour éviter
-    // d'avoir l'ancien objectif qui traîne dans le Gist
-    if (getGithubToken()) {
+    if (window.__UTILISATEUR__?.id && window.LkSync?.mettreAJourPlanSupabase && nouveauPlan.id) {
       try {
-        await sauvegarderPlan(nouveauPlan);
+        await window.LkSync.mettreAJourPlanSupabase(nouveauPlan.id, nouveauPlan);
         document.getElementById('sauvegardeMsg').textContent = '✅ Plan mis à jour et sauvegardé avec le nouvel objectif.';
         document.getElementById('sauvegardeMsg').style.color = 'var(--pace)';
         await afficherPlansSauvegardes();
@@ -2860,7 +2714,10 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     const nouveauNom = prompt('Nouveau nom pour ce plan :', nomActuel);
     if (!nouveauNom || nouveauNom.trim() === '') return;
     try {
-      await renommerPlan(id, nouveauNom.trim());
+      const planRenomme = { ...plan, nom: nouveauNom.trim() };
+      if (window.__UTILISATEUR__?.id && window.LkSync?.mettreAJourPlanSupabase) {
+        await window.LkSync.mettreAJourPlanSupabase(id, planRenomme);
+      }
       // Si c'est le plan actuellement affiché, mettre à jour son nom en mémoire aussi
       if (dernierPlanGenere?.id === id) dernierPlanGenere.nom = nouveauNom.trim();
       await afficherPlansSauvegardes();
@@ -2875,30 +2732,6 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     const titre = plan.nom || `${plan.distance} — ${plan.objectif}`;
     if (!confirm(`Supprimer définitivement "${titre}" ? Cette action ne supprime que ce plan (le reste de tes sauvegardes est conservé).`)) return;
     try {
-      // Suppression Gist rendue non-bloquante le 21/07/2026 — jusqu'ici,
-      // un échec ici (ex: aucun token GitHub configuré, cf. ecrireListePlans
-      // qui lève une exception explicite dans ce cas) interrompait TOUTE la
-      // fonction avant même d'atteindre la suppression Supabase plus bas,
-      // qui elle aurait réussi. Symptôme observé par Laurent : impossible de
-      // supprimer un plan du tout, malgré la suppression Supabase déjà en
-      // place et fonctionnelle depuis le 13/07 — son propre token GitHub
-      // ayant été volontairement retiré (v2.8, Supabase devenu le mécanisme
-      // de sauvegarde principal), ce chemin échouait systématiquement.
-      // Traitement désormais symétrique au bloc Supabase juste après :
-      // best-effort, on continue même en cas d'échec.
-      //
-      // Garde ajoutée le 22/07/2026 : la tentative n'est même plus lancée
-      // si aucun token n'existe (cf. pattern déjà utilisé ailleurs dans ce
-      // fichier, ex. ligne ~2678) — évite un console.warn systématique et
-      // sans intérêt pour Laurent, qui n'a plus de token GitHub configuré
-      // depuis la bascule Supabase (v2.8).
-      if (getGithubToken()) {
-        try {
-          await supprimerPlan(id);
-        } catch (eGist) {
-          console.warn('Suppression Gist échouée (Supabase reste la source de vérité principale, non bloquant) :', eGist.message);
-        }
-      }
       // Suppression Supabase — ajoutée le 13 juillet 2026, étendue le
       // 17/07/2026 pour couvrir plans_original ET plans_actif (chantier
       // séparation original/actif). plans_actif.id a un ON DELETE CASCADE
@@ -3278,23 +3111,7 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
           if (window.__UTILISATEUR__?.id) {
             await window.LkSync.assurerPlanExiste(window.__UTILISATEUR__.id, dernierPlanGenere.id, dernierPlanGenere);
           }
-          // Gist : best-effort, jamais bloquant — seulement si un token
-          // est encore configuré (compatibilité ascendante).
-          if (getGithubToken()) {
-            try {
-              await sauvegarderPlan(dernierPlanGenere);
-              // Copie figée (plansOriginal) — chantier séparation
-              // original/actif du 17/07/2026, miroir de l'insert double
-              // côté Supabase (assurerPlanExiste ci-dessus). Ne fait rien
-              // si déjà présente (protection dans ajouterPlanOriginal).
-              await Engine.ajouterPlanOriginal(dernierPlanGenere);
-            } catch (eGist) {
-              console.warn('Sauvegarde Gist échouée (Supabase OK, non bloquant) :', eGist.message);
-            }
-          }
         } catch (e) {
-          const blocSauvegarde = document.getElementById('blocSauvegarde');
-          if (blocSauvegarde) blocSauvegarde.style.display = 'block';
           const msgEl = document.getElementById('sauvegardeMsg');
           if (msgEl) {
             msgEl.textContent = '❌ ' + e.message;
