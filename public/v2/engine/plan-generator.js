@@ -1180,11 +1180,25 @@ export function completerPlanApresTestSemiCooper(planPartiel, resultatTest) {
   dateDebutSuite.setDate(dateDebutSuite.getDate() + 7);
   const dateDebutSuiteStr = dateDebutSuite.toISOString().slice(0, 10);
 
+  // BUG corrigé le 22/07/2026 : paramsOrigine.objectif est la valeur par
+  // défaut affichée par le champ neutralisé du wizard (jamais choisie par
+  // l'utilisateur, cf. activerFluxTestCourse qui grise ce champ) — la
+  // reprendre telle quelle faussait allure C, categoriserAmpleurObjectif
+  // et calculerStrategieCourse (jour de course + onglet Course), puisque
+  // computeAllures() dérive l'allure course directement de
+  // objectifTimeSeconds. Corrigé : objectif recalculé par Riegel depuis le
+  // vrai résultat du test, sur la distance réellement visée — aucun "gain"
+  // arbitraire, cohérent avec le principe du flux "pas de référence" (le
+  // coureur n'a jamais formulé d'objectif volontaire à ce stade).
+  const distanceCibleKm = KM_BY_DISTANCE[planPartiel.paramsOrigine?.distance] ?? 10;
+  const objectifTimeSeconds = riegelPredict(resultatTest.refTimeSeconds, resultatTest.refDistanceKm, distanceCibleKm);
+
   const paramsSuite = {
     ...planPartiel.paramsOrigine,
     dateDebut: dateDebutSuiteStr,
     refDistance: `${resultatTest.refDistanceKm}K`,
-    tempsReference: formatSecondsToTime(resultatTest.refTimeSeconds)
+    tempsReference: formatSecondsToTime(resultatTest.refTimeSeconds),
+    objectif: formatSecondsToTime(objectifTimeSeconds)
   };
 
   const planSuite = generatePlan(planPartiel.profilOrigine, paramsSuite);
