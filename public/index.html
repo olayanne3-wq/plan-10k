@@ -71,7 +71,7 @@ window.sentryOnLoad = function () {
   --warn-rgb: 255,119,85;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-body { background: var(--bg); color: var(--text); font-family: 'Inter',-apple-system,'Helvetica Neue',Arial,sans-serif; font-variant-numeric: tabular-nums; max-width: 430px; margin: 0 auto; transition: background 0.2s ease, color 0.2s ease; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter',-apple-system,'Helvetica Neue',Arial,sans-serif; font-variant-numeric: tabular-nums; line-height: 1.45; max-width: 430px; margin: 0 auto; transition: background 0.2s ease, color 0.2s ease; }
 button, input { font-family: inherit; }
 .pill { border-radius: 4px; padding: 2px 7px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; flex-shrink: 0; }
 .card { background: var(--surface); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; box-shadow: 0 1px 3px var(--shadow1), 0 1px 2px var(--shadow2); }
@@ -79,7 +79,7 @@ button, input { font-family: inherit; }
 .text2 { color: var(--text2); }
 .orange { color: var(--accent); }
 .green { color: var(--accent2); }
-.label { font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
+.label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
 input[type=text], input[type=number], input[type=password] {
   background: var(--surface); box-shadow: 0 1px 3px var(--shadow1), 0 1px 2px var(--shadow2); border-radius: 10px;
   padding: 10px 14px; color: var(--text); font-size: 14px; outline: none; width: 100%;
@@ -3742,9 +3742,9 @@ function renderDashboard() {
       el("div",{style:{color:color,fontSize:"22px",fontWeight:"900",marginBottom:"4px"}},title),
       el("div",{style:{color:"var(--text)",fontSize:"15px",marginBottom:"16px"}},RACE_NAME+" - "+new Date(DATE_COURSE_REFERENCE+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})),
       el("div",{style:{display:"grid",gridTemplateColumns:"1fr 1px 1fr",gap:"12px",marginBottom:"12px"}},
-        el("div",{style:{textAlign:"center"}},el("div",{style:{color:"var(--text-muted)",fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"4px"}},"Objectif"),el("div",{style:{color:"var(--accent)",fontSize:"24px",fontWeight:"900"}},fmtTime(raceGoalTime))),
+        el("div",{style:{textAlign:"center"}},el("div",{style:{color:"var(--text2)",fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"4px"}},"Objectif"),el("div",{style:{color:"var(--accent)",fontSize:"24px",fontWeight:"900"}},fmtTime(raceGoalTime))),
         el("div",{style:{background:"var(--border)"}}),
-        el("div",{style:{textAlign:"center"}},el("div",{style:{color:"var(--text-muted)",fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"4px"}},"Resultat"),el("div",{style:{color:color,fontSize:"24px",fontWeight:"900"}},fmtTime(raceResult)))
+        el("div",{style:{textAlign:"center"}},el("div",{style:{color:"var(--text2)",fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"4px"}},"Resultat"),el("div",{style:{color:color,fontSize:"24px",fontWeight:"900"}},fmtTime(raceResult)))
       ),
       el("div",{style:{background:color+"22",border:"1px solid "+color+"44",borderRadius:"10px",padding:"12px",marginBottom:"12px"}},el("div",{style:{color:color,fontSize:"14px",fontWeight:"700"}},subtitle)),
       el("div",{style:{background:"var(--border-soft)",borderRadius:"8px",padding:"10px 12px",display:"flex",gap:"8px",textAlign:"left",marginBottom:"8px"}},el("span",{style:{fontSize:"18px",flexShrink:"0"}},"🤖"),el("div",{style:{color:"var(--text2)",fontSize:"13px",lineHeight:"1.5"}},coachMsg2))
@@ -4872,7 +4872,7 @@ function renderStatusRow(uid, dateSeance) {
     };
     rebuildRpeStatut();
     rpeWrapperStatut = el("div",{style:{width:"100%"}},
-      el("div",{style:{fontSize:"11px",color:"var(--text-muted)",marginBottom:"4px"}},"Ressenti"),
+      el("div",{style:{fontSize:"11px",color:"var(--text2)",marginBottom:"4px"}},"Ressenti"),
       rpeRowStatut,
       rpeLabelStatut
     );
@@ -4947,7 +4947,7 @@ function renderManualPerfRow(uid, s, stravaRun) {
       stepBtn(-5,"+") // +5s/km = plus lent
     );
     if (target) {
-      formWrap.appendChild(el("div",{style:{fontSize:"11px",color:"var(--text-muted)",textAlign:"center",marginTop:"2px"}},
+      formWrap.appendChild(el("div",{style:{fontSize:"11px",color:"var(--text2)",textAlign:"center",marginTop:"2px"}},
         "cible plan : "+fmtPace(1000/target.targetMin)+"–"+fmtPace(1000/target.targetMax)+"/km"));
     }
 
@@ -4976,15 +4976,15 @@ function renderManualPerfRow(uid, s, stravaRun) {
       stravaRun ? "Strava a une activité ce jour-là — ta saisie primera dessus si tu valides." :
         "Pas de donnée Strava ce jour-là. Ajuste l'allure ci-dessous si besoin."));
 
-    formWrap.appendChild(el("div",{style:{fontSize:"11px",color:"var(--text-muted)",textAlign:"center",marginBottom:"4px"}},"Allure effort"));
+    formWrap.appendChild(el("div",{style:{fontSize:"11px",color:"var(--text2)",textAlign:"center",marginBottom:"4px"}},"Allure effort"));
     formWrap.appendChild(paceStepper);
     if (s.structureIntervalles) {
       formWrap.appendChild(el("div",{style:{marginTop:"12px"}},
-        el("div",{style:{fontSize:"11px",color:"var(--text-muted)",marginBottom:"4px"}},"Durée totale de la séance (min)"),dureeInput
+        el("div",{style:{fontSize:"11px",color:"var(--text2)",marginBottom:"4px"}},"Durée totale de la séance (min)"),dureeInput
       ));
     }
     formWrap.appendChild(el("div",{style:{marginTop:"12px"}},
-      el("div",{style:{fontSize:"11px",color:"var(--text-muted)",marginBottom:"4px"}},"FC moyenne (optionnel)"),hrInput
+      el("div",{style:{fontSize:"11px",color:"var(--text2)",marginBottom:"4px"}},"FC moyenne (optionnel)"),hrInput
     ));
     // Sélecteur RPE retiré d'ici le 17/07/2026 (chantier RPE unifié,
     // remarque de Laurent : doublon avec le sélecteur déjà présent dans
