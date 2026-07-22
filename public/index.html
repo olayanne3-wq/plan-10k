@@ -3447,10 +3447,17 @@ function renderDashboard() {
       ? decision.justification
       : decision.justification + ` (${cibleInfo.seance.type}, ${Math.round(cibleInfo.seance.kmEstime * 10) / 10}→${Math.round(cibleInfo.seance.kmEstime * (1 + decision.ampleurPourcent / 100) * 10) / 10}km)`;
 
+    // Titre distinct selon le type de décision (22/07/2026, signalé par
+    // Laurent) : "Yoria te propose un ajustement" est trompeur pour une
+    // décision purement informative (alerter_*), qui ne propose jamais
+    // d'action concrète (pas de bouton Appliquer, cf. estInformative
+    // ci-dessus) — juste un signal de vigilance à observer.
+    const titreCarte = estInformative ? "Yoria a repéré un signal à surveiller" : "Yoria te propose un ajustement";
+
     return el("div",{style:{background:"rgba(var(--accent-rgb),0.07)",border:"1px solid rgba(var(--accent-rgb),0.2)",borderRadius:"12px",padding:"14px 16px",marginBottom:"16px"}},
       el("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"8px"}},
         el("span",{style:{fontSize:"20px"}},"🟠"),
-        el("span",{style:{color:"var(--accent)",fontSize:"15px",fontWeight:"700"}},"Yoria te propose un ajustement")
+        el("span",{style:{color:"var(--accent)",fontSize:"15px",fontWeight:"700"}},titreCarte)
       ),
       el("div",{class:"muted",style:{fontSize:"14px",marginBottom:"12px",lineHeight:"1.5"}}, texteApercu),
       el("div",{style:{display:"flex",gap:"8px"}},
@@ -6844,7 +6851,7 @@ function renderHelp() {
     { q:"Import FIT, Strava ou saisie manuelle : quelle source choisir ?",
       a:"Strava reste la plus simple si tu es déjà connecté (synchro automatique). L\'import FIT convient si tu n\'utilises pas Strava — allure, distance et FC sont toujours bien récupérées, mais le découpage précis d\'une séance qualité (effort/récupération) dépend du modèle de montre : certaines n\'enregistrent pas cette structure dans le fichier exporté, même si la séance a été suivie fidèlement. La saisie manuelle reste la plus fiable si tu veux un contrôle total." },
     { q:"C\'est quoi la carte \"Yoria te propose un ajustement\" ?",
-      a:"C\'est le moteur de décision : il surveille ta fatigue, ta charge d\'entraînement et ta régularité, et propose parfois d\'alléger une prochaine séance EF/longue si les signaux l\'indiquent — jamais une séance de qualité, pour ne pas casser sa structure. Rien n\'est appliqué automatiquement : tu choisis d\'ignorer ou d\'appliquer la proposition." },
+      a:"C\'est le moteur de décision : il surveille ta fatigue, ta charge d\'entraînement et ta régularité, et propose parfois d\'alléger une prochaine séance EF/longue si les signaux l\'indiquent — jamais une séance de qualité, pour ne pas casser sa structure. Rien n\'est appliqué automatiquement : tu choisis d\'ignorer ou d\'appliquer la proposition. Le titre change en \"Yoria a repéré un signal à surveiller\" quand il s\'agit d\'une simple alerte de tendance (ex. fatigue en légère hausse) sans action concrète à proposer pour l\'instant — dans ce cas, seul \"Ignorer\" est disponible." },
     { q:"À quoi sert le sélecteur \"Ressenti\" (RPE) après une séance ?",
       a:"Le RPE (Rating of Perceived Exertion, ou \"ressenti d\'effort\") complète ce que Strava/ta montre mesurent (allure, FC) par ce que ton corps a vraiment ressenti — deux séances à l\'allure identique peuvent être très différentes un jour de fatigue ou de forme. Les 5 icônes correspondent à l\'échelle scientifique CR-10 de Borg (référence en sciences du sport) : 🙂 Facile (CR-10 1-2, conversation aisée) · 😐 Modéré (3-4, encore confortable) · 😓 Difficile (5-6, effort soutenu) · 😣 Très difficile (7-8, à la limite de ce que tu peux tenir) · 🥵 Maximal (9-10, tout donné). Ce ressenti aide Yoria à mieux estimer ta charge d\'entraînement réelle et à ajuster tes prochaines séances si besoin." },
   ];
