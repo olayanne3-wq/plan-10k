@@ -55,19 +55,22 @@ export function computeAlluresForme({ refTimeSeconds, refDistanceKm }) {
 // généralement jugé plus fiable en usage libre — moins d'erreur de gestion
 // d'allure sur une durée plus courte).
 //
-// La VMA estimée correspond directement à l'allure I (VMA) du système de
-// zones existant (PACE_RATIOS.I = 0.855, calibré sur le profil réel de
-// Laurent) — on en déduit un temps 10K équivalent pour rester compatible
-// avec computeAlluresForme(), qui attend un couple (refTimeSeconds,
-// refDistanceKm) plutôt qu'une VMA directe. Évite de repasser par un temps
-// de course simulé + Riegel (double approximation) : conversion directe
-// via le ratio déjà utilisé pour dériver les zones.
+// BUG corrigé le 22/07/2026 (signalé par Laurent, allures EF/10K
+// incohérentes) : la VMA du test était auparavant assimilée directement à
+// l'allure I du système de zones (PACE_RATIOS.I=0.855), calibrée sur les
+// séances VMA classiques de Laurent (répétitions courtes avec récupération)
+// — pas la même notion que la vitesse d'un effort continu de 6 minutes.
+// Chaîner les deux ratios sous-estimait fortement le 10K équivalent.
+// Corrigé : conversion directe VMA -> 10K via le ratio documenté de la
+// littérature du test demi-Cooper (~90% de la VMA tenue sur 10K).
 // ---------------------------------------------------------------------------
+
+const RATIO_VMA_VERS_10K = 0.90;
 
 export function estimerReferenceDepuisSemiCooper(distanceMetres) {
   const vmaKmh = distanceMetres / 100;
-  const allureISecKm = 3600 / vmaKmh;
-  const allure10kSecKm = allureISecKm / PACE_RATIOS.I;
+  const allure10kKmh = vmaKmh * RATIO_VMA_VERS_10K;
+  const allure10kSecKm = 3600 / allure10kKmh;
   const refTimeSeconds = Math.round(allure10kSecKm * 10);
   return { refTimeSeconds, refDistanceKm: 10, vmaKmh };
 }
