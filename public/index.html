@@ -4769,16 +4769,21 @@ function renderStatusRow(uid, dateSeance) {
     const cur = statuses[uid]||"—";
     boutons.forEach(({b, opt}) => {
       const actif = cur===opt;
-      b.style.background = actif ? SCOLORS[opt]+"33" : "var(--border-soft)";
+      // Fond renforcé le 22/07/2026 (demande Laurent : bouton sélectionné
+      // pas assez visible) — 33 (≈20% opacité) était trop discret,
+      // notamment sur mobile en plein soleil. Couleur pleine + texte clair
+      // pour un vrai contraste, cohérent avec le style déjà utilisé ailleurs
+      // dans l'app pour les états "actif" (ex. checklist course).
+      b.style.background = actif ? SCOLORS[opt] : "var(--border-soft)";
       b.style.border = `1px solid ${actif ? SCOLORS[opt] : "var(--border)"}`;
-      b.style.color = actif ? SCOLORS[opt] : "var(--text-muted)";
+      b.style.color = actif ? "#F8FAFC" : "var(--text-muted)";
       b.style.fontWeight = actif ? "700" : "400";
     });
   };
   SOPTS.forEach(opt=>{
     const cur=statuses[uid]||"—";
     const desactive = estFuture && opt!=="—";
-    const b=el("button",{style:{flex:"1",background:cur===opt?SCOLORS[opt]+"33":"var(--border-soft)",border:`1px solid ${cur===opt?SCOLORS[opt]:"var(--border)"}`,borderRadius:"8px",padding:"10px 0",cursor:desactive?"not-allowed":"pointer",color:cur===opt?SCOLORS[opt]:"var(--text-muted)",fontSize:"18px",fontWeight:cur===opt?"700":"400",opacity:desactive?"0.35":"1"}},opt==="—"?"–":opt);
+    const b=el("button",{style:{flex:"1",background:cur===opt?SCOLORS[opt]:"var(--border-soft)",border:`1px solid ${cur===opt?SCOLORS[opt]:"var(--border)"}`,borderRadius:"8px",padding:"10px 0",cursor:desactive?"not-allowed":"pointer",color:cur===opt?"#F8FAFC":"var(--text-muted)",fontSize:"18px",fontWeight:cur===opt?"700":"400",opacity:desactive?"0.35":"1"}},opt==="—"?"–":opt);
     if (desactive) b.disabled = true;
     boutons.push({ b, opt });
     b.addEventListener("click",avecRetourTactile(()=>{
@@ -4834,9 +4839,11 @@ function renderStatusRow(uid, dateSeance) {
       const optionActuelle = RPE_OPTIONS.find(o=>o.v===rpeValStatut);
       rpeLabelStatut.textContent = optionActuelle ? optionActuelle.label : "";
       RPE_OPTIONS.forEach(o=>{
+        // Fond renforcé le 22/07/2026 (même correctif que renderStatusRow :
+        // 0.13 d'opacité trop discret) — couleur pleine sur sélection.
         const rb = el("button",{title:o.label,style:{
           flex:"1",padding:"10px 0",fontSize:"18px",cursor:"pointer",
-          background:rpeValStatut===o.v?"rgba(var(--warn-rgb),0.13)":"var(--border-soft)",
+          background:rpeValStatut===o.v?"var(--warn)":"var(--border-soft)",
           border:`1px solid ${rpeValStatut===o.v?"var(--warn)":"var(--border)"}`,borderRadius:"8px"
         }}, o.e);
         rb.addEventListener("click", avecRetourTactile((e)=>{
