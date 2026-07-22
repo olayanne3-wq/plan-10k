@@ -374,6 +374,90 @@ export function computeAllures({ refTimeSeconds, refDistanceKm, objectifTimeSeco
   return allures;
 }
 
+// ── Allures dynamiques (22/07/2026) ─────────────────────────────────────────
+// Jusqu'ici, les allures d'entraînement (E/T/I/etc., via computeAllures())
+// restaient calibrées sur plan.paramsOrigine.tempsReference — la référence
+// de forme mesurée à la CRÉATION du plan, jamais mise à jour ensuite même
+// quand le prédicteur (predict10K(), index.html) détecte une vraie
+// progression. Résultat concret signalé par Laurent : sur un plan visant
+// 45:00 avec une référence de départ à 50:19, les allures restaient
+// calibrées sur 50:19 pendant toute la durée du plan, sans jamais se
+// resserrer vers ce qui serait nécessaire pour l'objectif — même après
+// plusieurs semaines de progression réelle mesurée par le prédicteur.
+//
+// Fonction pure (aucune dépendance à des globales d'index.html) : reçoit
+// l'historique de prédiction pertinent et calcule s'il faut, et vers
+// quelle valeur, recalibrer la référence utilisée par computeAllures().
+// Le calcul lui-même (predict10K(), fiabilitePlanPonderee()) reste dans
+// index.html — cette fonction ne fait que la décision de recalibrage à
+// partir de deux points de mesure déjà calculés.
+//
+// Principes validés avec Laurent le 22/07/2026 :
+// - Rythme : évalué à la fin de chaque semaine PAIRE du plan (S2, S4, S6...)
+//   — pas un rythme calendaire glissant, aligné sur les vraies limites de
+//   semaines du plan pour rester lisible ("recalculé après S4").
+// - Seuil de signification : 1% de l'estimation actuelle, pour ignorer le
+//   bruit de mesure normal d'une semaine à l'autre.
+// - Progression (estimation plus rapide, au-delà du seuil) : appliquée
+//   immédiatement, sans confirmation supplémentaire — le risque d'aller
+//   trop vite est faible ici, puisqu'on ne fait que suivre une amélioration
+//   déjà mesurée et déjà passée par les garde-fous du prédicteur lui-même
+//   (fiabilitePlanPonderee, clamp borneBrute).
+// - Régression (estimation plus lente, au-delà du seuil) : appliquée
+//   SEULEMENT si confirmée sur 2 périodes de 2 semaines consécutives — pour
+//   éviter de redurcir... non, d'assouplir les allures sur la base d'un
+//   simple accident ponctuel (mauvaise semaine, maladie passagère).
+//
+// @param estimationActuelle - predict10K().time à la date d'évaluation (secondes)
+// @param estimationPeriodePrecedente - même valeur, 2 semaines plus tôt (secondes), ou null si pas encore disponible
+// @param regressionDejaEnAttente - { depuis: estimation, semaineNum } si une régression a déjà été détectée à la période précédente sans être encore confirmée, sinon null
+// @returns { nouvelleReference: number|null, statut: 'progression'|'regression_confirmee'|'regression_en_attente'|'stable'|'insuffisant', messageUtilisateur: string|null }
+export function calculerReferenceCouranteAllures({ estimationActuelle, estimationPeriodePrecedente, referenceActuellementUtilisee, regressionDejaEnAttente }) {
+  if (estimationPeriodePrecedente == null) {
+    return { nouvelleReference: null, statut: 'insuffisant', messageUtilisateur: null };
+  }
+
+  const delta = estimationActuelle - estimationPeriodePrecedente; // <0 = progression, >0 = régression
+  const seuil = estimationActuelle * 0.01;
+
+  if (Math.abs(delta) <= seuil) {
+    // Pas assez significatif pour être une vraie tendance — mais si une
+    // régression était en attente de confirmation, elle est annulée (pas de
+    // 3e chance : il faut 2 périodes CONSÉCUTIVES, un retour au stable
+    // remet le compteur à zéro).
+    return { nouvelleReference: null, statut: 'stable', messageUtilisateur: null };
+  }
+
+  if (delta < 0) {
+    // Progression confirmée par le seuil — appliquée immédiatement.
+    return {
+      nouvelleReference: estimationActuelle,
+      statut: 'progression',
+      messageUtilisateur: `Allures resserrées suite à ta progression (${fmtMinSec(estimationPeriodePrecedente)} → ${fmtMinSec(estimationActuelle)}).`
+    };
+  }
+
+  // Régression : besoin de confirmation sur 2 périodes consécutives.
+  if (regressionDejaEnAttente) {
+    return {
+      nouvelleReference: estimationActuelle,
+      statut: 'regression_confirmee',
+      messageUtilisateur: `Allures ajustées à la baisse — ta forme récente suggère de lever le pied un peu (${fmtMinSec(regressionDejaEnAttente.depuis)} → ${fmtMinSec(estimationActuelle)}).`
+    };
+  }
+
+  return { nouvelleReference: null, statut: 'regression_en_attente', messageUtilisateur: null };
+}
+
+// Petit helper local de formatage — évite une dépendance croisée avec
+// fmtTime() (index.html), qui a une signature légèrement différente et
+// n'est pas exportée par ce module.
+function fmtMinSec(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = Math.round(totalSeconds % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 export const PLAFONDS_VOLUME = {
   '5K':       { debutant: [20, 25], intermediaire: [25, 35], confirme: [35, 45] },
   '10K':      { debutant: [25, 35], intermediaire: [35, 50], confirme: [50, 65] },
