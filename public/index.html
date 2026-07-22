@@ -715,14 +715,6 @@ let manualPerf = load(clePourPlan("lk_manual_perf"), {});
 let derniereUrlSyncApp = null;
 let hiddenSessions = load(clePourPlan("lk_hidden_sessions"), {}); // {uid: true}
 let swappedSessions = load(clePourPlan("lk_swapped_sessions"), {}); // {uid: swapUid} swap bidirectionnel
-// Recalcul immédiat (22/07/2026) : le tout premier ALL_SESSIONS (ligne
-// ~656) a été construit avant que swappedSessions soit chargée depuis
-// localStorage (temporal dead zone, cf. garde dans getEffectiveSession) —
-// sans ce recalcul ici, un plan avec des déplacements manuels déjà
-// enregistrés démarrerait avec un ALL_SESSIONS qui les ignore jusqu'au
-// premier render() qui en déclencherait un autre (plusieurs endroits le
-// font, mais pas garanti avant le tout premier rendu).
-ALL_SESSIONS = recalculerAllSessions();
 let notesList = load(clePourPlan("lk_notes"), []);
 let sessionNotes = load(clePourPlan("lk_session_notes"), {}); // {uid: "texte"}
 // RPE unifié — 17/07/2026 (chantier "remonter le RPE au statut de séance",
@@ -6476,16 +6468,24 @@ function renderCourse() {
 // Obtenir la session effective sur un slot (apres swap)
 function getEffectiveSession(week, slotIdx) {
   const uid = week.week+"-"+slotIdx;
-  // Garde (22/07/2026) : recalculerAllSessions() appelle désormais cette
-  // fonction dès son premier appel (ligne ~656), AVANT que swappedSessions
-  // ne soit déclarée (let, ligne ~717 — temporal dead zone en JS tant que
-  // l'exécution n'a pas atteint cette ligne). typeof évite le
-  // ReferenceError dans cette fenêtre précise ; le tout premier ALL_SESSIONS
-  // calculé au chargement n'a de toute façon aucun swap à appliquer
-  // (swappedSessions n'a pas encore été chargée depuis localStorage), donc
-  // se comporter comme "pas de swap" ici est correct, pas un simple repli
-  // silencieux qui masquerait un vrai bug.
-  const swaps = typeof swappedSessions !== 'undefined' ? swappedSessions : {};
+  // BUG corrigé le 22/07/2026 : le premier appel à recalculerAllSessions()
+  // (ligne ~656, "let ALL_SESSIONS = recalculerAllSessions()") a lieu AVANT
+  // que "let swappedSessions" (ligne ~717) ne soit exécutée — en JS,
+  // toute référence à une variable let/const non encore initialisée dans
+  // le MÊME scope lève une vraie ReferenceError ("temporal dead zone"),
+  // y compris via typeof (contrairement à une variable jamais déclarée du
+  // tout, seul cas où typeof protège réellement). Le garde-fou précédent
+  // (typeof swappedSessions !== 'undefined') ne protégeait donc PAS contre
+  // ce cas précis et provoquait un écran blanc au chargement (exception
+  // non rattrapée, bloquant toute l'IIFE englobante). Un tentative de
+  // recalcul immédiat de ALL_SESSIONS avait été ajoutée juste après la
+  // déclaration de swappedSessions pour "rattraper" ce premier appel
+  // prématuré, mais ALL_SESSIONS est de toute façon recalculée à 4 autres
+  // endroits du fichier avant le premier vrai rendu — ce recalcul immédiat
+  // a été retiré, inutile et source du bug. try/catch, seule protection
+  // fiable contre une TDZ, utilisé ici en dernier recours.
+  let swaps = {};
+  try { swaps = swappedSessions; } catch (e) { /* TDZ : swappedSessions pas encore déclarée, pas de swap à appliquer */ }
   if (swaps[uid]) {
     const swapUid = swaps[uid];
     const swapParts = swapUid.split("-");
