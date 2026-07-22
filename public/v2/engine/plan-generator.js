@@ -21,6 +21,16 @@ export function parseTimeToSeconds(str) {
   throw new Error(`Format de temps invalide: ${str}`);
 }
 
+// Inverse de parseTimeToSeconds — toujours "mm:ss" (suffisant pour les
+// distances de référence courtes type 10K utilisées par le test
+// semi-Cooper ; pas de format "h:mm:ss" nécessaire ici).
+export function formatSecondsToTime(totalSeconds) {
+  const s = Math.round(totalSeconds);
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
 export function formatPace(secPerKm) {
   const m = Math.floor(secPerKm / 60);
   const s = Math.round(secPerKm % 60);
@@ -1034,6 +1044,166 @@ export function genererContenuTest({ distance, alluresSec }) {
     allureEchauffement: formatPace(E)
   };
   return { sousType: 'test', contenu, kmEstime, distanceTestKm, structureIntervalles };
+}
+
+// ---------------------------------------------------------------------------
+// Test semi-Cooper préliminaire (plan course) — flux "je n'ai pas de
+// référence" côté wizard course (21/07/2026, décision avec Laurent).
+// Même principe que plan-forme.js (generatePlanFormeAvecTest /
+// completerBlocApresTest) mais contraint par dateCourse : la suite ne peut
+// pas être un bloc de taille fixe, elle doit respecter le nombre de
+// semaines réellement restantes jusqu'à la course. Semaine 1 = test seul
+// (enAttenteTest: true), semaines 2 à N générées ensuite en ré-appelant
+// generatePlan() normalement avec dateDebut décalé de 7 jours — computePhases
+// recalcule alors totalSemaines tout seul à partir du temps restant, pas de
+// duplication du pipeline de phases/volume ici.
+// ---------------------------------------------------------------------------
+
+const DUREE_TEST_SEMI_COOPER_MIN = 6;
+const DUREE_ECHAUFFEMENT_TEST_SEMI_COOPER_MIN = 15;
+const DUREE_RETOUR_CALME_TEST_SEMI_COOPER_MIN = 10;
+
+export function estimerReferenceDepuisSemiCooper(distanceMetres) {
+  const vmaKmh = distanceMetres / 100;
+  const allureISecKm = 3600 / vmaKmh;
+  const allure10kSecKm = allureISecKm / PACE_RATIOS.I;
+  const refTimeSeconds = Math.round(allure10kSecKm * 10);
+  return { refTimeSeconds, refDistanceKm: 10, vmaKmh };
+}
+
+export function genererContenuTestSemiCooper() {
+  const contenu = `Échauffement ${DUREE_ECHAUFFEMENT_TEST_SEMI_COOPER_MIN}min tranquille + Test semi-Cooper : cours le plus loin possible en ${DUREE_TEST_SEMI_COOPER_MIN}min, effort maximal mais régulier (ne pars pas trop vite) + Retour au calme ${DUREE_RETOUR_CALME_TEST_SEMI_COOPER_MIN}min tranquille`;
+  const structureIntervalles = {
+    blocs: [{ repetitions: 1, dureeEffortSec: DUREE_TEST_SEMI_COOPER_MIN * 60, allure: 'effort maximal régulier', dureeRecupSec: 0 }],
+    echauffementSec: DUREE_ECHAUFFEMENT_TEST_SEMI_COOPER_MIN * 60,
+    retourCalmeSec: DUREE_RETOUR_CALME_TEST_SEMI_COOPER_MIN * 60,
+    allureEchauffement: 'footing tranquille'
+  };
+  return { sousType: 'test-semi-cooper', contenu, kmEstime: null, structureIntervalles };
+}
+
+function genererContenuFootingLibrePreTest() {
+  return {
+    contenu: "Footing libre, à l'écoute des sensations — pas d'allure imposée cette semaine, en attendant ton test.",
+    kmEstime: null
+  };
+}
+
+/**
+ * Génère uniquement la semaine 1 d'un plan course quand aucune référence de
+ * temps n'est fournie (params.tempsReference absent). Retourne
+ * enAttenteTest: true — index.html doit détecter ce champ pour proposer la
+ * suite (saisie/détection du résultat, puis completerPlanApresTestSemiCooper).
+ * dateCourse est conservée dès cette étape pour permettre le calcul du
+ * nombre de semaines restantes à l'étape suivante.
+ */
+export function generatePlanAvecTestSemiCooper(profil, params) {
+  const { assignment, warnings: warningsPlacement } = placerSemaine({
+    joursDisponibles: profil.joursDisponiblesHabituels,
+    niveau: profil.niveau,
+    renforcementActif: profil.renforcementMusculaire,
+    modulation: {},
+    forcerAucuneQualite: false,
+    jourLongueChoisi: profil.jourLongueChoisi ?? null
+  });
+
+  for (const [, seance] of Object.entries(assignment)) {
+    if (seance.type === 'qualite') {
+      const { sousType, contenu, kmEstime, structureIntervalles } = genererContenuTestSemiCooper();
+      seance.sousType = sousType;
+      seance.contenu = contenu;
+      seance.kmEstime = kmEstime;
+      seance.structureIntervalles = structureIntervalles;
+      seance.estTest = true;
+    } else if (seance.type === 'ef' || seance.type === 'longue') {
+      const { contenu, kmEstime } = genererContenuFootingLibrePreTest();
+      seance.contenu = contenu;
+      seance.kmEstime = kmEstime;
+    }
+  }
+
+  const semaine1 = {
+    semaineNum: 1,
+    phase: 'PreTest',
+    volumeCibleKm: null,
+    estDechargeSemaine: false,
+    assignment,
+    warnings: warningsPlacement
+  };
+
+  return {
+    distance: params.distance,
+    objectif: params.objectif,
+    enAttenteTest: true,
+    dateDebut: params.dateDebut,
+    dateCourse: params.dateCourse,
+    allures: null,
+    zoneFC: (() => {
+      const fcMax = profil.fcMaxConnue ?? (profil.anneeNaissance ? computeFcMaxTanaka(profil.anneeNaissance) : null);
+      if (!fcMax) return null;
+      return {
+        methode: profil.fcMaxConnue ? 'mesuree' : 'tanaka',
+        fcMax,
+        zonesParType: computeZonesFC(fcMax)
+      };
+    })(),
+    semaines: [semaine1],
+    warnings: warningsPlacement,
+    // Conservés pour completerPlanApresTestSemiCooper (reconstruction de
+    // profil/params complets, même limite documentée que
+    // changerPalierGrandDebutant côté Mode Forme : ce plan partiel ne
+    // retient pas tout params/profil, seulement ce qui suit).
+    paramsOrigine: { ...params, dateDebut: params.dateDebut },
+    profilOrigine: { ...profil }
+  };
+}
+
+/**
+ * Complète un plan course partiel (enAttenteTest: true, une seule semaine)
+ * une fois le résultat du test semi-Cooper connu. Ré-appelle generatePlan()
+ * normalement avec dateDebut décalé de 7 jours (semaine 2 du plan réel) —
+ * computePhases recalcule alors totalSemaines depuis le temps réellement
+ * restant jusqu'à dateCourse, pas un bloc de taille fixe comme en Mode
+ * Forme. La semaine 1 (test + footings libres déjà réalisés) n'est jamais
+ * régénérée, conforme au principe transverse de l'app (ne jamais modifier
+ * rétroactivement une semaine déjà passée).
+ *
+ * resultatTest : { refTimeSeconds, refDistanceKm } — sortie de
+ * estimerReferenceDepuisSemiCooper().
+ */
+export function completerPlanApresTestSemiCooper(planPartiel, resultatTest) {
+  if (!planPartiel.enAttenteTest) {
+    throw new Error("Ce plan n'est pas en attente de test — rien à compléter.");
+  }
+
+  const dateDebutSuite = new Date(planPartiel.dateDebut);
+  dateDebutSuite.setDate(dateDebutSuite.getDate() + 7);
+  const dateDebutSuiteStr = dateDebutSuite.toISOString().slice(0, 10);
+
+  const paramsSuite = {
+    ...planPartiel.paramsOrigine,
+    dateDebut: dateDebutSuiteStr,
+    refDistance: `${resultatTest.refDistanceKm}K`,
+    tempsReference: formatSecondsToTime(resultatTest.refTimeSeconds)
+  };
+
+  const planSuite = generatePlan(planPartiel.profilOrigine, paramsSuite);
+
+  // Renumérotation : le plan généré pour la suite recommence à semaineNum=1,
+  // il faut le décaler à partir de 2 pour s'enchaîner après la semaine 1
+  // (test) déjà existante.
+  const semainesRenumerotees = planSuite.semaines.map(s => ({ ...s, semaineNum: s.semaineNum + 1 }));
+
+  return {
+    ...planSuite,
+    enAttenteTest: false,
+    dateDebut: planPartiel.dateDebut, // date de début réelle du plan complet, pas celle de la suite
+    dureeSemaines: (planSuite.dureeSemaines ?? 0) + 1,
+    semaines: [planPartiel.semaines[0], ...semainesRenumerotees],
+    warnings: [...(planPartiel.warnings ?? []), ...(planSuite.warnings ?? [])],
+    paramsOrigine: undefined,
+    profilOrigine: undefined
+  };
 }
 
 function calculerSplitsCalibres(distanceKm, tempsObjectifSec, definitionsSegmentsIntermediaires, dernierNote) {
