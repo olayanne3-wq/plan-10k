@@ -6498,15 +6498,28 @@ function getEffectiveSession(week, slotIdx) {
 }
 
 // Jours disponibles pour deplacement (REPOS non swappés, ou slots masqués)
+// Jours disponibles pour déplacement (22/07/2026, demande de Laurent :
+// swap entre deux séances existantes, pas seulement vers un jour repos) —
+// propose désormais TOUS les jours de la semaine sauf le slot d'origine,
+// avec un libellé indiquant le vrai contenu du jour cible pour que le
+// coureur sache ce qu'il échange. Exclut uniquement les jours dont la
+// séance est déjà validée (✅/⚠️/❌) — même règle que celle déjà appliquée
+// à la séance SOURCE (cf. isDone dans showSessionMenu) : on ne réécrit
+// jamais un historique déjà réalisé, dans aucun des deux sens de l'échange.
 function getAvailableSlots(week, excludeIdx) {
   const slots = week.sessions.map((s,i) => {
     const uid = week.week+"-"+i;
     if (i === excludeIdx) return null;
     const effective = getEffectiveSession(week, i);
     if (!effective) return null;
+    const isDone = ["✅","⚠️","❌"].includes(statuses[uid]);
+    if (isDone) return null; // séance déjà réalisée, jamais une cible d'échange
     if (effective.type === "REPOS") return {idx:i, uid, date:s.date, label:"Repos"};
     if (hiddenSessions[uid]) return {idx:i, uid, date:s.date, label:effective.type+" (masquee)"};
-    return null;
+    // Jour actif normal — libellé avec le vrai type de séance présente,
+    // pour que le coureur comprenne qu'il s'agit d'un échange, pas d'un
+    // simple déplacement vers du vide.
+    return {idx:i, uid, date:s.date, label:effective.type+" — "+(effective.session||"").slice(0,30)};
   }).filter(Boolean);
 return slots;
 }
@@ -6605,7 +6618,7 @@ function showSessionMenu(week, slotIdx) {
 
 function showMoveMenu(week, slotIdx) {
   const slots = getAvailableSlots(week, slotIdx);
-  if (!slots.length) { alert("Aucun jour disponible cette semaine. Slots vides pour idx="+slotIdx); return; }
+  if (!slots.length) { alert("Aucune autre séance à échanger cette semaine (toutes déjà validées, ou une seule séance dans la semaine)."); return; }
 
   document.querySelectorAll(".sess-overlay").forEach(m=>m.remove());
   const overlay = document.createElement("div");
@@ -6617,7 +6630,7 @@ function showMoveMenu(week, slotIdx) {
 
   const t1 = document.createElement("div");
   t1.style.cssText = "color:var(--text);font-size:15px;font-weight:700;margin-bottom:16px;";
-  t1.textContent = "Deplacer vers...";
+  t1.textContent = "Échanger avec...";
   panel.appendChild(t1);
 
   const btnStyle = "width:100%;padding:13px;border-radius:10px;border:1px solid var(--border);background:var(--border-soft);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px;text-align:left;display:block;";
@@ -6626,7 +6639,17 @@ function showMoveMenu(week, slotIdx) {
     const btn = document.createElement("button");
     btn.style.cssText = btnStyle;
     const dayLabel = new Date(slot.date+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
-    btn.textContent = dayLabel+" ("+slot.label+")";
+    // Affichage sur deux lignes (22/07/2026) : jour en évidence, contenu de
+    // la séance cible en sous-texte — plus lisible qu'une seule ligne
+    // compacte depuis que ce menu propose aussi des jours actifs (pas
+    // seulement "Repos"), dont le libellé est plus long.
+    const ligneJour = document.createElement("div");
+    ligneJour.textContent = dayLabel;
+    btn.appendChild(ligneJour);
+    const ligneDetail = document.createElement("div");
+    ligneDetail.style.cssText = "font-size:12px;font-weight:400;color:var(--text-muted);margin-top:2px;";
+    ligneDetail.textContent = slot.label;
+    btn.appendChild(ligneDetail);
     btn.addEventListener("click", () => {
       const uidA = week.week+"-"+slotIdx;
       const uidB = slot.uid;
