@@ -631,8 +631,27 @@ let PLAN = window.__PLAN_GENERE__;
 // convergence-v1-v2.md, section 7) — si un autre plan est chargé après le
 // démarrage, ALL_SESSIONS doit être reconstruite depuis le nouveau PLAN,
 // pas rester sur l'ancien.
+// BUG corrigé le 22/07/2026 (signalé par Laurent : "déplacement manuel
+// bug") : ALL_SESSIONS était construite depuis w.sessions[i] BRUT, sans
+// jamais tenir compte de swappedSessions — seul renderWeekDetail()
+// (l'affichage de la carte) appliquait le swap via getEffectiveSession().
+// Conséquence : après un déplacement manuel (ex. séance VMA glissée vers
+// un jour repos), l'écran montrait bien le nouveau placement, mais TOUT
+// le reste de l'app (moteur de décision, INTERVAL_SESSION_DATES, matching
+// Strava/structureIntervalles, prédicteur 10K, stats) continuait de lire
+// l'ancien placement — 67 usages de ALL_SESSIONS dans ce fichier, aucun
+// n'était au courant du swap. Corrigé à la source : recalculerAllSessions()
+// applique désormais getEffectiveSession() lui-même, une seule fois, pour
+// que tous les consommateurs en bénéficient automatiquement sans devoir
+// être modifiés un par un. La date du slot affiché (s.date) est conservée
+// (c'est le jour calendaire réel où la séance doit être faite/a été
+// faite), seul le CONTENU de la séance (type, structureIntervalles,
+// contenu, kmEstime...) vient du swap le cas échéant.
 function recalculerAllSessions() {
-  return PLAN.flatMap(w => w.sessions.map((s,i) => ({...s, week:w.week, phase:w.phase, uid:`${w.week}-${i}`})));
+  return PLAN.flatMap(w => w.sessions.map((s,i) => {
+    const effSess = (typeof getEffectiveSession === 'function' ? getEffectiveSession(w, i) : null) || s;
+    return {...effSess, date: s.date, week:w.week, phase:w.phase, uid:`${w.week}-${i}`};
+  }));
 }
 let ALL_SESSIONS = recalculerAllSessions();
 
@@ -696,6 +715,14 @@ let manualPerf = load(clePourPlan("lk_manual_perf"), {});
 let derniereUrlSyncApp = null;
 let hiddenSessions = load(clePourPlan("lk_hidden_sessions"), {}); // {uid: true}
 let swappedSessions = load(clePourPlan("lk_swapped_sessions"), {}); // {uid: swapUid} swap bidirectionnel
+// Recalcul immédiat (22/07/2026) : le tout premier ALL_SESSIONS (ligne
+// ~656) a été construit avant que swappedSessions soit chargée depuis
+// localStorage (temporal dead zone, cf. garde dans getEffectiveSession) —
+// sans ce recalcul ici, un plan avec des déplacements manuels déjà
+// enregistrés démarrerait avec un ALL_SESSIONS qui les ignore jusqu'au
+// premier render() qui en déclencherait un autre (plusieurs endroits le
+// font, mais pas garanti avant le tout premier rendu).
+ALL_SESSIONS = recalculerAllSessions();
 let notesList = load(clePourPlan("lk_notes"), []);
 let sessionNotes = load(clePourPlan("lk_session_notes"), {}); // {uid: "texte"}
 // RPE unifié — 17/07/2026 (chantier "remonter le RPE au statut de séance",
@@ -6449,8 +6476,18 @@ function renderCourse() {
 // Obtenir la session effective sur un slot (apres swap)
 function getEffectiveSession(week, slotIdx) {
   const uid = week.week+"-"+slotIdx;
-  if (swappedSessions[uid]) {
-    const swapUid = swappedSessions[uid];
+  // Garde (22/07/2026) : recalculerAllSessions() appelle désormais cette
+  // fonction dès son premier appel (ligne ~656), AVANT que swappedSessions
+  // ne soit déclarée (let, ligne ~717 — temporal dead zone en JS tant que
+  // l'exécution n'a pas atteint cette ligne). typeof évite le
+  // ReferenceError dans cette fenêtre précise ; le tout premier ALL_SESSIONS
+  // calculé au chargement n'a de toute façon aucun swap à appliquer
+  // (swappedSessions n'a pas encore été chargée depuis localStorage), donc
+  // se comporter comme "pas de swap" ici est correct, pas un simple repli
+  // silencieux qui masquerait un vrai bug.
+  const swaps = typeof swappedSessions !== 'undefined' ? swappedSessions : {};
+  if (swaps[uid]) {
+    const swapUid = swaps[uid];
     const swapParts = swapUid.split("-");
     const swapWeekNum = parseInt(swapParts[0]);
     const swapIdx = parseInt(swapParts[1]);
