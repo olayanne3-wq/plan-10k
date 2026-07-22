@@ -32,8 +32,8 @@ window.sentryOnLoad = function () {
   --surface-rgb: 248,250,252;
   --text-rgb: 31,41,55;
   --accent-rgb: 30,78,216;
-  --accent2-rgb: 34,199,184;
-  --warn-rgb: 255,119,85;
+  --accent2-rgb: 0,140,128;
+  --warn-rgb: 194,65,12;
   --bg: rgb(var(--bg-rgb));
   --surface: rgb(var(--surface-rgb));
   --text: rgb(var(--text-rgb));
@@ -55,6 +55,20 @@ window.sentryOnLoad = function () {
   --border-soft: rgba(var(--text-rgb),0.07);
   --shadow1: rgba(0,0,0,0.4);
   --shadow2: rgba(0,0,0,0.3);
+  /* Accessibilité (22/07/2026) : accent-rgb/accent2-rgb/warn-rgb sont des
+     valeurs UNIQUES en :root, or une seule couleur ne peut pas satisfaire
+     WCAG AA (contraste ≥3.0 texte large/≥4.5 texte normal) sur deux fonds
+     opposés (clair ET sombre) à la fois. Repris ici : accent2 (turquoise,
+     statuts ✅/bilan) et warn (orange, alertes ⚠️❌) gardent leur valeur
+     d'origine — déjà de bon contraste sur fond sombre (8.95 et 7.23) —
+     tandis que ces mêmes couleurs sont assombries en :root pour repasser
+     le seuil en mode clair (où elles ne l'étaient pas : 2.02 et 2.5).
+     accent (bleu, allures/liens) suit la logique inverse : éclairci ici
+     uniquement (2.83→6.11 en mode sombre), la valeur de :root restant
+     inchangée en mode clair (déjà bonne à 6.4). */
+  --accent-rgb: 99,142,250;
+  --accent2-rgb: 34,199,184;
+  --warn-rgb: 255,119,85;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 body { background: var(--bg); color: var(--text); font-family: 'Inter',-apple-system,'Helvetica Neue',Arial,sans-serif; font-variant-numeric: tabular-nums; max-width: 430px; margin: 0 auto; transition: background 0.2s ease, color 0.2s ease; }
