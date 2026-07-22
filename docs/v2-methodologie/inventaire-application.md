@@ -123,9 +123,10 @@ Fonctions de rendu (`render*`) :
 ## 5. Persistance
 
 **localStorage (préfixe `lk_`)** — clés globales (profil/config) :
-`lk_profil_coureur`, `lk_github_token`, `lk_strava_token`,
+`lk_profil_coureur`, `lk_strava_token`,
 `lk_strava_refresh`, `lk_strava_expires`, `lk_strava_activities`,
-`lk_last_sync`.
+`lk_last_sync`. (`lk_github_token`/`lk_gist_id`/`v2_gist_id` retirés le
+22/07/2026 avec le reste du système Gist v2, cf. §5 et §11.)
 
 Clés préfixées par plan (via `clePourPlan()`) : `lk_statuses`,
 `lk_hidden_sessions`, `lk_swapped_sessions`, `lk_session_notes`, `lk_notes`,
@@ -154,18 +155,24 @@ Realtime activée sur `plan_donnees` (anti-écho 3s). File d'attente de
 sync en cas d'échec réseau (`lk_file_attente_sync`, rejouée au retour
 réseau et toutes les 5 min, abandon après 10 essais).
 
-**Sauvegarde de plan — Supabase est la source de vérité principale, Gist
-en best-effort uniquement** : toute fonction qui modifie un plan existant
-(génération du bloc suivant, complétion après test, suppression) doit
-appeler `LkSync.mettreAJourPlanSupabase()`/`supprimerPlanSupabase()` comme
-mécanisme bloquant, et n'appeler `sauvegarderPlan()`/`supprimerPlan()`
-(Gist, `gist-sync.js`) qu'en `try/catch` non bloquant, seulement si un
-token GitHub existe encore (`getGithubToken()`). Sans ce garde, tout code
-qui appelle le Gist en premier échoue systématiquement pour un compte sans
-token configuré (`ecrireListePlans()` lève une exception explicite),
-interrompant toute la fonction avant même d'atteindre Supabase — plusieurs
-bugs de ce type trouvés et corrigés le 21/07/2026 (suppression de plan,
-génération du bloc suivant, complétion après test).
+**Sauvegarde de plan — Supabase est l'unique mécanisme de persistance
+(22/07/2026)** : le système Gist v2 (`gist-sync.js`, sync par token GitHub
+personnel) a été entièrement retiré de `index.html` et du wizard
+(`public/v2/index.html`) — bouton "☁️ Sauvegarder" et formulaire de token
+supprimés côté wizard, tous les appels `sauvegarderPlan()`/
+`chargerPlans()`/`supprimerPlan()`/`renommerPlan()` remplacés par leurs
+équivalents Supabase (`mettreAJourPlanSupabase`/`chargerPlansSupabase`,
+etc.) ou simplement retirés quand Supabase gérait déjà la même action en
+parallèle. `gist-sync.js` reste dans le repo (toujours importé par
+`sync-storage.js` pour `trouverPlanEnConflit`, le garde-fou anti-
+chevauchement de dates entre plans — fonction pure indépendante de la
+persistance elle-même), mais n'est plus utilisé pour aucune écriture/
+lecture de plan. **Garde-fou porté vers Supabase** au même moment : un plan
+Forme déjà clôturé (`dateCloture` posée) ne peut plus être écrasé via
+`mettreAJourPlanSupabase()` — protection qui n'existait qu'au niveau du
+Gist jusqu'ici, absente côté Supabase (bug potentiel découvert en
+vérifiant l'impact du retrait, corrigé avant qu'il ne cause de régression
+réelle).
 
 ## 6. Profil coureur (`lk_profil_coureur`)
 
@@ -273,6 +280,36 @@ restant jusqu'à la course (pas un bloc de taille fixe comme en Forme).
   "dernière semaine du plan" = semaine de course) — `jourCourseIndex` mis
   à `null` dans ce cas côté wizard.
 
+**Allures dynamiques (22/07/2026)** — jusqu'ici, les allures E/T/I
+(`computeAllures()`) restaient calibrées sur `paramsOrigine.tempsReference`
+(référence de forme mesurée à la CRÉATION du plan) pendant toute sa durée,
+même quand le prédicteur détectait une vraie progression — un plan visant
+45:00 avec une référence de départ à 50:19 gardait des allures calibrées
+sur 50:19 tout du long, sans jamais se resserrer vers l'objectif. Nouveau
+mécanisme, déclenché à la fin de chaque semaine PAIRE du plan (S2, S4,
+S6...) :
+- `calculerReferenceCouranteAllures()` (fonction pure, `plan-generator.js`)
+  compare l'estimation du prédicteur à celle de la période précédente
+  (`predHistory`), avec un seuil de signification de 1% pour ignorer le
+  bruit. Progression (estimation plus rapide) → appliquée immédiatement.
+  Régression → appliquée seulement si confirmée sur 2 périodes de 2
+  semaines CONSÉCUTIVES (state `lk_regression_allures_en_attente`), pour
+  éviter de réagir à un accident ponctuel.
+- `verifierEtAppliquerAlluresDynamiques()` (`index.html`) orchestre :
+  détection de la fin de semaine paire (`currentWeek()`), lecture des deux
+  estimations dans `predHistory`, appel à la fonction pure, application
+  (régénère `window.__PLAN_BRUT__.allures` via `computeAllures()`,
+  sauvegarde Supabase) et notification visible ("📈 Allures mises à jour",
+  bandeau dismissible sur le dashboard — jamais silencieux).
+- Première comparaison possible dès la fin de S2, contre
+  `paramsOrigine.tempsReference` (pas de `null` forcé — correctif du même
+  jour, la version initiale bloquait toute détection avant la fin de S4).
+- Indépendant d'`appliquerAdaptations()` (qui réagit à des semaines ratées,
+  déclenché sur clic explicite) — les deux mécanismes coexistent sans se
+  substituer l'un à l'autre.
+- **Non testé en conditions réelles** — le premier déclenchement possible
+  n'arrive qu'à la fin d'un cycle S2 d'un plan en cours, à surveiller.
+
 ## 8. Moteur de décision
 
 5 modules, tous livrés et en production (`engine-classic-scripts/decision-engine-*.classic.js`) :
@@ -366,10 +403,43 @@ progressive") :
   (remplace l'ancienne boucle indépendante `predict10KAtDate` par jour) —
   applique la même convergence jour par jour depuis le début du plan,
   nécessaire car chaque jour dépend de la veille. `calculerBorneBruteAtDate`
-  (ex-`predict10KAtDate`) calcule la borne brute à une date donnée, version
-  simplifiée sans SEUIL ni garde-fou d'exclusion (écart accepté, SEUIL ne
-  pèse que 0.10). `PREDICTOR_VERSION` (actuellement 6) déclenche la
-  reconstruction automatique au chargement si incrémentée.
+  (ex-`predict10KAtDate`) calcule la borne brute à une date donnée en
+  réutilisant `weightedAvgByEffortDuration()` (extrait de `predict10K()` en
+  fonction top-level partagée le 22/07/2026 — la version précédente était
+  simplifiée et OUBLIAIT SEUIL entièrement, bug réel découvert sur un compte
+  de test avec séances SEUIL+VMA validées : la convergence restait figée
+  sur `BASE_TIME_REFERENCE` malgré des séances de qualité, le graphe Stats
+  affichant une ligne plate). `PREDICTOR_VERSION` (actuellement 8) déclenche
+  la reconstruction automatique au chargement si incrémentée — nécessite un
+  geste manuel (incrémenter la constante) à chaque changement de méthode de
+  calcul, rien d'automatique ne détecte qu'une formule a changé.
+- **Source SEUIL — formule Daniels-Gilbert (VDOT) depuis le 22/07/2026** :
+  remplace Riegel, qui traitait une allure seuil (sous-maximale par nature,
+  86-88% VO2max chez Daniels, tenable ~60min en course) comme si c'était
+  une performance maximale — sous-estimait systématiquement la vitesse 10K
+  réelle (écart mesuré ~4min sur un cas réel : 52'58" en Riegel contre
+  49'15"-49'02" en VDOT pour la même séance). Nouvelles fonctions pures dans
+  `plan-generator.js` : `vo2FromVelocity`/`velocityFromVo2` (coût O2 ↔
+  vitesse), `pctVo2MaxPourDuree` (courbe de durée Daniels-Gilbert),
+  `vdotDepuisEffortSousMaximal`/`vitesseDepuisVdotEtDistance` (assemblage
+  complet). Équations vérifiées par recherche web (chapitre 5 du livre,
+  "VDOT System of Training", absent du fichier projet fourni — seuls les
+  chapitres 1-4 sont disponibles), cohérentes avec plusieurs calculateurs
+  VDOT tiers indépendants et avec les % VO2max déjà confirmés dans le
+  chapitre 4 (seuil 86-88% VO2max, tenable ~60min).
+- **Convergence progressive et corrections de formule rétroactives** :
+  la convergence (`departConvergence` dans `predict10K()`) part toujours de
+  la DERNIÈRE valeur mémorisée dans `predHistory`, jamais de `borneBrute`
+  directement — donc un changement de méthode de calcul (comme le fix VDOT
+  ci-dessus) n'améliore pas immédiatement l'estimation AFFICHÉE tant
+  qu'aucune nouvelle séance de qualité n'a lieu, même si la borne brute
+  sous-jacente a changé. Vérifié par calcul (22/07/2026) : forcer un
+  redémarrage de la convergence depuis `BASE_TIME_REFERENCE` au changement
+  de version serait CONTRE-PRODUCTIF (ferait reculer l'affichage vers la
+  référence, plus lente que la valeur déjà mémorisée, avant de reconverger)
+  — décision actée de ne rien changer sur ce point, le rattrapage se fait
+  naturellement à chaque nouvelle séance de qualité, sans mécanisme
+  supplémentaire nécessaire.
 
 **Non couvert / reporté** :
 - Réduction d'intervalles pour séances de qualité (VMA/SEUIL/SPEC) —
@@ -378,15 +448,15 @@ progressive") :
   régularité comportementale seule
 - R-062/R-070/R-080 jamais observées sur données réelles de Laurent — à
   surveiller
-- Facteur Riegel appliqué à SEUIL (poids 0.10 dans `predict10K`) reste
-  structurellement pessimiste (traite une allure seuil sous-maximale comme
-  une performance maximale) — non corrigé, la convergence progressive
-  limite l'impact mais ne règle pas la formule à la racine. Piste évoquée :
-  conversion via tables VDOT plutôt que Riegel brut.
 - Convergence progressive (22/07/2026) pas encore observée sur plusieurs
   semaines réelles — à surveiller, notamment le rythme du pas
   (`PAS_CONVERGENCE_BASE=0.15`) qui pourrait s'avérer trop lent ou trop
   rapide une fois éprouvé en conditions réelles.
+- Chapitre 5 du livre Daniels ("VDOT System of Training", tables complètes)
+  absent du fichier projet fourni à Claude — la formule VDOT implémentée le
+  22/07/2026 a été reconstruite à partir des équations Daniels-Gilbert
+  vérifiées par recherche web, pas directement lue dans le livre fourni ;
+  fiable mais pas garantie identique à 100% aux tables publiées.
 
 **Bug "0 séance sur 14 jours" (résolu le 22/07/2026)** : cause la plus
 probable identifiée — `autoSync()` (auto-synchro Strava) ne se
@@ -474,9 +544,10 @@ pas un doublon.
 
 **Coach (messages courts)** — `api/coach.js`, proxy Claude Haiku 4.5.
 
-**Sync multi-device** — GitHub Gist (`lk_github_token`), géré par
-`v2/engine/gist-sync.js`. Best-effort uniquement pour la sauvegarde de
-plan, cf. §5.
+**Sync multi-device** — Supabase (auth par compte email/mot de passe),
+seul mécanisme depuis le 22/07/2026 (Gist v2/GitHub token entièrement
+retiré, cf. §5). Aucune action de l'utilisateur nécessaire au-delà de se
+connecter avec le même compte sur chaque appareil.
 
 **Stripe (abonnements, v2.5)** — Produit "Yoria Premium" (7€/mois,
 `STRIPE_PRICE_ID`, et tarif annuel `STRIPE_PRICE_ID_ANNUAL`), mode Checkout
@@ -665,6 +736,9 @@ calcul si le temps donné venait d'une autre distance) — sélecteur compact
 | Validation empirique de `RATIO_VMA_VERS_10K` (0.90) et `PACE_RATIOS.E` (1.225) | 🔜 Corrigés le 22/07/2026 sur base théorique (littérature demi-Cooper) faute de vraies données — à revalider avec le premier vrai test semi-Cooper couru par Laurent (pas simulé) une fois disponible. |
 | Refonte swap : écrire directement dans `plan_actif` au lieu de `swappedSessions` séparé | 🔜 Discuté le 22/07/2026 (suggestion de Laurent) — éliminerait la classe de bug déjà rencontrée (oublier d'appliquer le swap à un nouvel endroit). Complexité identifiée avant de s'y lancer : annulation d'un swap (garder une trace de l'état d'origine), interaction avec les régénérations de plan (bloc suivant, adaptation, complétion post-test — risque d'écraser silencieusement un swap), séparation `plans_actif`/`plans_original`, chemin de sauvegarde (bloquant `LkSync` vs `save()` fire-and-forget actuel), interaction avec le moteur de décision (`reduire_charge` sur une séance swappée) et le jour du test semi-Cooper. Pas commencé. |
 | `statutEffectif` : étendre aux autres lecteurs de `statuses[uid]` | 🔜 Centralisé dans `ALL_SESSIONS`/`recalculerAllSessions()` et la garde du swap (22/07/2026), mais plusieurs autres lectures directes de `statuses[uid]` dans `index.html` (stats détaillées §Stats, moteur de décision R-040/R-070, prédicteur) ne tiennent pas encore compte du 😴 automatique — à auditer et étendre au cas par cas, pas fait en une passe pour limiter le risque de régression. |
+| App native (Capacitor) pour publication iOS | 🔜 Piste identifiée le 22/07/2026 (Laurent envisage la publication grand public) — Capacitor recommandé plutôt qu'un rewrite natif complet (React Native/Flutter), permettrait de réutiliser le code web existant quasi tel quel pour Android ET iOS. Pas de code, discussion uniquement. Pas urgent tant qu'aucun besoin iOS confirmé — TWA actuelle suffit pour Android grand public (Google ne pénalise pas ce mode de publication). |
+| Passage du repo GitHub en privé | 🔜 Décidé le 22/07/2026 : repo reste PUBLIC pendant le développement solo/bêta (économise des tokens pour Claude — lecture directe via `raw.githubusercontent.com`), bascule en privé prévue juste avant la commercialisation/lancement public, pour protéger le code métier différenciant (moteur de décision, calibrations) sans gêner le rythme de travail actuel. Vérifié : Vercel et le connecteur MCP GitHub (déjà authentifiés) continueront de fonctionner sans changement après le passage en privé. |
+| Convergence progressive et fix VDOT SEUIL — observation en conditions réelles | 🔜 Les deux chantiers du 22/07/2026 (convergence progressive du prédicteur, remplacement Riegel→VDOT pour SEUIL) sont en production mais pas encore éprouvés sur plusieurs semaines réelles — à surveiller, notamment le rythme du pas de convergence (`PAS_CONVERGENCE_BASE=0.15`, potentiellement trop lent) et la fidélité de la formule VDOT reconstruite (chapitre 5 du livre absent du fichier projet fourni, formule vérifiée par recherche web plutôt que lue directement). |
 
 Pour l'historique des versions livrées et des correctifs, voir
 `changelog.classic.js`. Pour le détail méthodologique des séances, voir
