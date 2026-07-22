@@ -1589,10 +1589,15 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     if (!estSelectionne) {
       el.classList.add('selected');
     } else if (!estLongue) {
-      grid.querySelectorAll('.day.longue').forEach(d => d.classList.remove('longue'));
+      grid.querySelectorAll('.day.longue').forEach(d => {
+        d.classList.remove('longue');
+        d.querySelector('span:last-child').textContent = '●';
+      });
       el.classList.add('longue');
+      el.querySelector('span:last-child').textContent = '★';
     } else {
       el.classList.remove('selected', 'longue');
+      el.querySelector('span:last-child').textContent = '●';
     }
   }
 
