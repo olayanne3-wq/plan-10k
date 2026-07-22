@@ -21,7 +21,14 @@
  */
 
 const VERSIONS = [
-      { ver:"v2.20", title:"Estimation 10K progressive, bandes de tolérance, lisibilité des statuts", current:true, notes:[
+      { ver:"v2.21", title:"Estimation plus fidèle (VDOT), allures qui suivent ta progression, sync 100% Supabase", current:true, notes:[
+        "🎯 L'allure de seuil compte maintenant pour ce qu'elle est vraiment — l'ancienne méthode (Riegel) traitait une séance de seuil comme un effort maximal et sous-estimait ta vitesse réelle de plusieurs minutes sur 10K",
+        "📈 Tes allures d'entraînement (endurance, seuil, VMA) se resserrent maintenant automatiquement au fil du plan à mesure que ta forme progresse, au lieu de rester figées sur ta référence de départ",
+        "☁️ La sauvegarde et la synchronisation entre appareils passent maintenant à 100% par ton compte — plus besoin de token GitHub, un vestige de l'ancien système a été retiré",
+        "🐛 Correction d'un cas où l'estimation restait bloquée sur ta référence de départ malgré des séances de seuil et VMA validées",
+        "🎨 Correction des contrastes de couleur sur certains éléments (statuts, alertes) pour une meilleure lisibilité en extérieur",
+      ]},
+      { ver:"v2.20", title:"Estimation 10K progressive, bandes de tolérance, lisibilité des statuts", current:false, notes:[
         "🎯 L'estimation 10K ne recule plus après une séance de qualité réussie — elle progresse désormais par petits pas vers ta forme mesurée au lieu de sauter directement dessus, et ralentit si tu rates plusieurs séances récemment",
         "📊 Le graphique d'évolution de l'estimation affiche maintenant une bande de tolérance autour de la courbe",
         "😴 Le nombre de séances sautées apparaît maintenant dans le bilan de la semaine sur le dashboard",
