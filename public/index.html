@@ -8102,9 +8102,22 @@ function matchActivitiesToPlan(activities) {
 }
 
 // Auto-synchro Strava si token valide et dernière synchro > 1h
+// BUG corrigé le 22/07/2026 (investigation carte moteur de décision "0
+// séance sur 14 jours", cf. inventaire §8) : cette garde ne considérait
+// QUE l'ancienneté de la dernière synchro (lastSyncTime), jamais l'état
+// réel de stravaActivities. Si une incohérence survient entre les deux
+// (ex. lk_last_sync écrit récemment mais lk_strava_activities resté vide
+// ou obsolète — scénario plausible lors d'une interruption de session,
+// comme l'incident de profil dupliqué du 21/07/2026), le moteur de
+// décision tournait alors sur un historique vide de façon silencieuse et
+// persistante, jusqu'à ce qu'une heure s'écoule ou qu'une synchro
+// manuelle soit faite. Ajout d'une seconde condition : activités vides
+// force la resynchro immédiatement, même si lastSyncTime est récent.
 (function autoSync() {
   const ONE_HOUR = 60 * 60 * 1000;
-  if (stravaToken && (Date.now() - lastSyncTime) > ONE_HOUR) {
+  const syncAncienne = (Date.now() - lastSyncTime) > ONE_HOUR;
+  const activitesVides = !stravaActivities || stravaActivities.length === 0;
+  if (stravaToken && (syncAncienne || activitesVides)) {
     setTimeout(() => syncStrava(), 1500);
   }
 })();
