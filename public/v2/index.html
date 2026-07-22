@@ -1252,6 +1252,14 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
         </div>
         <button class="btn-mini" onclick="applyAltEstimate()">Utiliser cette estimation</button>
       </div>
+
+      <!-- Flux "pas de référence" (plan course, cf. plan-generator.js
+           generatePlanAvecTestSemiCooper/completerPlanApresTestSemiCooper) —
+           même principe que le wizard Forme (activerFluxTestForme), mais la
+           suite du plan dépend de dateCourse plutôt que d'un bloc fixe. -->
+      <div id="coursePasDeReferenceLien" style="text-align:center; margin-top:14px;">
+        <a href="#" onclick="return activerFluxTestCourse(event)" style="color:var(--muted); font-size:13px; text-decoration:underline;">Je n'ai pas de référence</a>
+      </div>
     </div>
 
     <!-- STEP 5: Objectif -->
@@ -1274,6 +1282,10 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
       <div class="flag" style="margin-top:16px;">
         <span class="ico">✅</span>
         <span id="feasibilityText">Objectif réaliste sur 11 semaines pour un profil intermédiaire.</span>
+      </div>
+      <div class="flag" id="courseTestFlag" style="display:none; margin-top:16px;">
+        <span class="ico">🎯</span>
+        <span>Cette étape est ignorée — ton objectif sera calibré après ton test de 6 minutes en semaine 1.</span>
       </div>
     </div>
 
@@ -1529,6 +1541,29 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     document.querySelectorAll('.opt-compact[data-dist-forme]').forEach(o=>o.classList.remove('selected'));
     el.classList.add('selected');
     currentDistForme = el.dataset.distForme;
+  }
+
+  // Flux "pas de référence" (plan course, 21/07/2026) — bascule la
+  // génération vers generatePlanAvecTestSemiCooper() (plan-generator.js,
+  // semaine 1 uniquement) au lieu du flux normal. Neutralise visuellement
+  // le champ temps de référence (étape 3) et l'étape objectif (étape 4,
+  // dont la faisabilité dépend justement de ce temps de référence absent)
+  // sans les masquer — même logique que activerFluxTestForme ci-dessous.
+  let fluxTestCourse = false;
+  function activerFluxTestCourse(event) {
+    event.preventDefault();
+    fluxTestCourse = true;
+    document.querySelector('[data-step="3"] .time-input').style.opacity = '0.35';
+    document.querySelector('[data-step="3"] .time-input').style.pointerEvents = 'none';
+    document.querySelector('[data-step="3"] .alt-toggle').style.opacity = '0.35';
+    document.querySelector('[data-step="3"] .alt-toggle').style.pointerEvents = 'none';
+    document.getElementById('coursePasDeReferenceLien').innerHTML =
+      '<div style="color:var(--signal); font-size:13px;">✓ Un test de 6 minutes te sera proposé en première semaine, pour calibrer tes allures à partir de tes vraies sensations.</div>';
+    document.querySelector('[data-step="4"] .time-input').style.opacity = '0.35';
+    document.querySelector('[data-step="4"] .time-input').style.pointerEvents = 'none';
+    document.getElementById('feasibilityText').parentElement.style.display = 'none';
+    document.getElementById('courseTestFlag').style.display = 'flex';
+    return false;
   }
 
   // Flux "pas de référence" (21/07/2026) — bascule la génération vers
@@ -2814,6 +2849,38 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
 
   function generateAndShowResults(){
     const { profil, params } = collectParamsFromWizard();
+
+    // Flux "pas de référence" (21/07/2026) — route vers
+    // generatePlanAvecTestSemiCooper() (plan-generator.js), qui ignore
+    // params.tempsReference/objectif (non pertinents ici) et ne génère que
+    // la semaine 1 avec le test semi-Cooper. La suite (semaines 2 à N,
+    // taille dépendante de dateCourse) sera générée depuis le dashboard une
+    // fois le résultat du test connu (completerPlanApresTestSemiCooper).
+    if (fluxTestCourse) {
+      let planTest;
+      try {
+        planTest = Engine.generatePlanAvecTestSemiCooper(profil, params);
+      } catch (err) {
+        alert("Erreur de génération : " + err.message);
+        console.error(err);
+        return;
+      }
+      planTest.id = (window.crypto?.randomUUID) ? crypto.randomUUID() : ('plan-' + Date.now());
+      planTest.statuses = {};
+      planTest.profilOrigine = profil;
+      planTest.paramsOrigine = params;
+      dernierPlanGenere = planTest;
+      renderResults(planTest);
+      showingResults = true;
+      consultationSeule = false;
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.querySelector('.screen[data-step="10"]').classList.add('active');
+      document.getElementById('nextBtn').innerHTML = '✓';
+      document.getElementById('nextBtn').setAttribute('aria-label', 'Terminer');
+      document.getElementById('nextBtn').title = 'Terminer';
+      return;
+    }
+
     let plan;
     try {
       plan = Engine.generatePlan(profil, params);
