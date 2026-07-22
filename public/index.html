@@ -6512,8 +6512,20 @@ function getAvailableSlots(week, excludeIdx) {
     if (i === excludeIdx) return null;
     const effective = getEffectiveSession(week, i);
     if (!effective) return null;
-    const isDone = ["✅","⚠️","❌"].includes(statuses[uid]);
-    if (isDone) return null; // séance déjà réalisée, jamais une cible d'échange
+    // BUG évité le 22/07/2026 (discussion avec Laurent) : statuses[uid]
+    // seul ne suffit pas — une séance peut avoir une note (sessionNotes),
+    // un RPE (sessionRpe) ou une saisie manuelle (manualPerf) déjà
+    // enregistrés SANS statut ✅/⚠️/❌ posé (ex. note ajoutée avant même
+    // de courir). Ces données restent indexées par uid (position
+    // calendaire), pas par le contenu de la séance — un swap les
+    // laisserait accrochées au mauvais jour après échange. Toute trace
+    // d'activité réelle, peu importe sa forme, bloque désormais le swap
+    // dans les deux sens (source ET destination).
+    const aTraceActivite = ["✅","⚠️","❌"].includes(statuses[uid])
+      || !!sessionNotes[uid]
+      || !!sessionRpe[uid]
+      || !!manualPerf[uid];
+    if (aTraceActivite) return null; // séance déjà réalisée ou annotée, jamais une cible d'échange
     if (effective.type === "REPOS") return {idx:i, uid, date:s.date, label:"Repos"};
     if (hiddenSessions[uid]) return {idx:i, uid, date:s.date, label:effective.type+" (masquee)"};
     // Jour actif normal — libellé avec le vrai type de séance présente,
@@ -6566,7 +6578,12 @@ function showSessionMenu(week, slotIdx) {
     }
 
     const isDone = ["✅","⚠️","❌"].includes(statuses[uid]);
-    if (!isDone) {
+    // Garde renforcée pour le déplacement uniquement (22/07/2026, cf.
+    // getAvailableSlots) : une note/RPE/saisie manuelle sans statut posé
+    // bloque aussi le déplacement — le bouton "Supprimer cette séance"
+    // garde sa propre règle (isDone seul), sémantique différente.
+    const aTraceActivite = isDone || !!sessionNotes[uid] || !!sessionRpe[uid] || !!manualPerf[uid];
+    if (!aTraceActivite) {
       const moveBtn = document.createElement("button");
       moveBtn.style.cssText = btnStyle+"background:rgba(var(--accent-rgb),0.13);color:var(--accent);";
       moveBtn.textContent = "Deplacer cette seance";
