@@ -343,35 +343,28 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
   // valeurs en dur (docs/v2-methodologie/convergence-v1-v2.md, section 7bis).
   window.__PLAN_PRET__ = (async () => {
     // Attend que le préchargement Supabase (window.__AUTH_PRET__) ait
-    // restauré lk_github_token/lk_gist_id en localStorage AVANT d'appeler
-    // chargerPlans() — sinon celle-ci part sans token (pas encore rentré
-    // depuis Supabase) et échoue silencieusement, avec repli sur le plan
+    // résolu window.__UTILISATEUR__ AVANT d'appeler
+    // LkSync.chargerPlansSupabase() plus bas — sinon celle-ci part sans
+    // utilisateur connu et échoue silencieusement, avec repli sur le plan
     // par défaut. Bug découvert le 13 juillet 2026 en test de production :
-    // les deux promesses démarraient en parallèle sans dépendance, donc
-    // chargerPlans() pouvait gagner la course et échouer avant que le
-    // préchargement n'ait eu lieu. Chantier v2.5 migration, cf. inventaire
-    // §8bis. Coût : le premier rendu attend maintenant la connexion réseau
-    // à Supabase avant de tenter le Gist, légèrement plus lent qu'avant,
-    // mais correct plutôt que rapide-et-faux.
+    // les deux promesses démarraient en parallèle sans dépendance. Chantier
+    // v2.5 migration, cf. inventaire §8bis.
     await window.__AUTH_PRET__;
 
-    // Cache des modules gist-sync.js et plan-generator.js (19/07/2026,
-    // étape 2 du chantier de conversion module — cf. mémoire de session).
-    // Même pattern que _fitParserModule plus bas dans ce fichier :
-    // import() dynamique, chargé une seule fois puis réutilisé, plutôt
-    // qu'un <script src> statique (gist-sync.classic.js/
-    // plan-generator.classic.js retirés). Les fonctions/constantes des
-    // modules sont exposées en global via Object.assign(window, ...) pour
-    // rester compatibles avec tout le code existant qui les appelle
-    // directement (chargerPlans(), generatePlan(), KM_BY_DISTANCE, etc.
-    // sans préfixe, à de nombreux endroits de ce fichier) — pas de
+    // Cache du module plan-generator.js (19/07/2026, étape 2 du chantier de
+    // conversion module — cf. mémoire de session ; gist-sync.js retiré le
+    // 22/07/2026, système Gist v2 démantelé — cf. inventaire §16). Même
+    // pattern que _fitParserModule plus bas dans ce fichier : import()
+    // dynamique, chargé une seule fois puis réutilisé, plutôt qu'un
+    // <script src> statique (plan-generator.classic.js retiré). Les
+    // fonctions/constantes du module sont exposées en global via
+    // Object.assign(window, ...) pour rester compatibles avec tout le code
+    // existant qui les appelle directement (generatePlan(), KM_BY_DISTANCE,
+    // etc. sans préfixe, à de nombreux endroits de ce fichier) — pas de
     // réécriture de chaque point d'appel, seul le tout premier chargement
-    // change. Les deux modules sont chargés ici, tôt dans ce bloc, car
-    // KM_BY_DISTANCE (plan-generator.js) et generatePlan() sont utilisés
-    // de façon synchrone plus loin dans ce même IIFE async (ligne
-    // ~291/~850) — doivent donc être garantis disponibles AVANT.
-    window._gistSyncModule = await import("/v2/engine/gist-sync.js");
-    Object.assign(window, window._gistSyncModule);
+    // change. Chargé ici, tôt dans ce bloc, car KM_BY_DISTANCE et
+    // generatePlan() sont utilisés de façon synchrone plus loin dans ce
+    // même IIFE async — doivent donc être garantis disponibles AVANT.
     window._planGeneratorModule = await import("/v2/engine/plan-generator.js");
     Object.assign(window, window._planGeneratorModule);
     // plan-forme.js importe déjà plan-generator.js via de vrais import ES
@@ -390,27 +383,13 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
     let planBrut = null;
     let plansDisponibles = [];
 
-    // Supabase d'abord (v2.8, 15/07/2026) — Gist n'est plus le système
-    // principal depuis que Laurent a retiré le token GitHub ; chargerPlans()
-    // (Gist) sans token retourne toujours [] silencieusement, laissant tout
-    // nouveau plan introuvable au retour sur le dashboard, quel que soit le
-    // wizard utilisé pour le créer. Gist reste tenté en repli SEULEMENT si
-    // un token est encore configuré (compatibilité ascendante, au cas où
-    // Laurent le rétablirait plus tard) et que Supabase n'a rien retourné.
+    // Supabase — mécanisme principal (v2.8, 15/07/2026).
     try {
       if (window.__UTILISATEUR__?.id) {
         plansDisponibles = await LkSync.chargerPlansSupabase(window.__UTILISATEUR__.id);
       }
     } catch (e) {
       console.warn('Chargement des plans depuis Supabase échoué :', e.message);
-    }
-
-    if (plansDisponibles.length === 0) {
-      try {
-        plansDisponibles = await chargerPlans();
-      } catch (e) {
-        console.warn('Chargement des plans depuis le Gist échoué, génération par défaut :', e.message);
-      }
     }
 
     if (plansDisponibles.length > 0) {
@@ -3277,11 +3256,6 @@ function renderDashboard() {
         if (window.__UTILISATEUR__?.id && window.LkSync) {
           await window.LkSync.mettreAJourPlanSupabase(nouveauPlan.id, nouveauPlan);
         }
-        // Gist : best-effort, jamais bloquant (compatibilité ascendante).
-        if (getGithubToken()) {
-          try { await sauvegarderPlan(nouveauPlan); }
-          catch (eGist) { console.warn('Sauvegarde Gist échouée (Supabase OK, non bloquant) :', eGist.message); }
-        }
         window.location.reload();
       } catch (e) {
         alert("La génération du bloc suivant a échoué : " + e.message);
@@ -3359,10 +3333,6 @@ function renderDashboard() {
         // genererSuivant() juste au-dessus (21/07/2026).
         if (window.__UTILISATEUR__?.id && window.LkSync) {
           await window.LkSync.mettreAJourPlanSupabase(nouveauPlan.id, nouveauPlan);
-        }
-        if (getGithubToken()) {
-          try { await sauvegarderPlan(nouveauPlan); }
-          catch (eGist) { console.warn('Sauvegarde Gist échouée (Supabase OK, non bloquant) :', eGist.message); }
         }
         window.location.reload();
       } catch (e) {
@@ -3591,8 +3561,8 @@ function renderDashboard() {
             window.__PLAN_GENERE__ = traduirePlanVersFormatV1(window.__PLAN_BRUT__);
             PLAN = window.__PLAN_GENERE__;
             ALL_SESSIONS = recalculerAllSessions();
-            if (getGithubToken && getGithubToken() && sauvegarderPlan) {
-              sauvegarderPlan(window.__PLAN_BRUT__).catch(e => console.warn("Adaptation appliquée localement, sauvegarde échouée :", e.message));
+            if (window.__UTILISATEUR__?.id && window.LkSync?.mettreAJourPlanSupabase && window.__PLAN_BRUT__.id) {
+              window.LkSync.mettreAJourPlanSupabase(window.__PLAN_BRUT__.id, window.__PLAN_BRUT__).catch(e => console.warn("Adaptation appliquée localement, sauvegarde échouée :", e.message));
             }
             render();
           }
@@ -3682,8 +3652,8 @@ function renderDashboard() {
             window.__PLAN_GENERE__ = traduirePlanVersFormatV1(window.__PLAN_BRUT__);
             PLAN = window.__PLAN_GENERE__;
             ALL_SESSIONS = recalculerAllSessions();
-            if (getGithubToken && getGithubToken() && sauvegarderPlan) {
-              sauvegarderPlan(window.__PLAN_BRUT__).catch(e => console.warn("Décision du moteur appliquée localement, sauvegarde échouée :", e.message));
+            if (window.__UTILISATEUR__?.id && window.LkSync?.mettreAJourPlanSupabase && window.__PLAN_BRUT__.id) {
+              window.LkSync.mettreAJourPlanSupabase(window.__PLAN_BRUT__.id, window.__PLAN_BRUT__).catch(e => console.warn("Décision du moteur appliquée localement, sauvegarde échouée :", e.message));
             }
             render();
           }
@@ -4684,14 +4654,10 @@ async function changerPalierGrandDebutant(nouveauPalierId) {
   ALL_SESSIONS = recalculerAllSessions();
 
   // Même pattern de sauvegarde que la clôture de plan (Réglages) : Supabase
-  // en priorité (mécanisme principal depuis §17.11), Gist en best-effort.
+  // comme mécanisme principal (§17.11).
   try {
     if (window.__UTILISATEUR__?.id && window.LkSync?.mettreAJourPlanSupabase && window.__PLAN_BRUT__.id) {
       await window.LkSync.mettreAJourPlanSupabase(window.__PLAN_BRUT__.id, window.__PLAN_BRUT__);
-    }
-    if (getGithubToken && getGithubToken()) {
-      try { await sauvegarderPlan(window.__PLAN_BRUT__); }
-      catch (eGist) { console.warn('Sauvegarde Gist échouée (Supabase OK, non bloquant) :', eGist.message); }
     }
   } catch (e) {
     console.warn('Palier changé localement, sauvegarde Supabase échouée :', e.message);
@@ -7154,7 +7120,7 @@ function renderHelp() {
     { q:"Qu\'est-ce que l\'Indice d\'Économie (IE) ?",
       a:"L\'IE compare ta FC réelle à ta FC théorique pour une allure donnée. Un score supérieur à 100 signifie que tu cours plus économiquement qu\'attendu — ton cœur travaille moins pour la même vitesse." },
     { q:"Pourquoi mes données ont disparu sur un nouvel appareil ?",
-      a:"Tes données sont sauvegardées automatiquement dans le cloud (GitHub Gist). Pour les récupérer sur un nouvel appareil, scanne le QR code généré depuis Paramètres → Options avancées sur ton appareil principal." },
+      a:"Tes données sont liées à ton compte (email + mot de passe) et synchronisées automatiquement dans le cloud. Connecte-toi avec le même compte sur ton nouvel appareil et tout réapparaît — plans, statuts, profil." },
     { q:"À quoi sert la cadence affichée ?",
       a:"La cadence (pas par minute) est un indicateur de technique de course. Idéalement entre 170 et 180 spm — une cadence stable ou en hausse au fil du plan indique une meilleure efficacité de foulée." },
     { q:"Comment saisir mes records personnels ?",
@@ -7822,21 +7788,9 @@ function renderSettings() {
       msgEl.textContent = "Sauvegarde…";
       msgEl.style.color = "var(--text-muted)";
       try {
-        // Supabase d'abord (v2.8, 15/07/2026) — sauvegarderPlan() (Gist)
-        // seule ne suffit plus depuis que Laurent a retiré son token
-        // GitHub ; sans ce correctif, une clôture manuelle depuis
-        // Réglages ne persisterait nulle part si aucun token n'est
-        // configuré, comme pour tout autre plan avant les correctifs de
-        // cette session.
+        // Supabase — mécanisme principal (v2.8, 15/07/2026).
         if (window.__UTILISATEUR__?.id && window.LkSync?.mettreAJourPlanSupabase && window.__PLAN_BRUT__.id) {
           await window.LkSync.mettreAJourPlanSupabase(window.__PLAN_BRUT__.id, window.__PLAN_BRUT__);
-        }
-        if (getGithubToken && getGithubToken()) {
-          try {
-            await sauvegarderPlan(window.__PLAN_BRUT__);
-          } catch (eGist) {
-            console.warn('Sauvegarde Gist échouée (Supabase OK, non bloquant) :', eGist.message);
-          }
         }
         msgEl.textContent = "✅ Plan clôturé. Tu peux maintenant planifier un plan course à partir du lendemain.";
         msgEl.style.color = "var(--accent2)";
