@@ -2191,8 +2191,17 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
 
   function rafraichirPlanComplet() {
     if (!dernierPlanGenere) return;
+    // BUG corrigé le 22/07/2026 : pour un plan partiel en attente de test
+    // (enAttenteTest:true), il n'y a qu'une seule semaine — elle devenait
+    // donc à la fois semaine 1 ET "dernière semaine du plan"
+    // (derniereSemaineNum), faisant afficher à tort le badge "🏁 Jour J —
+    // Course !" sur un jour de cette semaine de test, alors que la vraie
+    // date de course n'a évidemment aucun rapport avec cette semaine 1.
+    // jourCourseIndex mis à null dans ce cas : la condition
+    // `i === jourCourseIndex` dans renderSemaineHtml ne peut plus jamais
+    // matcher (i va de 0 à 6, jamais null).
     const jsDay = new Date(dernierPlanGenere.dateCourse).getDay();
-    const jourCourseIndex = (jsDay + 6) % 7;
+    const jourCourseIndex = dernierPlanGenere.enAttenteTest ? null : (jsDay + 6) % 7;
     const derniereSemaineNum = dernierPlanGenere.semaines.length
       ? dernierPlanGenere.semaines[dernierPlanGenere.semaines.length - 1].semaineNum
       : null;
