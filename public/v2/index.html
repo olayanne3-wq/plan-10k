@@ -2815,10 +2815,18 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
       // de sauvegarde principal), ce chemin échouait systématiquement.
       // Traitement désormais symétrique au bloc Supabase juste après :
       // best-effort, on continue même en cas d'échec.
-      try {
-        await supprimerPlan(id);
-      } catch (eGist) {
-        console.warn('Suppression Gist échouée (Supabase reste la source de vérité principale, non bloquant) :', eGist.message);
+      //
+      // Garde ajoutée le 22/07/2026 : la tentative n'est même plus lancée
+      // si aucun token n'existe (cf. pattern déjà utilisé ailleurs dans ce
+      // fichier, ex. ligne ~2678) — évite un console.warn systématique et
+      // sans intérêt pour Laurent, qui n'a plus de token GitHub configuré
+      // depuis la bascule Supabase (v2.8).
+      if (getGithubToken()) {
+        try {
+          await supprimerPlan(id);
+        } catch (eGist) {
+          console.warn('Suppression Gist échouée (Supabase reste la source de vérité principale, non bloquant) :', eGist.message);
+        }
       }
       // Suppression Supabase — ajoutée le 13 juillet 2026, étendue le
       // 17/07/2026 pour couvrir plans_original ET plans_actif (chantier
