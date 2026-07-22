@@ -3110,16 +3110,20 @@ function renderDashboard() {
     );
   })();
 
-  // ── Complétion du plan après test semi-Cooper (21/07/2026) ───────────────
+  // ── Complétion du plan après test semi-Cooper (21/07/2026, étendu au
+  // plan course le 22/07/2026) ──────────────────────────────────────────────
   // Semi-automatique, même pattern que blocSuivantEl juste au-dessus — le
-  // plan reste en enAttenteTest:true (une seule semaine, cf. plan-forme.js
-  // generatePlanFormeAvecTest) jusqu'à ce que ce bandeau soit confirmé,
-  // même si lk_resultat_test_forme existe déjà (le test peut être validé
-  // sans recharger la page immédiatement après).
+  // plan reste en enAttenteTest:true (une seule semaine) jusqu'à ce que ce
+  // bandeau soit confirmé, même si lk_resultat_test_forme existe déjà (le
+  // test peut être validé sans recharger la page immédiatement après).
+  // Deux moteurs distincts selon plan.mode : completerBlocApresTest()
+  // (Mode Forme, bloc de taille fixe) ou completerPlanApresTestSemiCooper()
+  // (plan course, taille dépendante de dateCourse, cf. plan-generator.js).
   const completerTestEl = (() => {
     if (!window.__PLAN_BRUT__?.enAttenteTest) return null;
     const resultatTest = load(clePourPlan("lk_resultat_test_forme"), null);
     if (!resultatTest) return null; // test pas encore fait/validé
+    const estPlanForme = window.__PLAN_BRUT__.mode === 'forme';
 
     const completerPlan = async () => {
       const boutonClique = document.getElementById("completer-test-btn");
@@ -3143,11 +3147,16 @@ function renderDashboard() {
           // Volume de départ : pas de trace fiable de ce qui a été saisi au
           // wizard pour ce plan (mêmes limites que blocSuivantEl un peu
           // plus haut — profilOrigine/paramsOrigine non stockés sur le plan
-          // résultant). Repli à 20km/semaine, valeur prudente pour démarrer.
+          // résultant côté Forme). Repli à 20km/semaine, valeur prudente
+          // pour démarrer. Le plan course, lui, garde profilOrigine/
+          // paramsOrigine sur le plan partiel (cf. plan-generator.js) et
+          // n'a pas besoin de ce repli.
           volumeActuel: 20
         };
 
-        const nouveauPlan = completerBlocApresTest(planCourant, profil, resultatTest);
+        const nouveauPlan = estPlanForme
+          ? completerBlocApresTest(planCourant, profil, resultatTest)
+          : completerPlanApresTestSemiCooper(planCourant, resultatTest);
         nouveauPlan.id = planCourant.id;
         nouveauPlan.nom = planCourant.nom;
         nouveauPlan.statuses = planCourant.statuses;
