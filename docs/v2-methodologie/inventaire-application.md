@@ -328,6 +328,49 @@ en produire une différente.
 Monotonie d'entraînement (Foster 1998) : calculée et affichée dans Stats,
 sans règle d'alerte (pas de seuils validés pour coureurs récréatifs).
 
+**Prédicteur d'estimation 10K** (`predict10K()`, `index.html`) — distinct
+des 5 modules ci-dessus mais lit les mêmes données (`ALL_SESSIONS`,
+`statuses`). Deux couches (22/07/2026, refonte "convergence
+progressive") :
+- **Borne brute** (`borneBrute`, ex-"estimate") : mesure physio pure, non
+  lissée — moyenne pondérée SPEC (poids 0.45, allure directe), VMA (0.35,
+  vitesse×0.87), SEUIL (0.10, Riegel — contribue seulement à partir de 3
+  séances ; formule connue pour être structurellement pessimiste sur cette
+  source précise, pas encore corrigée, cf. chantiers ouverts), combinée à
+  `BASE_TIME_REFERENCE` via `lavendouWeight` (poids de la référence,
+  décroît linéairement de 90% à 10% sur 8 semaines, garde-fou 50% si
+  aucune séance VMA/SPEC dans les 3 dernières semaines). Garde-fou
+  d'exclusion : source écartée si écart >20% vs `BASE_TIME_REFERENCE`.
+- **Estimation affichée** (`estimate`) : ne saute plus directement à
+  `borneBrute` à chaque séance — part de `BASE_TIME_REFERENCE` en début de
+  plan et converge par petits pas (`PAS_CONVERGENCE_BASE=0.15`, modulé par
+  `fiabilitePlanPonderee()`) à chaque nouvelle séance de qualité
+  (SEUIL/VMA/SPEC) réussie ou partielle. Clampée entre `BASE_TIME_REFERENCE`
+  et `borneBrute` — ne peut jamais dépasser ce que les séances mesurent
+  réellement. Corrige le comportement pré-22/07/2026 où une séance de
+  qualité réussie pouvait dégrader l'estimation affichée (cas réel : un
+  3ᵉ seuil réussi avait fait reculer l'estimation de 49'22" à 49'31" à
+  cause du poids Riegel pessimiste de SEUIL).
+- **`fiabilitePlanPonderee(dateStr)`** : taux de réussite sur TOUTES les
+  séances (pas seulement qualité — une EF/LONGUE ratée est un vrai signal
+  de fatigue qui doit freiner la convergence même sans donnée de vitesse),
+  pondéré par récence sur toute la durée du plan (demi-vie 21 jours,
+  ✅=1/⚠️=0.5/❌=0). Fiabilité 0 → convergence gelée.
+- **Bande de tolérance affichée dans le graphe Stats** : incertitude
+  autour de l'estimation (`±margin`, `margin = (1-confidence/100)×90s`),
+  pas l'intervalle `BASE_TIME_REFERENCE↔borneBrute` — ce dernier est
+  structurellement plat en début de plan (borneMax=BASE tant que peu de
+  données), donnait une bande plaquée contre le haut du graphe plutôt
+  qu'un vrai relief symétrique (retour utilisateur après premier essai).
+- **Historique rejoué rétroactivement** : `rebuildPredHistorySequentielle()`
+  (remplace l'ancienne boucle indépendante `predict10KAtDate` par jour) —
+  applique la même convergence jour par jour depuis le début du plan,
+  nécessaire car chaque jour dépend de la veille. `calculerBorneBruteAtDate`
+  (ex-`predict10KAtDate`) calcule la borne brute à une date donnée, version
+  simplifiée sans SEUIL ni garde-fou d'exclusion (écart accepté, SEUIL ne
+  pèse que 0.10). `PREDICTOR_VERSION` (actuellement 6) déclenche la
+  reconstruction automatique au chargement si incrémentée.
+
 **Non couvert / reporté** :
 - Réduction d'intervalles pour séances de qualité (VMA/SEUIL/SPEC) —
   algorithme dédié nécessaire, pas encore conçu
@@ -335,6 +378,15 @@ sans règle d'alerte (pas de seuils validés pour coureurs récréatifs).
   régularité comportementale seule
 - R-062/R-070/R-080 jamais observées sur données réelles de Laurent — à
   surveiller
+- Facteur Riegel appliqué à SEUIL (poids 0.10 dans `predict10K`) reste
+  structurellement pessimiste (traite une allure seuil sous-maximale comme
+  une performance maximale) — non corrigé, la convergence progressive
+  limite l'impact mais ne règle pas la formule à la racine. Piste évoquée :
+  conversion via tables VDOT plutôt que Riegel brut.
+- Convergence progressive (22/07/2026) pas encore observée sur plusieurs
+  semaines réelles — à surveiller, notamment le rythme du pas
+  (`PAS_CONVERGENCE_BASE=0.15`) qui pourrait s'avérer trop lent ou trop
+  rapide une fois éprouvé en conditions réelles.
 
 **Bug "0 séance sur 14 jours" (résolu le 22/07/2026)** : cause la plus
 probable identifiée — `autoSync()` (auto-synchro Strava) ne se
