@@ -2305,7 +2305,7 @@ function analyserSeanceQualite(seance) {
 // PRÉDICTION 10K — v3
 // ══════════════════════════════════════════════════════════════════════════════
 const EFFORT_PACE_THRESHOLD = 5.5 * 60;
-const PREDICTOR_VERSION = 5; // Incrémenté après convergence progressive + bornes de tolérance (22/07/2026)
+const PREDICTOR_VERSION = 6; // Incrémenté : bande de tolérance = incertitude autour de l'estimation (±confidence), pas l'intervalle BASE↔borneBrute (22/07/2026)
 
 
 // ── Score d'Économie normalisé ──────────────────────────────────────────────
@@ -2703,10 +2703,16 @@ function rebuildPredHistorySequentielle(startDate, endDate) {
     const aDesDonnees = stravaActivities.some(a=>a.start_date_local?.slice(0,10)<=dateStr) ||
       Object.entries(manualPerf).some(([uid,m])=>m?.average_speed && ALL_SESSIONS.find(s=>s.uid===uid && s.date<=dateStr));
     const confidence = aDesDonnees ? 45 : 30;
+    // Bande stockée = incertitude autour de l'estimation (±0-90s selon
+    // confidence), même formule que predict10K() — pas l'intervalle de
+    // convergence (BASE↔borneBrute), qui reste utilisé seulement pour le
+    // clamp ci-dessus, cohérent avec la correction du 22/07/2026 (bande
+    // plaquée contre le haut du graphe sinon).
+    const margin = Math.round((1 - confidence/100) * 90);
     newHistory.push({
       date: dateStr, time: Math.round(estimateClampee), confidence,
       predictorVersion: PREDICTOR_VERSION,
-      borneMin: Math.round(borneMin), borneMax: Math.round(borneMax),
+      borneMin: Math.round(estimateClampee) - margin, borneMax: Math.round(estimateClampee) + margin,
     });
     d.setDate(d.getDate()+1);
   }
@@ -3034,10 +3040,24 @@ function predict10K() {
   const target = OBJECTIF_REFERENCE;
   const gap = estimate - target;
 
+  // Fourchette selon la confiance — calculée ici (avant l'enregistrement
+  // dans l'historique) car utilisée à la fois pour l'entrée predHistory du
+  // jour (bande de tolérance affichée dans le graphe Stats, 22/07/2026) et
+  // pour le retour de la fonction plus bas.
+  const margin = Math.round((1 - confidence/100) * 90); // ±0-90 sec selon confiance
+  const estimateLow = Math.round(estimate) - margin;
+  const estimateHigh = Math.round(estimate) + margin;
+
   // Enregistrer l\'estimation du jour dans l\'historique
   const todayStr = today();
   const lastEntry = predHistory[predHistory.length-1];
-  const entryDuJour = { date: todayStr, time: Math.round(estimate), confidence, predictorVersion: PREDICTOR_VERSION, borneMin: Math.round(borneMin), borneMax: Math.round(borneMax) };
+  // Bande stockée = incertitude autour de l'estimation affichée (timeLow/
+  // timeHigh, liée à confidence), pas l'intervalle de convergence
+  // (BASE↔borneBrute) : ce dernier est structurellement plat au début du
+  // plan (borneMax=BASE tant que peu de données), ce qui donnait une bande
+  // plaquée contre le haut du graphe plutôt qu'un vrai relief symétrique au
+  // bas — retour de Laurent le 22/07/2026 après premier essai.
+  const entryDuJour = { date: todayStr, time: Math.round(estimate), confidence, predictorVersion: PREDICTOR_VERSION, borneMin: estimateLow, borneMax: estimateHigh };
   if (!lastEntry || lastEntry.date !== todayStr) {
     predHistory.push(entryDuJour);
     if (predHistory.length > 80) predHistory.shift();
@@ -3047,11 +3067,6 @@ function predict10K() {
     predHistory[predHistory.length-1] = entryDuJour;
     save(clePourPlan("lk_pred_history"), predHistory);
   }
-
-  // Fourchette selon la confiance
-  const margin = Math.round((1 - confidence/100) * 90); // ±0-90 sec selon confiance
-  const estimateLow = Math.round(estimate) - margin;
-  const estimateHigh = Math.round(estimate) + margin;
 
   return {
     time: Math.round(estimate), timeStr: fmtTime(Math.round(estimate)),
@@ -5386,7 +5401,7 @@ function renderStats() {
     const bornesBasses = predHistory.map(p=>p.borneMin??p.time);
     const bornesHautes = predHistory.map(p=>p.borneMax??p.time);
     const minT = Math.min(...times,...bornesBasses,TARGET)-30;
-    const maxT = Math.max(...times,...bornesHautes,BASE)+30;
+    const maxT = Math.max(...times,...bornesHautes,BASE)+45;
     const xScale = i => PAD.l+(i/(predHistory.length-1))*iW;
     const yScale = t => PAD.t+iH-((t-minT)/(maxT-minT))*iH;
     const svg = document.createElementNS("http://www.w3.org/2000/svg","svg");
