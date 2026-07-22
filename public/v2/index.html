@@ -1553,6 +1553,17 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
   function activerFluxTestCourse(event) {
     event.preventDefault();
     fluxTestCourse = true;
+    // BUG corrigé le 22/07/2026 : preremplirDepuisProfilCoureur() (appelée
+    // à chaque changement de distance, étape 1) réécrit tHour/tMin/tSec
+    // avec le vrai record du profil coureur s'il existe — activerFluxTestCourse
+    // ne faisait que griser visuellement (pointer-events:none) sans jamais
+    // vider ces champs, donc le vrai temps de référence de Laurent restait
+    // transmis à params.tempsReference malgré le clic sur "Je n'ai pas de
+    // référence". Vidés explicitement ici.
+    ['tHour','tMin','tSec','oHour','oMin','oSec'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
     document.querySelector('[data-step="3"] .time-input').style.opacity = '0.35';
     document.querySelector('[data-step="3"] .time-input').style.pointerEvents = 'none';
     document.querySelector('[data-step="3"] .alt-toggle').style.opacity = '0.35';
@@ -3436,6 +3447,12 @@ window.__AUTH_PRET__ = new Promise((resolve) => { window.__resoudreAuthPret__ = 
 
   function preremplirDepuisProfilCoureur() {
     if (!window.Engine) return; // pas encore chargé, l'appel via engineReady réessaiera
+    // Garde ajoutée le 22/07/2026 : si le flux "pas de référence" est actif
+    // (fluxTestCourse), ne jamais réécrire tHour/tMin/tSec avec un record du
+    // profil — cette fonction est rappelée à chaque changement de distance
+    // (selectDist), y compris après un retour en arrière dans le wizard,
+    // et écrasait silencieusement le vidage fait par activerFluxTestCourse.
+    if (fluxTestCourse) return;
     let profil;
     try { profil = JSON.parse(localStorage.getItem('lk_profil_coureur')); } catch { profil = null; }
     if (!profil) return;
