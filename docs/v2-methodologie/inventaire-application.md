@@ -510,14 +510,12 @@ calcul si le temps donné venait d'une autre distance) — sélecteur compact
 
 | Chantier | Statut |
 |---|---|
-| Test semi-Cooper (6min) pour plan course, en repli si "pas de référence" | 🔜 Même principe que Mode Forme (semaine 1 seule, `enAttenteTest`), mais dépendant de `dateCourse` — les semaines 2 à N doivent respecter le nombre de semaines restantes jusqu'à la course, pas un bloc de taille fixe comme en Forme. Décidé le 21/07/2026, pas commencé. |
-| Saisie manuelle du volume hebdo accessible sans synchro Strava (wizard) | 🔜 Actuellement le champ de saisie manuelle du volume actuel n'est accessible/visible qu'après une synchro Strava (ou son échec) — doit devenir une alternative immédiatement disponible, sans dépendance à Strava. Concerne tous les wizards (course, forme). Décidé le 21/07/2026, pas commencé. |
-| Sélecteur explicite du jour de sortie longue (wizard, tous plans) | 🔜 À l'étape de sélection des jours disponibles de la semaine, ajouter un sélecteur dédié "quel jour est ta sortie longue ?" parmi les jours cochés — actuellement le jour de la longue est déduit automatiquement (via `placerSemaine()`) sans que le coureur puisse le choisir explicitement. Décidé le 21/07/2026, pas commencé. |
 | Réduction d'intervalles pour séances qualité | 🔜 Session de conception dédiée nécessaire |
 | Saisie plaisir par séance (PACES-S) | 🔜 Reporté |
 | Republier piste "V2" Play Console | 🔜 Pas urgent, Alpha suffit pour Laurent |
 | Passage Stripe en clés live (commercialisation réelle) | 🔜 Quand prêt à lancer publiquement |
 | Bug carte moteur "0 séance sur 14 jours" | 🔜 À investiguer, cf. §8 |
+| Validation empirique de `RATIO_VMA_VERS_10K` (0.90) et `PACE_RATIOS.E` (1.225) | 🔜 Corrigés le 22/07/2026 sur base théorique (littérature demi-Cooper) faute de vraies données — à revalider avec le premier vrai test semi-Cooper couru par Laurent (pas simulé) une fois disponible. |
 
 Pour l'historique des versions livrées et des correctifs, voir
 `changelog.classic.js`. Pour le détail méthodologique des séances, voir
