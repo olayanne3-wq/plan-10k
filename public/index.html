@@ -3849,15 +3849,25 @@ function renderDashboard() {
     // d'afficher la carte — sinon on proposerait "Appliquer" sur un bouton qui
     // échouerait silencieusement, cf. limite actée le 16/07/2026 (séances de
     // qualité non modifiables automatiquement).
+    const niveauCoureur = profilCoureur?.niveau || 'intermediaire';
+
     let cibleInfo = null;
     if (!estInformative) {
-      cibleInfo = DecisionEngineApply.trouverProchaineSeanceCible(window.__PLAN_BRUT__, new Date().toISOString());
+      cibleInfo = DecisionEngineApply.trouverProchaineSeanceCible(window.__PLAN_BRUT__, new Date().toISOString(), niveauCoureur);
       if (!cibleInfo) return null; // aucune cible sûre cette semaine — le moteur reste muet plutôt que de proposer une action impossible
     }
 
+    // Aperçu du km avant/après : pour une cible via réduction structurelle
+    // (séance qualité, cf. 23/07/2026), l'ampleur réellement appliquée
+    // diffère de decision.ampleurPourcent (arrondi à l'unité de répétition
+    // près) — on ne peut donc pas prévisualiser le nouveau kmEstime sans
+    // recalculer la réduction, ce qui modifierait le plan avant le clic.
+    // Aperçu simplifié dans ce cas : pas de "→Xkm", juste le libellé.
     const texteApercu = estInformative
       ? decision.justification
-      : decision.justification + ` (${cibleInfo.seance.type}, ${Math.round(cibleInfo.seance.kmEstime * 10) / 10}→${Math.round(cibleInfo.seance.kmEstime * (1 + decision.ampleurPourcent / 100) * 10) / 10}km)`;
+      : cibleInfo.viaQualite
+        ? decision.justification + ` (${cibleInfo.seance.type} — ajustement du nombre de répétitions)`
+        : decision.justification + ` (${cibleInfo.seance.type}, ${Math.round(cibleInfo.seance.kmEstime * 10) / 10}→${Math.round(cibleInfo.seance.kmEstime * (1 + decision.ampleurPourcent / 100) * 10) / 10}km)`;
 
     // Titre distinct selon le type de décision (22/07/2026, signalé par
     // Laurent) : "Yoria te propose un ajustement" est trompeur pour une
@@ -3876,7 +3886,7 @@ function renderDashboard() {
         estInformative ? null : el("button",{style:{flex:"1",background:"var(--accent)",border:"none",borderRadius:"8px",padding:"9px",color:"#F8FAFC",fontSize:"14px",fontWeight:"700",cursor:"pointer"},
           feedback:true,
           onClick:()=>{
-            const resultat = DecisionEngineApply.appliquerDecisionAuPlan(window.__PLAN_BRUT__, decision, new Date().toISOString());
+            const resultat = DecisionEngineApply.appliquerDecisionAuPlan(window.__PLAN_BRUT__, decision, new Date().toISOString(), niveauCoureur);
             if (!resultat.succes) {
               console.warn("Application de la décision du moteur refusée :", resultat.raison);
               // Garde-fou §10.2 : un refus (ex. plafond de réduction cumulée
