@@ -3990,7 +3990,7 @@ function renderDashboard() {
     // qualité non modifiables automatiquement).
     let cibleInfo = null;
     if (!estInformative) {
-      cibleInfo = DecisionEngineApply.trouverProchaineSeanceCible(window.__PLAN_BRUT__, new Date().toISOString(), niveauCoureur);
+      cibleInfo = DecisionEngineApply.trouverProchaineSeanceCible(window.__PLAN_BRUT__, new Date().toISOString(), niveauCoureur, decision.cibleQualitePrioritaire === true);
       if (!cibleInfo) return null; // aucune cible sûre cette semaine — le moteur reste muet plutôt que de proposer une action impossible
     }
 
