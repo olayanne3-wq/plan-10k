@@ -31,16 +31,34 @@
 // v1-bridge.classic.js plutôt que de la redupliquer avec un risque de
 // divergence future entre les deux fichiers.
 //
-// LIMITE ACTÉE (16/07/2026, décision explicite de Laurent) : une décision
-// reduire_charge ne cible QUE les séances de type 'ef' / 'longue' (les
-// séances de type 'qualite' ont une structureIntervalles — blocs,
-// répétitions, pyramides — qu'une réduction linéaire de kmEstime casserait).
-// Ce cas (réduire le nombre d'intervalles plutôt que le volume brut) est un
-// chantier futur à part entière, non traité ici, cf. mémoire de session. Si
-// la prochaine séance est une séance de qualité, ce module cherche la
-// prochaine séance 'ef'/'longue' de la même semaine ; si aucune n'existe,
-// aucune cible n'est trouvée et la décision ne peut pas être appliquée (la
-// carte de proposition ne doit alors pas s'afficher, cf. index.html).
+// RÉDUCTION D'INTERVALLES POUR SÉANCES QUALITÉ (23/07/2026, conception
+// validée avec Laurent, cf. bibliotheque-seances.md §42 pour la justification
+// littérature du plancher "base") : une décision reduire_charge peut
+// désormais cibler une séance 'qualite', mais JAMAIS en réduisant kmEstime
+// linéairement (casserait la structure d'intervalles — allure et récup ne
+// sont jamais touchées, cf. Daniels + littérature consultée). Le principe :
+//   - Bloc unique répété (structureIntervalles.blocs.length === 1, avec
+//     repetitions > 1) : retirer des répétitions une à une, jamais sous le
+//     plancher `base` du sous-type/niveau (tables dupliquées ci-dessous
+//     depuis plan-generator.js — RISQUE DE DIVERGENCE, ces tables ne sont
+//     PAS exportées par le module source, cf. commentaire sur
+//     PARAMS_NIVEAU_PAR_SOUS_TYPE plus bas).
+//   - Pyramide (structureIntervalles.blocs.length > 1, paliers) : retirer des
+//     blocs entiers en partant de la fin, plancher = pyramide 'debutant'
+//     ([2,3,4], 3 blocs) quel que soit le niveau réel du coureur.
+//   - i-30-30 (repsParSerie + nbSeries) : réduire repsParSerie en premier
+//     jusqu'à son plancher, nbSeries seulement en dernier recours.
+//   - Bloc continu unique (repetitions === 1, ex. tempo-court,
+//     seuil-negatif) : PAS de structure à casser → traité EXACTEMENT comme
+//     'ef'/'longue', réduction linéaire simple sur kmEstime (décision
+//     tranchée le 23/07/2026, pas une exclusion).
+// Si la séance cible est déjà à son plancher structurel : trouverProchaineSeanceCible
+// élargit sa recherche (EF/LONGUE d'abord, autre qualité avec marge ensuite)
+// avant de renvoyer null — jamais de réduction fictive à 0%.
+// L'ampleur RÉELLEMENT appliquée (après arrondi à l'unité de répétition/bloc
+// la plus proche) est systématiquement recalculée et utilisée pour kmEstime
+// ET historiqueReductionsMoteur — jamais l'ampleur brute demandée par la
+// décision (cf. calculerAmpleurReelleAppliquee).
 //
 // Où le déposer : /engine-classic-scripts/decision-engine-apply.classic.js
 // Comment le charger : dans index.html, APRÈS decision-engine-rules.classic.js
@@ -54,11 +72,48 @@
 
   // Types de séance (champ `type` brut de assignment[jourIndex], minuscules)
   // sur lesquels une réduction linéaire de volume est sûre. 'qualite' est
-  // volontairement exclu (cf. limite actée en en-tête). 'repos' et
-  // 'marche-course' n'ont pas de sens à réduire non plus (repos = déjà 0 ;
-  // marche-course suit une progression par palier distincte, cf. mémoire
-  // grand-débutant — pas gérée par ce moteur de décision pour l'instant).
+  // géré séparément (cf. réductionQualite ci-dessous) car il nécessite de
+  // préserver la structure d'intervalles. 'repos' et 'marche-course' n'ont
+  // pas de sens à réduire (repos = déjà 0 ; marche-course suit une
+  // progression par palier distincte, non gérée par ce moteur pour l'instant).
   const TYPES_REDUCTION_SURE = ['ef', 'longue'];
+
+  // --------------------------------------------------------------------------
+  // DUPLICATION DEPUIS plan-generator.js (23/07/2026) — RISQUE DE DIVERGENCE.
+  // Ces tables base/cap par sous-type/niveau sont déclarées LOCALEMENT dans
+  // chaque `case` du switch de generateSeanceQualite (plan-generator.js),
+  // jamais exportées par le module source. Dupliquées ici volontairement
+  // (cohérent avec le pattern déjà en place dans ce fichier — cf. commentaire
+  // CORRECTIF STRUCTUREL sur la structure de assignment) plutôt que de
+  // toucher au générateur pour un export, hors périmètre de ce chantier.
+  // Seul `base` nous intéresse ici (plancher de réduction) — `cap` n'est pas
+  // dupliqué car jamais utilisé par ce module.
+  // SI plan-generator.js change une valeur `base`, PENSER À RÉPERCUTER ICI.
+  // --------------------------------------------------------------------------
+  const BASE_PAR_SOUS_TYPE_NIVEAU = {
+    'seuil-court':          { debutant: 2, intermediaire: 3, confirme: 4 },
+    'seuil':                { debutant: 2, intermediaire: 3, confirme: 4 },
+    'seuil-2min':           { debutant: 3, intermediaire: 4, confirme: 5 },
+    'i-3min':               { debutant: 3, intermediaire: 4, confirme: 5 },
+    'vitesse':              { debutant: 4, intermediaire: 6, confirme: 8 },
+    'cotes':                { debutant: 4, intermediaire: 6, confirme: 8 },
+    'allure-course':        { debutant: 2, intermediaire: 3, confirme: 4 },
+    'allure-course-court':  { debutant: 1, intermediaire: 2, confirme: 3 },
+  };
+
+  // i-30-30 : base exprimée en repsParSerie (nbSeries démarre toujours à 1).
+  const BASE_I3030_REPS_PAR_SERIE = { debutant: 3, intermediaire: 4, confirme: 5 };
+
+  // Pyramide 'debutant' — plancher UNIQUE quel que soit le niveau réel du
+  // coureur (cf. bibliotheque-seances.md §42 : cohérent avec la logique
+  // "redémarrage conservateur", transposée à la structure pyramidale qui n'a
+  // pas de notion de `base` numérique comme les autres sous-types).
+  const PYRAMIDE_PLANCHER_PALIERS = [2, 3, 4];
+
+  // Sous-types dont structureIntervalles n'a qu'un seul bloc continu
+  // (repetitions === 1) : pas de structure interne à préserver, traités
+  // exactement comme 'ef'/'longue' (réduction linéaire sur kmEstime).
+  const SOUS_TYPES_BLOC_CONTINU = ['tempo-court', 'seuil-negatif'];
 
   // --------------------------------------------------------------------------
   // Reconstruit, pour une semaine donnée (semaineNum), la liste des séances
@@ -104,14 +159,181 @@
   }
 
   // --------------------------------------------------------------------------
+  // Détermine si une séance 'qualite' a encore de la marge de réduction
+  // structurelle (pas déjà à son plancher). Retourne un booléen — utilisé par
+  // trouverProchaineSeanceCible pour élargir sa recherche si besoin.
+  // Ne modifie jamais la séance — lecture seule.
+  // --------------------------------------------------------------------------
+  function seanceQualiteAEncoreDeLaMarge(seance, niveau) {
+    const structure = seance && seance.structureIntervalles;
+    if (!structure || !Array.isArray(structure.blocs) || structure.blocs.length === 0) return false;
+
+    const sousType = seance.sousType;
+    const blocs = structure.blocs;
+
+    // Bloc continu unique : traité comme EF/LONGUE, toujours de la marge
+    // tant que kmEstime existe (pas de plancher structurel spécifique).
+    if (blocs.length === 1 && blocs[0].repetitions === 1) return typeof seance.kmEstime === 'number';
+
+    // i-30-30 : marge si repsParSerie > base OU nbSeries > 1.
+    if (sousType === 'i-30-30') {
+      const base = BASE_I3030_REPS_PAR_SERIE[niveau] || BASE_I3030_REPS_PAR_SERIE.intermediaire;
+      const bloc = blocs[0];
+      return (bloc.repsParSerie || bloc.repetitions || 0) > base || (structure.nbSeries || 1) > 1;
+    }
+
+    // Pyramide : marge si plus de blocs que le plancher debutant.
+    if (blocs.length > 1) return blocs.length > PYRAMIDE_PLANCHER_PALIERS.length;
+
+    // Bloc unique répété (cas général) : marge si repetitions > base.
+    const base = (BASE_PAR_SOUS_TYPE_NIVEAU[sousType] || {})[niveau]
+      || (BASE_PAR_SOUS_TYPE_NIVEAU[sousType] || {}).intermediaire;
+    if (typeof base !== 'number') return false; // sous-type inconnu de nos tables, prudence
+    return (blocs[0].repetitions || 0) > base;
+  }
+
+  // --------------------------------------------------------------------------
+  // Calcule la réduction structurelle à appliquer à une séance 'qualite'.
+  // Retourne { possible: bool, nouvelleStructure?, ampleurReelleAppliquee?,
+  // raison?: string }. Ne modifie JAMAIS la séance directement — c'est
+  // appliquerDecisionAuPlan qui écrit, une fois le calcul validé.
+  //
+  // ampleurReelleAppliquee est TOUJOURS négative ou nulle, en pourcentage du
+  // volume d'unités d'effort d'origine (pas du kmEstime brut) — cf. § "Ampleur
+  // réelle vs demandée" de la conception : l'arrondi à l'unité entière fait
+  // dévier ce chiffre de ampleurPourcent demandé, c'est ATTENDU et voulu.
+  // --------------------------------------------------------------------------
+  function calculerReductionQualite(seance, ampleurPourcentDemande, niveau) {
+    const structure = seance.structureIntervalles;
+    if (!structure || !Array.isArray(structure.blocs) || structure.blocs.length === 0) {
+      return { possible: false, raison: 'structureIntervalles absente ou vide.' };
+    }
+
+    const sousType = seance.sousType;
+    const blocs = structure.blocs;
+    const pourcentAbs = Math.abs(ampleurPourcentDemande);
+
+    // --- Cas 1 : bloc continu unique (tempo-court, seuil-negatif) ---
+    // Pas de structure à casser, traité comme EF/LONGUE.
+    if (blocs.length === 1 && blocs[0].repetitions === 1) {
+      if (typeof seance.kmEstime !== 'number') {
+        return { possible: false, raison: 'kmEstime absent sur une séance à bloc continu unique.' };
+      }
+      return {
+        possible: true,
+        reductionLineaireKm: true, // signal pour appliquerDecisionAuPlan : pas de nouvelleStructure, juste kmEstime
+        ampleurReelleAppliquee: -pourcentAbs, // pas d'arrondi à l'unité ici, comme EF/LONGUE
+      };
+    }
+
+    // --- Cas 2 : i-30-30 (repsParSerie prioritaire, nbSeries en dernier recours) ---
+    if (sousType === 'i-30-30') {
+      const base = BASE_I3030_REPS_PAR_SERIE[niveau] || BASE_I3030_REPS_PAR_SERIE.intermediaire;
+      const bloc = blocs[0];
+      const repsActuelles = bloc.repsParSerie || bloc.repetitions || 0;
+      const seriesActuelles = structure.nbSeries || 1;
+      const uniteTotaleActuelle = repsActuelles * seriesActuelles;
+
+      let aRetirerUnites = Math.max(1, Math.round(uniteTotaleActuelle * pourcentAbs / 100));
+
+      // Priorité 1 : réduire repsParSerie jusqu'au plancher (marge disponible sur cette série).
+      const margeReps = repsActuelles - base;
+      const retirerSurReps = Math.min(margeReps, aRetirerUnites);
+      let nouvellesReps = repsActuelles - retirerSurReps;
+      aRetirerUnites -= retirerSurReps;
+
+      let nouvellesSeries = seriesActuelles;
+      // Priorité 2 (dernier recours) : retirer une série entière si encore besoin
+      // ET qu'il reste plus d'une série (jamais descendre à 0 série).
+      if (aRetirerUnites > 0 && seriesActuelles > 1) {
+        nouvellesSeries = seriesActuelles - 1;
+      }
+
+      if (nouvellesReps === repsActuelles && nouvellesSeries === seriesActuelles) {
+        return { possible: false, raison: 'i-30-30 déjà à son plancher (repsParSerie=base, nbSeries=1).' };
+      }
+
+      const uniteTotaleNouvelle = nouvellesReps * nouvellesSeries;
+      const ampleurReelle = -Math.round((1 - uniteTotaleNouvelle / uniteTotaleActuelle) * 1000) / 10;
+
+      return {
+        possible: true,
+        nouvelleStructure: {
+          ...structure,
+          nbSeries: nouvellesSeries,
+          blocs: [{ ...bloc, repsParSerie: nouvellesReps, repetitions: nouvellesReps }],
+        },
+        ratioVolume: uniteTotaleNouvelle / uniteTotaleActuelle,
+        ampleurReelleAppliquee: ampleurReelle,
+      };
+    }
+
+    // --- Cas 3 : pyramide (plusieurs blocs, un palier chacun) ---
+    if (blocs.length > 1) {
+      const nbBlocsActuel = blocs.length;
+      const plancherBlocs = PYRAMIDE_PLANCHER_PALIERS.length;
+      let aRetirer = Math.max(1, Math.round(nbBlocsActuel * pourcentAbs / 100));
+      aRetirer = Math.min(aRetirer, nbBlocsActuel - plancherBlocs);
+
+      if (aRetirer <= 0) {
+        return { possible: false, raison: 'Pyramide déjà à son plancher (' + plancherBlocs + ' paliers).' };
+      }
+
+      const nouveauxBlocs = blocs.slice(0, nbBlocsActuel - aRetirer);
+      // Volume approximé par nombre de blocs (chaque palier a une durée
+      // différente, mais retirer depuis la fin retire les paliers les plus
+      // longs de la pyramide — approximation acceptée, cohérent avec le
+      // principe "réduction mesurée mais pas exacte au %").
+      const ampleurReelle = -Math.round((aRetirer / nbBlocsActuel) * 1000) / 10;
+
+      return {
+        possible: true,
+        nouvelleStructure: { ...structure, blocs: nouveauxBlocs },
+        ratioVolume: nouveauxBlocs.length / nbBlocsActuel,
+        ampleurReelleAppliquee: ampleurReelle,
+      };
+    }
+
+    // --- Cas 4 : bloc unique répété (cas général : i-3min, seuil, vitesse...) ---
+    const base = (BASE_PAR_SOUS_TYPE_NIVEAU[sousType] || {})[niveau]
+      || (BASE_PAR_SOUS_TYPE_NIVEAU[sousType] || {}).intermediaire;
+    if (typeof base !== 'number') {
+      return { possible: false, raison: 'Sous-type "' + sousType + '" inconnu des tables de plancher (BASE_PAR_SOUS_TYPE_NIVEAU).' };
+    }
+
+    const bloc = blocs[0];
+    const repsActuelles = bloc.repetitions || 0;
+    let aRetirer = Math.max(1, Math.round(repsActuelles * pourcentAbs / 100));
+    aRetirer = Math.min(aRetirer, repsActuelles - base);
+
+    if (aRetirer <= 0) {
+      return { possible: false, raison: 'Séance déjà à son plancher (base=' + base + ' répétitions).' };
+    }
+
+    const nouvellesReps = repsActuelles - aRetirer;
+    const ampleurReelle = -Math.round((aRetirer / repsActuelles) * 1000) / 10;
+
+    return {
+      possible: true,
+      nouvelleStructure: { ...structure, blocs: [{ ...bloc, repetitions: nouvellesReps }] },
+      ratioVolume: nouvellesReps / repsActuelles,
+      ampleurReelleAppliquee: ampleurReelle,
+    };
+  }
+
+  // --------------------------------------------------------------------------
   // Trouve la prochaine séance à venir sur laquelle une réduction linéaire de
   // volume est sûre (type 'ef' ou 'longue'), dans la semaine courante
   // uniquement (ne déborde jamais sur la semaine suivante, cf. limite en
   // en-tête : pas de proposition plutôt qu'une cible hasardeuse).
   //
-  // Retourne { semaine, seance, jourIndex, dateStr } ou null si aucune cible sûre.
+  // Retourne { semaine, seance, jourIndex, dateStr, viaQualite?: bool } ou
+  // null si aucune cible sûre. Priorité : EF/LONGUE d'abord (réduction
+  // linéaire simple), puis QUALITE avec marge structurelle disponible en
+  // dernier recours (cf. conception 23/07/2026) — jamais l'inverse, une
+  // réduction sur EF/LONGUE est toujours préférable quand elle existe.
   // --------------------------------------------------------------------------
-  function trouverProchaineSeanceCible(planBrut, dateReference) {
+  function trouverProchaineSeanceCible(planBrut, dateReference, niveau) {
     if (!planBrut || !Array.isArray(planBrut.semaines) || !planBrut.dateDebut) return null;
 
     const aujourdhui = new Date(dateReference || new Date().toISOString()).toISOString().slice(0, 10);
@@ -140,9 +362,19 @@
     if (joursAvenir.length === 0) return null;
 
     const cible = joursAvenir.find(({ seance }) => TYPES_REDUCTION_SURE.includes(seance.type));
-    if (!cible) return null; // toutes les séances à venir cette semaine sont des séances de qualité (ou repos/marche-course) — pas de cible sûre
+    if (cible) {
+      return { semaine: semaineCourante, seance: cible.seance, jourIndex: cible.jourIndex, dateStr: cible.dateStr };
+    }
 
-    return { semaine: semaineCourante, seance: cible.seance, jourIndex: cible.jourIndex, dateStr: cible.dateStr };
+    // Aucune EF/LONGUE disponible cette semaine : chercher une séance
+    // qualité qui a encore de la marge de réduction structurelle avant de
+    // refuser complètement (cf. conception 23/07/2026).
+    const cibleQualite = joursAvenir.find(({ seance }) =>
+      seance.type === 'qualite' && seanceQualiteAEncoreDeLaMarge(seance, niveau || 'intermediaire')
+    );
+    if (!cibleQualite) return null; // aucune cible sûre, ni EF/LONGUE ni qualité avec marge
+
+    return { semaine: semaineCourante, seance: cibleQualite.seance, jourIndex: cibleQualite.jourIndex, dateStr: cibleQualite.dateStr, viaQualite: true };
   }
 
   // --------------------------------------------------------------------------
@@ -183,7 +415,7 @@
   // Retourne { succes: bool, raison?: string } — ne modifie planBrut qu'en
   // cas de succès, jamais partiellement.
   // --------------------------------------------------------------------------
-  function appliquerDecisionAuPlan(planBrut, decision, dateReference) {
+  function appliquerDecisionAuPlan(planBrut, decision, dateReference, niveau) {
     if (!decision || !decision.type) {
       return { succes: false, raison: 'Décision absente ou invalide.' };
     }
@@ -194,14 +426,35 @@
       return { succes: false, raison: 'Ce type de décision est informatif, rien à appliquer au plan.' };
     }
 
-    const cible = trouverProchaineSeanceCible(planBrut, dateReference);
+    const cible = trouverProchaineSeanceCible(planBrut, dateReference, niveau);
     if (!cible) {
-      return { succes: false, raison: 'Aucune séance cible sûre trouvée cette semaine (uniquement des séances de qualité/repos, ou aucune séance à venir).' };
+      return { succes: false, raison: 'Aucune séance cible sûre trouvée cette semaine (EF/LONGUE absentes, et aucune qualité avec marge de réduction structurelle).' };
     }
 
-    const ampleur = decision.ampleurPourcent;
-    if (typeof ampleur !== 'number') {
+    const ampleurDemandee = decision.ampleurPourcent;
+    if (typeof ampleurDemandee !== 'number') {
       return { succes: false, raison: 'ampleurPourcent manquant sur la décision.' };
+    }
+
+    // Détermine la branche d'application : réduction structurelle (séance
+    // qualité atteinte via viaQualite) ou réduction linéaire simple
+    // (EF/LONGUE, comme avant). L'ampleur RÉELLEMENT appliquée peut différer
+    // de ampleurDemandee (arrondi à l'unité entière) — c'est cette valeur
+    // réelle qui est utilisée pour kmEstime ET le journal, jamais la brute.
+    let ampleurReelleAppliquee = ampleurDemandee;
+    let nouvelleStructure = null;
+
+    if (cible.viaQualite) {
+      const resultatReduction = calculerReductionQualite(cible.seance, ampleurDemandee, niveau || 'intermediaire');
+      if (!resultatReduction.possible) {
+        return { succes: false, raison: 'Réduction structurelle impossible sur la séance qualité ciblée : ' + resultatReduction.raison };
+      }
+      ampleurReelleAppliquee = resultatReduction.ampleurReelleAppliquee;
+      if (!resultatReduction.reductionLineaireKm) {
+        nouvelleStructure = resultatReduction.nouvelleStructure;
+      }
+      // Sinon (bloc continu unique) : reductionLineaireKm=true, on tombe
+      // dans la même branche kmEstime que EF/LONGUE ci-dessous.
     }
 
     if (typeof cible.seance.kmEstime !== 'number') {
@@ -210,10 +463,12 @@
 
     // Garde-fou cumulé : refuse d'appliquer si le cumul (réductions déjà
     // appliquées sur la fenêtre + cette nouvelle décision) dépasserait le
-    // plafond. Le moteur reste muet plutôt que d'aggraver une réduction déjà
-    // conséquente — cohérent avec le principe "sécurité avant performance".
+    // plafond. Vérifié sur l'ampleur RÉELLE (post-arrondi), pas la demandée
+    // — cohérent avec le principe "le journal reflète ce qui a vraiment été
+    // appliqué". Le moteur reste muet plutôt que d'aggraver une réduction
+    // déjà conséquente — cohérent avec le principe "sécurité avant performance".
     const cumulExistant = calculerReductionCumulee(planBrut, dateReference);
-    const cumulApresApplication = cumulExistant + Math.abs(ampleur);
+    const cumulApresApplication = cumulExistant + Math.abs(ampleurReelleAppliquee);
     if (cumulApresApplication > PLAFOND_REDUCTION_CUMULEE_POURCENT) {
       return {
         succes: false,
@@ -221,7 +476,18 @@
       };
     }
 
-    cible.seance.kmEstime = Math.round(cible.seance.kmEstime * (1 + ampleur / 100) * 10) / 10;
+    if (nouvelleStructure) {
+      // Réduction structurelle (bloc unique répété, pyramide, i-30-30) :
+      // recalcule kmEstime proportionnellement au nouveau volume d'unités,
+      // jamais sur le pourcentage brut demandé (cf. conception "ampleur réelle").
+      cible.seance.structureIntervalles = nouvelleStructure;
+      cible.seance.kmEstime = Math.round(cible.seance.kmEstime * (1 + ampleurReelleAppliquee / 100) * 10) / 10;
+    } else {
+      // Réduction linéaire simple : EF/LONGUE, ou séance qualité à bloc
+      // continu unique (tempo-court, seuil-negatif) traitée identiquement.
+      cible.seance.kmEstime = Math.round(cible.seance.kmEstime * (1 + ampleurReelleAppliquee / 100) * 10) / 10;
+    }
+
     cible.semaine.origineModification = {
       regleId: decision.id,
       libelle: decision.libelle,
@@ -232,17 +498,19 @@
     if (!Array.isArray(planBrut.historiqueReductionsMoteur)) planBrut.historiqueReductionsMoteur = [];
     planBrut.historiqueReductionsMoteur.push({
       regleId: decision.id,
-      ampleurPourcent: ampleur,
+      ampleurPourcent: ampleurReelleAppliquee, // ampleur RÉELLE, jamais la demandée brute
       appliqueLe: new Date().toISOString(),
     });
 
-    return { succes: true, semaineNum: cible.semaine.semaineNum, jourIndex: cible.jourIndex, dateStr: cible.dateStr };
+    return { succes: true, semaineNum: cible.semaine.semaineNum, jourIndex: cible.jourIndex, dateStr: cible.dateStr, ampleurReelleAppliquee };
   }
 
   global.DecisionEngineApply = {
     appliquerDecisionAuPlan,
-    trouverProchaineSeanceCible, // exposée pour tests unitaires isolés et pour l'affichage (savoir QUOI proposer avant de l'appliquer)
-    calculerReductionCumulee,    // exposée pour tests unitaires isolés
+    trouverProchaineSeanceCible,    // exposée pour tests unitaires isolés et pour l'affichage (savoir QUOI proposer avant de l'appliquer)
+    calculerReductionCumulee,       // exposée pour tests unitaires isolés
+    calculerReductionQualite,       // exposée pour tests unitaires isolés (réduction structurelle séances qualité)
+    seanceQualiteAEncoreDeLaMarge,  // exposée pour tests unitaires isolés
   };
 
 })(window);
