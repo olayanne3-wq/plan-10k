@@ -21,7 +21,12 @@
  */
 
 const VERSIONS = [
-      { ver:"v2.23", title:"Adaptation plus fine des séances de qualité, ressenti du jour", current:true, notes:[
+      { ver:"v2.24", title:"Ajustement après séances ratées, fuseau horaire corrigé", current:true, notes:[
+        "🎯 Si tu rates deux séances de qualité prévues d'affilée, Yoria peut désormais te proposer d'alléger la prochaine plutôt que de simplement te le signaler",
+        "🐛 L'app pouvait afficher la séance de la veille comme \"Aujourd'hui\" entre minuit et 2h du matin — corrigé",
+        "🔋 Le sélecteur de ressenti est plus clair (question précisée, réponse par défaut, disparaît une fois la séance validée)",
+      ]},
+      { ver:"v2.23", title:"Adaptation plus fine des séances de qualité, ressenti du jour", current:false, notes:[
         "🎯 Quand ton plan doit être allégé, Yoria peut désormais réduire le nombre de répétitions d'une séance de qualité (VMA, seuil...) plutôt que de se limiter aux séances faciles — l'allure et la récupération ne changent jamais",
         "🔋 Un nouveau sélecteur te permet d'indiquer comment tu te sens avant une séance de qualité — s'il existe déjà une proposition d'allègement, ton ressenti peut la renforcer",
       ]},
