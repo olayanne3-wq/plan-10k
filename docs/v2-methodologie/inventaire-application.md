@@ -427,19 +427,47 @@ progressive") :
   chapitres 1-4 sont disponibles), cohérentes avec plusieurs calculateurs
   VDOT tiers indépendants et avec les % VO2max déjà confirmés dans le
   chapitre 4 (seuil 86-88% VO2max, tenable ~60min).
-- **Convergence progressive et corrections de formule rétroactives** :
-  la convergence (`departConvergence` dans `predict10K()`) part toujours de
-  la DERNIÈRE valeur mémorisée dans `predHistory`, jamais de `borneBrute`
-  directement — donc un changement de méthode de calcul (comme le fix VDOT
-  ci-dessus) n'améliore pas immédiatement l'estimation AFFICHÉE tant
-  qu'aucune nouvelle séance de qualité n'a lieu, même si la borne brute
-  sous-jacente a changé. Vérifié par calcul (22/07/2026) : forcer un
-  redémarrage de la convergence depuis `BASE_TIME_REFERENCE` au changement
-  de version serait CONTRE-PRODUCTIF (ferait reculer l'affichage vers la
-  référence, plus lente que la valeur déjà mémorisée, avant de reconverger)
-  — décision actée de ne rien changer sur ce point, le rattrapage se fait
-  naturellement à chaque nouvelle séance de qualité, sans mécanisme
-  supplémentaire nécessaire.
+- **Bug racine "convergence figée" (22/07/2026, résolu)** — après plusieurs
+  correctifs partiels dans la même journée (fix SEUIL manquant, fix VDOT,
+  fix condition de déclenchement, fix repli `sport_type`), l'estimation
+  restait bloquée sur `BASE_TIME_REFERENCE` malgré 3 séances SEUIL validées
+  — graphe Stats plat de bout en bout. Cause racine trouvée par
+  instrumentation directe (logs temporaires en production, méthode utilisée
+  faute d'accès aux variables de module depuis la console navigateur) :
+  `fiabilitePlanPonderee(dateStr)` lisait `s.statutEffectif`, un champ
+  **FIGÉ** calculé une seule fois par `recalculerAllSessions()` par rapport
+  à `today()` réel — jamais recalculé pour les dates passées simulées dans
+  `rebuildPredHistorySequentielle()` (boucle jour par jour depuis le début
+  du plan). Résultat : fiabilité mesurée à 0 dès les premiers jours du plan
+  (peu de séances encore passées par rapport à `today()`, indépendamment de
+  la date simulée), bloquant tout pas de convergence dès la première
+  itération — et comme `estimateCourante` est séquentielle (chaque jour
+  dépend du précédent), ce blocage initial se propageait à toute la
+  séquence, y compris les dates ultérieures où la fiabilité aurait dû être
+  bonne. Corrigé : `fiabilitePlanPonderee()` recalcule maintenant
+  `statutEffectif` localement, PAR RAPPORT À `dateStr` (paramètre), au lieu
+  de lire le champ figé — comportement inchangé pour l'appel avec
+  `today()` (calcul en direct, `predict10K()`), corrigé uniquement pour la
+  reconstruction rétroactive. `PREDICTOR_VERSION` 12. Confirmé résolu :
+  graphe affiche une vraie descente progressive après ce fix, pas juste un
+  saut final.
+- **Repli `sport_type` sur les filtres d'activités** (22/07/2026, fix
+  intermédiaire, toujours valide) : `a.type === "Run"` seul ratait
+  certaines activités selon la source de synchro (montres tierces
+  notamment) — corrigé en `a.type === "Run" || a.sport_type === "Run"`
+  dans `predict10K()`, `calculerBorneBruteAtDate()`,
+  `aDesNouvellesDonneesQualite()`, `matchActivitiesToPlan()`. N'était pas
+  la cause du bug racine ci-dessus (vérifié par diagnostic : les 3
+  activités de Laurent avaient bien `type: "Run"`), mais reste une
+  vraie correction de robustesse à conserver.
+- **Convergence n'avance que sur nouvelle donnée du jour** (22/07/2026,
+  fix intermédiaire, toujours valide) : `predict10K()` utilisait
+  `estimates.length > 0` (vrai dès qu'au moins une source existe au
+  global) au lieu de `aDesNouvellesDonneesQualite(todayStrConv)` (vrai
+  uniquement si une séance de qualité a réellement lieu aujourd'hui) —
+  l'estimation avançait donc d'un petit pas à chaque simple chargement du
+  dashboard, pas seulement sur une vraie nouvelle séance. Corrigé,
+  unifié avec la logique déjà utilisée par la reconstruction rétroactive.
 
 **Non couvert / reporté** :
 - Réduction d'intervalles pour séances de qualité (VMA/SEUIL/SPEC) —
@@ -448,15 +476,25 @@ progressive") :
   régularité comportementale seule
 - R-062/R-070/R-080 jamais observées sur données réelles de Laurent — à
   surveiller
-- Convergence progressive (22/07/2026) pas encore observée sur plusieurs
-  semaines réelles — à surveiller, notamment le rythme du pas
-  (`PAS_CONVERGENCE_BASE=0.15`) qui pourrait s'avérer trop lent ou trop
-  rapide une fois éprouvé en conditions réelles.
+- Convergence progressive — maintenant confirmée fonctionnelle en
+  conditions réelles (22/07/2026, graphe descendant observé après le fix
+  du bug racine ci-dessus), mais le rythme du pas
+  (`PAS_CONVERGENCE_BASE=0.15`) reste à éprouver sur plusieurs semaines
+  pour juger s'il est bien calibré (ni trop lent, ni trop rapide).
 - Chapitre 5 du livre Daniels ("VDOT System of Training", tables complètes)
   absent du fichier projet fourni à Claude — la formule VDOT implémentée le
   22/07/2026 a été reconstruite à partir des équations Daniels-Gilbert
   vérifiées par recherche web, pas directement lue dans le livre fourni ;
   fiable mais pas garantie identique à 100% aux tables publiées.
+- Méthode de diagnostic à retenir : aucune variable interne (`ALL_SESSIONS`,
+  `statuses`, `PLAN`, `SESSION_TARGETS`, les fonctions du prédicteur) n'est
+  exposée sur `window` pour un debug depuis la console navigateur — seuls
+  `window.__PLAN_BRUT__`, `window.__PLAN_GENERE__`, `window.stravaActivities`
+  et le contenu de `localStorage` (préfixé par plan) sont accessibles de
+  l'extérieur. Pour un diagnostic profond, l'instrumentation directe
+  (logs temporaires poussés en production, retirés une fois la cause
+  identifiée) reste la méthode la plus fiable — cf. procédure suivie le
+  22/07/2026 pour ce bug.
 
 **Bug "0 séance sur 14 jours" (résolu le 22/07/2026)** : cause la plus
 probable identifiée — `autoSync()` (auto-synchro Strava) ne se
