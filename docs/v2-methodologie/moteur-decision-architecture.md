@@ -995,10 +995,15 @@ interface DecisionFormatter {
 >   pour consommer `trendAnalysis`, les deux mécanismes coexistent
 >   (§13.4 doc intégration)
 > - **R-070** Séances planifiées ratées consécutives (engagement, priorité
->   55, ajoutée 17/07/2026) — 2 séances *prévues au plan* marquées ❌
+>   55 à l'origine, ajoutée 17/07/2026) — 2 séances *prévues au plan* marquées ❌
 >   d'affilée (lit `ALL_SESSIONS`/`statuses` côté index.html, transmis en
 >   input) ; signal plus direct que R-040, pas dans le catalogue théorique
->   d'origine
+>   d'origine. **Transformée en `reduire_charge` le 23/07/2026** (priorité
+>   relevée à 70) : ampleur fixe -15%, cible directement la prochaine séance
+>   qualité (pas EF/LONGUE en priorité comme R-024s/R-050) — comble le
+>   manque identifié où aucune règle n'ajustait le plan face à un
+>   comportement réel, seules les données physiologiques le faisaient.
+>   Détail complet en inventaire §8.
 > - **R-040** Désengagement précoce (engagement, priorité 50) — correspond à
 >   la règle documentée plus bas dans cette section
 >
@@ -1210,8 +1215,10 @@ En résumé, pour ce document :
 - **Module 2** (`SessionAnalyzer`) : codé, testé, corrigé en profondeur (17/07/2026) — ne couvre que les séances de qualité (VMA/SPEC/SEUIL/TEST), conformément au contrat.
 - **Module 3** (`WeekAnalyzer`) : codé (17/07/2026), complété le 18/07/2026 avec la monotonie de charge (`monotonieRealisee`/`monotoniePrevue`, formule Foster). `ecartVolumePourcent`/`chargeTotaleSemaine`/`seancesManquees` désormais consommés par R-080 (18/07/2026) ; `recuperationEstimee`/`progressionVsPrecedente` restent inconsommés — test empirique mené le 18/07/2026, résultat non concluant sur seulement 2 semaines de données, à refaire plus tard (cf. document d'intégration §15.4).
 - **Module 4** (`TrendAnalyzer`) : codé (17/07/2026), désormais consommé par 2 règles (R-062 sur `FATIGUE_CROISSANTE`, R-080 sur le nouveau signal `DEFICIT_VOLUME_DURABLE` ajouté le 18/07/2026). Les 3 autres signaux qu'il détecte déjà (`CHARGE_CROISSANTE_RAPIDE`, `SEANCES_MANQUEES_REPETEES`, `3_SEMAINES_REUSSIES`) restent inconsommés par aucune règle à ce jour.
-- **Module 5** : `RuleEngine` codé, catalogue passé de 3 règles (démarrage) à **7 règles actives** : R-006, R-024s, R-050, R-060, R-062, R-070, R-080. Toutes les règles issues de `TrendAnalysis`/`WeekAnalysis` (R-062, R-080) et R-070 n'ont jamais été observées se déclencher en conditions réelles à ce jour — à surveiller. `evaluerRegles()` applique toujours une borne dure sur l'ampleur de toute décision individuelle (jamais plus de -30%, cf. §10.2).
+- **Module 5** : `RuleEngine` codé, catalogue passé de 3 règles (démarrage) à **7 règles actives** : R-006, R-024s, R-050, R-060, R-062, R-070, R-080. Les règles issues de `TrendAnalysis`/`WeekAnalysis` (R-062, R-080) n'ont jamais été observées se déclencher en conditions réelles à ce jour — à surveiller. R-070, elle, a été transformée en `reduire_charge` et observée le 23/07/2026 (cf. mise à jour ci-dessous). `evaluerRegles()` applique toujours une borne dure sur l'ampleur de toute décision individuelle (jamais plus de -30%, cf. §10.2).
 - **Un désaccord de fond a été corrigé entre ce document et le code réel** : la structure `PlanContext`/séance implicitement supposée ici et dans le document d'intégration (§6.2 de ce dernier) ne correspond pas à la vraie structure de `window.__PLAN_BRUT__` telle qu'elle existe dans le code de Yoria (`assignment` indexé par jour, pas `sessions[]` avec dates explicites). Le détail complet est en §11.3 du document d'intégration — à lire avant toute implémentation future qui toucherait directement au plan brut.
+
+**Mise à jour du 23 juillet 2026** : R-070 est sortie de la catégorie "jamais observée se déclencher" — elle a été transformée de `alerter_risque_decrochage` en `reduire_charge` (priorité relevée de 55 à 70), la première règle du catalogue "engagement" à réellement modifier le plan plutôt que se contenter d'alerter. Cible directement la prochaine séance qualité via un nouveau paramètre `cibleQualitePrioritaire`, réutilisant l'infrastructure de réduction structurelle des intervalles (elle-même livrée le même jour — les séances qualité peuvent désormais être réduites en nombre de répétitions/blocs, jamais en allure ni récup, avec un plancher par sous-type/niveau justifié par la littérature de périodisation). Un sélecteur de "readiness" pré-séance (ressenti du jour, distinct du RPE rétrospectif) a aussi été ajouté et vient moduler l'ampleur d'une décision `reduire_charge` déjà existante, jamais la déclencher seul. Détail complet en inventaire §8, pas dupliqué ici pour éviter la divergence — cf. avertissement en tête de §13.
 - **Garde-fous du §10.2** : les deux mécanismes proposés dans ce document (plafond de réduction cumulée, borne dure individuelle) sont désormais codés (17/07/2026) — `decision-engine-rules.classic.js` pour la borne dure, `decision-engine-apply.classic.js` pour le plafond cumulé sur 14 jours glissants. Détail complet en §26.3 de l'inventaire de l'application.
 - **Le coach IA existant (§9.1)** consomme désormais `RunnerState`/`EngagementState`/`EngineDecision` au lieu de son ancien calcul ACWR informel, conformément à la décision actée dans ce document — détail en §26.2 de l'inventaire. Une chaîne de 4 bugs distincts affectant ce même coach IA (prompt, race condition de synchronisation, paramètre manquant) a été trouvée et corrigée le 18/07/2026 — détail en inventaire §37.
 - **Nouveauté hors contrat théorique initial** : monotonie de charge (concept Foster, absent du §5 de ce document) ajoutée au Module 3 le 18/07/2026, après recherche de littérature ad hoc — affichage seul, décision explicite de ne pas créer de règle faute de seuil validé pour un coureur récréatif (contrairement à R-006/R-050 qui s'appuient sur des seuils bien soutenus). Détail en inventaire §36.1 et document d'intégration §15.3.
