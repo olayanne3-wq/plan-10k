@@ -1448,7 +1448,40 @@ if (sessionStorage.getItem("lk_strava_sync_apres_reload")) {
 // ══════════════════════════════════════════════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════════════════════════════════════════════
-function today() { return new Date().toISOString().slice(0,10); }
+// CORRECTIF fuseau horaire (23/07/2026, signalé par Laurent à 00h45) :
+// l'ancienne version (new Date().toISOString().slice(0,10)) retourne
+// toujours la date en UTC, jamais le fuseau local de l'utilisateur — en
+// France l'été (UTC+2), entre minuit et 2h du matin heure locale, l'app
+// affichait encore "hier" comme date du jour (ex. observé : à 00h45, la
+// séance de la veille restait affichée comme "Aujourd'hui"). Corrigé en
+// utilisant les getters locaux (getFullYear/getMonth/getDate), qui
+// retournent TOUJOURS l'heure du fuseau du navigateur exécutant le JS —
+// s'adapte automatiquement à n'importe quel utilisateur, n'importe où,
+// sans fuseau codé en dur (cf. mémoire de session : audit des 45 usages
+// de today() + 10 usages indépendants du même pattern avant correction,
+// certains étaient déjà en UTC intentionnel et n'ont pas été touchés).
+function today() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// Même correctif que today() ci-dessus, appliqué à "demain" — remplace les
+// trois usages qui calculaient demain via
+// new Date(new Date().getTime()+86400000).toISOString().slice(0,10) (même
+// biais UTC). Construit sur un objet Date en heure locale (pas de calcul en
+// millisecondes qui pourrait glisser sur un changement heure été/hiver),
+// puis appelle today()-style sur ce nouvel objet.
+function demain() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 // ── Catégorie d'âge FFA (ajouté le 19/07/2026, cf. mémoire dateNaissance) ──
 // Règles officielles (athle.fr, "les catégories d'âge en 2026") : la
@@ -2010,7 +2043,7 @@ async function fetchCoachMsg() {
   // ET de "pas encore fait" — jamais mélangée avec le RPE (cohérent avec la
   // décision déjà actée que 😴 n'a pas de RPE, cf. ligne ~3870).
   const sessionSkipped = todaySessionStatus==="😴";
-  const tomorrowKeyStr = new Date(new Date().getTime()+86400000).toISOString().slice(0,10);
+  const tomorrowKeyStr = demain();
   const tomorrowKeySess = ALL_SESSIONS.find(s=>s.date===tomorrowKeyStr&&["VMA","SPEC","SEUIL","TEST"].includes(s.type));
   const isEveOfKeySession = !!tomorrowKeySess;
 
@@ -3688,7 +3721,7 @@ function renderDashboard() {
                 // maximiser les chances que la clôture soit bien
                 // enregistrée avant que le nouveau plan tente de se créer).
                 e.preventDefault();
-                const dateCloture = new Date().toISOString().slice(0,10);
+                const dateCloture = today(); // CORRECTIF fuseau horaire 23/07/2026 (était new Date().toISOString().slice(0,10), biais UTC)
                 if (window.__UTILISATEUR__?.id && window.LkSync?.cloturerPlanSupabase && window.__PLAN_BRUT__?.id) {
                   try {
                     await window.LkSync.cloturerPlanSupabase(window.__PLAN_BRUT__.id, dateCloture);
@@ -4293,7 +4326,7 @@ function renderDashboard() {
   if (todaySessions.length) {
     const isFullRepos = todaySessions.every(s=>s.type==="REPOS");
     // Séance clé demain ?
-    const tomorrowStr = new Date(new Date().getTime()+86400000).toISOString().slice(0,10);
+    const tomorrowStr = demain();
     const tomorrowKey = ALL_SESSIONS.find(s=>s.date===tomorrowStr&&["VMA","SPEC","SEUIL","TEST","RACE"].includes(s.type));
     if (isFullRepos) {
       // Bilan semaine pour la carte repos
@@ -4345,7 +4378,7 @@ function renderDashboard() {
       );
     } else {
     // Prochaine séance (lendemain)
-    const tomorrowStr2 = new Date(new Date().getTime()+86400000).toISOString().slice(0,10);
+    const tomorrowStr2 = demain();
     const nextSess = ALL_SESSIONS.find(s=>s.date===tomorrowStr2);
 
     todayEl=el("div",{style:{marginBottom:"16px"}},
@@ -6877,7 +6910,18 @@ function renderCourse() {
     meteoRaceEl = el("div",{style:{marginBottom:"16px"}},
       el("div",{class:"label"},"🌡️ Météo prévue le "+fmtDate(DATE_COURSE_REFERENCE)),
       el("div",{style:{background:"var(--bg)",boxShadow:"0 1px 3px var(--shadow1), 0 1px 2px var(--shadow2)",borderRadius:"10px",padding:"14px",textAlign:"center"}},
-        el("div",{class:"muted",style:{fontSize:"14px",fontStyle:"italic"}},"Disponible à partir du "+fmtDate(new Date(new Date(DATE_COURSE_REFERENCE+"T00:00:00").getTime()-16*86400000).toISOString().slice(0,10))+" · J–"+daysToRace+" actuellement")
+        el("div",{class:"muted",style:{fontSize:"14px",fontStyle:"italic"}},"Disponible à partir du "+fmtDate((() => {
+          // CORRECTIF 23/07/2026 : l'ancien calcul (Date - 16*86400000 ms
+          // puis toISOString()) risquait un décalage d'un jour selon l'heure
+          // d'exécution (mélange interprétation locale de DATE_COURSE_REFERENCE
+          // et reconversion UTC) — remplacé par setDate(), cohérent avec
+          // demain()/today() ci-dessus, gère aussi nativement les changements
+          // heure été/hiver sur une plage de 16 jours.
+          const d = new Date(DATE_COURSE_REFERENCE+"T00:00:00");
+          d.setDate(d.getDate() - 16);
+          const yyyy = d.getFullYear(), mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+          return `${yyyy}-${mm}-${dd}`;
+        })())+" · J–"+daysToRace+" actuellement")
       )
     );
   }
