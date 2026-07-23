@@ -3918,29 +3918,40 @@ function renderDashboard() {
   const todaySessions=ALL_SESSIONS.filter(s=>s.date===today());
 
   // Readiness pré-séance qualité (23/07/2026) — affichée UNIQUEMENT si
-  // aujourd'hui est un jour de séance qualité (VMA/SEUIL/SPEC), jamais les
-  // jours à venir. uid utilisé comme clé de stockage : s'il y a plusieurs
-  // séances qualité le même jour (rare), la readiness s'applique à la
-  // première trouvée — cas non observé en pratique, pas géré spécifiquement.
-  const seanceQualiteAujourdhui = todaySessions.find(s => ["VMA","SEUIL","SPEC"].includes(s.type));
+  // aujourd'hui est un jour de séance qualité (VMA/SEUIL/SPEC) ET que cette
+  // séance n'a pas déjà un statut renseigné (statuses[uid], même test que
+  // ligne ~5119 pour masquer un élément post-validation) — une fois la
+  // séance faite/ratée/adaptée, la question "comment tu te sens POUR cette
+  // séance" n'a plus de sens (readiness = ressenti PRÉ-séance, distinct du
+  // RPE rétrospectif). uid utilisé comme clé de stockage : s'il y a
+  // plusieurs séances qualité le même jour (rare), la readiness s'applique
+  // à la première trouvée — cas non observé en pratique, pas géré
+  // spécifiquement.
+  const seanceQualiteAujourdhui = todaySessions.find(s =>
+    ["VMA","SEUIL","SPEC"].includes(s.type) && (!statuses[s.uid] || statuses[s.uid] === '—')
+  );
   let readinessEl = null;
   if (seanceQualiteAujourdhui) {
     const uidReadiness = seanceQualiteAujourdhui.uid;
-    let readinessVal = sessionReadiness[uidReadiness] || null;
-    // Défaut VISUEL uniquement (23/07/2026, retour Laurent) : "Normal" est
-    // pré-sélectionné à l'écran pour ancrer le regard au centre, mais tant
-    // que le coureur n'a pas cliqué explicitement, RIEN n'est écrit dans
-    // sessionReadiness — cohérent avec "rien d'automatique" déjà appliqué
-    // partout ailleurs dans le moteur de décision. affichageSeulementDefaut
-    // distingue ce cas ("Normal" affiché mais jamais vraiment choisi) d'un
-    // vrai clic sur "Normal" (qui, lui, écrit bien dans sessionReadiness).
-    const valeurAffichee = () => readinessVal || 'normal';
+    // "Normal" est désormais une VRAIE valeur par défaut (23/07/2026,
+    // revirement suite à discussion avec Laurent) : écrite dans
+    // sessionReadiness dès l'affichage si rien n'est encore enregistré —
+    // pas juste un repère visuel comme la version précédente. Justifié
+    // par : (1) aucun risque concret aujourd'hui, "normal"/"forme" n'ont de
+    // toute façon aucun effet sur la modulation (seul "fatigue" en a un,
+    // cf. moduleAmpleurSelonReadiness) ; (2) évite l'incohérence d'un
+    // bouton affiché en surbrillance sans être la vraie valeur retenue.
+    if (!sessionReadiness[uidReadiness]) {
+      sessionReadiness[uidReadiness] = 'normal';
+      save(clePourPlan("lk_session_readiness"), sessionReadiness);
+    }
+    let readinessVal = sessionReadiness[uidReadiness];
     const libelleActif = el("div",{style:{textAlign:"center",fontSize:"12px",color:"var(--text-muted)",marginTop:"6px"}});
     const readinessRow = el("div",{style:{display:"flex",gap:"6px",width:"100%"}});
     const rebuildReadiness = () => {
       readinessRow.innerHTML = "";
       READINESS_OPTIONS.forEach(o=>{
-        const estActif = valeurAffichee()===o.v;
+        const estActif = readinessVal===o.v;
         const rb = el("button",{title:o.label,style:{
           flex:"1",padding:"10px 0",fontSize:"20px",cursor:"pointer",
           background:estActif?"var(--accent2)":"var(--border-soft)",
@@ -3948,7 +3959,7 @@ function renderDashboard() {
         }}, o.e);
         rb.addEventListener("click", avecRetourTactile((e)=>{
           e.stopPropagation();
-          readinessVal = readinessVal===o.v ? null : o.v;
+          readinessVal = o.v; // toujours une vraie valeur désormais, jamais null (pas de "désélection" possible)
           sessionReadiness[uidReadiness] = readinessVal;
           save(clePourPlan("lk_session_readiness"), sessionReadiness);
           rebuildReadiness();
@@ -3956,18 +3967,19 @@ function renderDashboard() {
         }));
         readinessRow.appendChild(rb);
       });
-      const optionActive = READINESS_OPTIONS.find(o => o.v === valeurAffichee());
+      const optionActive = READINESS_OPTIONS.find(o => o.v === readinessVal);
       libelleActif.textContent = optionActive ? optionActive.label : "";
     };
     rebuildReadiness();
     readinessEl = el("div",{style:{background:"rgba(var(--accent2-rgb),0.1)",border:"1px solid rgba(var(--accent2-rgb),0.3)",borderRadius:"12px",padding:"14px 16px",marginBottom:"16px"}},
       el("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"10px"}},
         el("span",{style:{fontSize:"20px"}},"⚡"),
-        el("span",{style:{color:"var(--accent2)",fontSize:"15px",fontWeight:"700"}},"Comment tu te sens aujourd'hui ?")
+        el("span",{style:{color:"var(--accent2)",fontSize:"15px",fontWeight:"700"}},"Comment te sens-tu avant la séance d'aujourd'hui ?")
       ),
       readinessRow,
       libelleActif
     );
+
   }
 
   const moteurDecisionEl = (() => {
