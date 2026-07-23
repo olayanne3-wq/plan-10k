@@ -608,6 +608,22 @@ const RPE_OPTIONS = [
   {v:10, e:"🥵", label:"Maximal (CR-10 : 9-10)"},
 ];
 
+// Readiness pré-séance qualité — 23/07/2026, conception avec Laurent
+// (distincte du RPE ci-dessus, qui est rétrospectif). Affichée UNIQUEMENT
+// le jour même d'une séance qualité (VMA/SEUIL/SPEC), jamais bloquante,
+// jamais d'historique (une seule valeur retenue par jour, écrasée à chaque
+// nouvelle saisie — cf. clePourPlan("lk_session_readiness")). Consommée
+// par DecisionEngineApply en post-traitement (jamais une nouvelle règle du
+// RuleEngine) : "fatigue" pousse une décision reduire_charge existante au
+// palier suivant connu (-15→-25), jamais au-delà ; sans décision
+// existante, affiche seulement un message d'invitation à la prudence,
+// jamais de modification automatique du plan.
+const READINESS_OPTIONS = [
+  {v:"fatigue", e:"🪫", label:"Fatigué"},
+  {v:"normal",  e:"😐", label:"Normal"},
+  {v:"forme",   e:"🔋", label:"En forme"},
+];
+
 // ── Allures de référence (sec/km) ──
 // EF : 6:20/km = 380 s/km
 // Longue : 6:20/km = 380 s/km
@@ -749,6 +765,12 @@ let sessionNotes = load(clePourPlan("lk_session_notes"), {}); // {uid: "texte"}
 // (anciennes saisies manuelles déjà enregistrées avant ce chantier), mais
 // n'est plus jamais écrit par le nouveau sélecteur.
 let sessionRpe = load(clePourPlan("lk_session_rpe"), {}); // {uid: 1|2|3}
+
+// Readiness pré-séance qualité — même pattern de stockage que sessionRpe
+// ci-dessus (clé par uid, écrasée à chaque nouvelle saisie), mais AUCUN
+// historique conservé au-delà de la valeur du jour — pas d'usage identifié
+// pour un historique pour l'instant (cf. mémoire de session 23/07/2026).
+let sessionReadiness = load(clePourPlan("lk_session_readiness"), {}); // {uid: "fatigue"|"normal"|"forme"}
 let stravaToken = load("lk_strava_token", null);
 let stravaRefresh = load("lk_strava_refresh", null);
 let stravaExpires = load("lk_strava_expires", 0);
@@ -974,6 +996,31 @@ function calculerEtatMoteurDecision() {
     return null;
   }
 }
+
+// Modulation de l'ampleur d'une décision reduire_charge selon le readiness
+// du jour — 23/07/2026, conception validée avec Laurent (option C). Le
+// RuleEngine reste totalement inchangé (ne connaît jamais le readiness) :
+// c'est un post-traitement appliqué juste avant affichage/application.
+// Règles :
+//   - readiness "fatigue" pousse l'ampleur au palier suivant DÉJÀ CONNU du
+//     système (-15 → -25), jamais au-delà, jamais si déjà à -25 (ou plus).
+//   - readiness "normal"/"forme" (ou absent) : aucune modification, jamais
+//     de modulation à la baisse.
+// Retourne l'ampleurPourcent modulée (nombre), jamais l'objet decision
+// entier — appelant responsable de construire une copie de la décision.
+const PALIERS_AMPLEUR_CONNUS = [-15, -25]; // seules valeurs produites par R-024s/R-050 actuellement
+function moduleAmpleurSelonReadiness(ampleurPourcent, readinessVal) {
+  if (readinessVal !== "fatigue") return ampleurPourcent;
+  const indexActuel = PALIERS_AMPLEUR_CONNUS.indexOf(ampleurPourcent);
+  if (indexActuel === -1 || indexActuel === PALIERS_AMPLEUR_CONNUS.length - 1) {
+    // Ampleur inconnue de la table, ou déjà au palier le plus élevé connu
+    // (-25) : rien à pousser plus loin, le readiness ne peut pas dépasser
+    // ce que le système sait déjà proposer.
+    return ampleurPourcent;
+  }
+  return PALIERS_AMPLEUR_CONNUS[indexActuel + 1];
+}
+
 
 let syncing = false;
 let syncMsg = "";
@@ -3833,12 +3880,56 @@ function renderDashboard() {
     if (!window.__PLAN_BRUT__ || window.__PLAN_BRUT__.estPlanRepli) return null;
     if (typeof DecisionEngineApply === 'undefined') return null; // scripts pas encore chargés, jamais planter le dashboard pour ça
 
+    const niveauCoureur = profilCoureur?.niveau || 'intermediaire';
+
+    // Readiness du jour, si une séance qualité a lieu aujourd'hui (cf.
+    // readinessEl plus haut — même clé de stockage, même uid). undefined
+    // si pas de séance qualité aujourd'hui ou readiness non renseignée.
+    const readinessDuJour = seanceQualiteAujourdhui ? sessionReadiness[seanceQualiteAujourdhui.uid] : undefined;
+
     const etatMoteur = calculerEtatMoteurDecision();
+
+    // Cas "readiness fatigué SANS décision reduire_charge du RuleEngine" —
+    // cf. conception 23/07/2026, principe "entre-deux" : jamais de
+    // modification automatique du plan sur readiness seul, mais un signal
+    // visible plutôt qu'un silence total (le cas le plus fréquent en
+    // pratique — cf. mémoire de session, R-024s/R-050 rarement déclenchées).
+    const decisionBrute = etatMoteur ? etatMoteur.decision : null;
+    if (readinessDuJour === "fatigue" && (!decisionBrute || decisionBrute.type !== 'reduire_charge')) {
+      const cleIgnoreeReadiness = clePourPlan("lk_invitation_prudence_ignoree");
+      const idInvitationDuJour = "readiness_fatigue_" + today();
+      if (load(cleIgnoreeReadiness, null) !== idInvitationDuJour) {
+        return el("div",{style:{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:"12px",padding:"14px 16px",marginBottom:"16px"}},
+          el("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"8px"}},
+            el("span",{style:{fontSize:"20px"}},"🪫"),
+            el("span",{style:{color:"var(--text)",fontSize:"15px",fontWeight:"700"}},"Écoute ton corps aujourd'hui")
+          ),
+          el("div",{class:"muted",style:{fontSize:"14px",marginBottom:"12px",lineHeight:"1.5"}},
+            "Tu as indiqué te sentir fatigué. Tes données ne montrent pas de signal particulier, mais rien ne t'empêche de commencer doucement et d'ajuster selon ton ressenti pendant la séance."
+          ),
+          el("button",{style:{width:"100%",background:"none",boxShadow:"0 1px 3px var(--shadow1), 0 1px 2px var(--shadow2)",borderRadius:"8px",padding:"9px",color:"var(--text-muted)",fontSize:"14px",fontWeight:"600",cursor:"pointer"},
+            feedback:true,
+            onClick:()=>{ save(cleIgnoreeReadiness, idInvitationDuJour); render(); }
+          },"Compris")
+        );
+      }
+    }
+
     if (!etatMoteur || !etatMoteur.decision) return null;
-    const decision = etatMoteur.decision;
+    const decisionOriginale = etatMoteur.decision;
 
     // Décisions informatives (alerter_*) : affichées mais sans bouton "Appliquer" (rien à appliquer au plan, cf. decision-engine-apply.classic.js)
-    const estInformative = decision.type !== 'reduire_charge';
+    const estInformative = decisionOriginale.type !== 'reduire_charge';
+
+    // Modulation readiness : construit une copie de la décision avec
+    // l'ampleur éventuellement poussée au palier suivant (cf.
+    // moduleAmpleurSelonReadiness ci-dessus). Jamais de mutation de
+    // decisionOriginale — copie explicite pour ne jamais corrompre l'objet
+    // retourné par le RuleEngine.
+    const decision = estInformative ? decisionOriginale : {
+      ...decisionOriginale,
+      ampleurPourcent: moduleAmpleurSelonReadiness(decisionOriginale.ampleurPourcent, readinessDuJour),
+    };
 
     const cleIgnoree = clePourPlan("lk_decision_moteur_ignoree");
     const ignoree = load(cleIgnoree, null);
@@ -3849,8 +3940,6 @@ function renderDashboard() {
     // d'afficher la carte — sinon on proposerait "Appliquer" sur un bouton qui
     // échouerait silencieusement, cf. limite actée le 16/07/2026 (séances de
     // qualité non modifiables automatiquement).
-    const niveauCoureur = profilCoureur?.niveau || 'intermediaire';
-
     let cibleInfo = null;
     if (!estInformative) {
       cibleInfo = DecisionEngineApply.trouverProchaineSeanceCible(window.__PLAN_BRUT__, new Date().toISOString(), niveauCoureur);
@@ -3983,6 +4072,43 @@ function renderDashboard() {
   const total=ALL_SESSIONS.filter(s=>s.type!=="REPOS"&&s.type!=="RACE").length;
   const todaySessions=ALL_SESSIONS.filter(s=>s.date===today());
   const pred=currentPred||predict10K();
+
+  // Readiness pré-séance qualité (23/07/2026) — affichée UNIQUEMENT si
+  // aujourd'hui est un jour de séance qualité (VMA/SEUIL/SPEC), jamais les
+  // jours à venir. uid utilisé comme clé de stockage : s'il y a plusieurs
+  // séances qualité le même jour (rare), la readiness s'applique à la
+  // première trouvée — cas non observé en pratique, pas géré spécifiquement.
+  const seanceQualiteAujourdhui = todaySessions.find(s => ["VMA","SEUIL","SPEC"].includes(s.type));
+  let readinessEl = null;
+  if (seanceQualiteAujourdhui) {
+    const uidReadiness = seanceQualiteAujourdhui.uid;
+    let readinessVal = sessionReadiness[uidReadiness] || null;
+    const readinessRow = el("div",{style:{display:"flex",gap:"6px",width:"100%"}});
+    const rebuildReadiness = () => {
+      readinessRow.innerHTML = "";
+      READINESS_OPTIONS.forEach(o=>{
+        const rb = el("button",{title:o.label,style:{
+          flex:"1",padding:"8px 0",fontSize:"18px",cursor:"pointer",
+          background:readinessVal===o.v?"var(--accent)":"var(--border-soft)",
+          border:`1px solid ${readinessVal===o.v?"var(--accent)":"var(--border)"}`,borderRadius:"8px"
+        }}, o.e);
+        rb.addEventListener("click", avecRetourTactile((e)=>{
+          e.stopPropagation();
+          readinessVal = readinessVal===o.v ? null : o.v;
+          sessionReadiness[uidReadiness] = readinessVal;
+          save(clePourPlan("lk_session_readiness"), sessionReadiness);
+          rebuildReadiness();
+          render(); // recalcule moteurDecisionEl, qui lit sessionReadiness (cf. plus bas)
+        }));
+        readinessRow.appendChild(rb);
+      });
+    };
+    rebuildReadiness();
+    readinessEl = el("div",{style:{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:"10px",padding:"12px 14px",marginBottom:"12px"}},
+      el("div",{style:{fontSize:"12px",color:"var(--text2)",marginBottom:"6px"}},"Comment tu te sens pour ta séance du jour ?"),
+      readinessRow
+    );
+  }
 
   const heroPred = el("div",{style:{background:"linear-gradient(135deg,var(--bg) 0%,var(--border-soft) 100%)",borderRadius:"16px",padding:"16px",marginBottom:"12px",border:"1px solid rgba(var(--accent-rgb),0.2)",marginTop:"8px"}},
     // ── Header : course ──────────────────────────────────────────────────────
@@ -4646,7 +4772,7 @@ function renderDashboard() {
   // principal (décision d'emplacement tranchée le 6 juillet 2026).
   const selecteurPlanEl = renderSelecteurPlan();
 
-  return el("div",{style:{padding:"0 16px 100px"}},dashHeaderEl,selecteurPlanEl,progressionMarcheCourseEl,blocSuivantEl,completerTestEl,adaptationEl,alluresDynamiquesEl,moteurDecisionEl,prochainPalierEl,ESTMODEFORME?null:heroPred,todayEl||"",bilanEl,phaseEl,stravaSection);
+  return el("div",{style:{padding:"0 16px 100px"}},dashHeaderEl,selecteurPlanEl,progressionMarcheCourseEl,blocSuivantEl,completerTestEl,adaptationEl,alluresDynamiquesEl,readinessEl,moteurDecisionEl,prochainPalierEl,ESTMODEFORME?null:heroPred,todayEl||"",bilanEl,phaseEl,stravaSection);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
