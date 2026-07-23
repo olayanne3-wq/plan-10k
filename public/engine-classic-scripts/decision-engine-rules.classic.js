@@ -356,6 +356,30 @@
   // déjà calculé en input, cf. §"Ce module ne modifie AUCUNE donnée" en tête
   // de fichier.
   // --------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
+  // R-070 — Séances qualité ratées consécutives → ajustement (23/07/2026).
+  // Transformée de alerter_risque_decrochage (17/07) en reduire_charge, après
+  // constat qu'aucune règle du catalogue n'ajustait le plan face à un
+  // comportement réel (séances ratées) — seules R-024s/R-050 (charge
+  // physiologique mesurée) le faisaient. Conception validée avec Laurent :
+  //   - Ampleur FIXE -15% (alignée sur R-024s, palier "modéré" déjà connu du
+  //     système) — R-070 est un déclenchement binaire (>=2 consécutives),
+  //     pas de signal gradué qui justifierait un palier -25%.
+  //   - Cible : la prochaine séance QUALITÉ directement (pas EF/LONGUE en
+  //     priorité comme R-024s/R-050) — le signal dit précisément "tu rates
+  //     tes séances de qualité", alléger une EF ne répond pas à ce problème.
+  //     Géré côté DecisionEngineApply (cf. flag cibleQualitePrioritaire).
+  //   - Priorité 70 : reste sous R-006(100)/R-024s(90)/R-050(85) — la charge
+  //     physiologique mesurée l'emporte toujours sur un comportement déclaré
+  //     en cas de conflit le même jour (une seule décision gagnante à la
+  //     fois, cf. tri par priorité plus bas) — mais au-dessus des règles
+  //     purement informatives restantes (R-080=52, R-040=50).
+  //   - Hors scope (chantier futur documenté en mémoire de session) : aucune
+  //     gestion du "rebond" après l'allègement — pas d'accélération si succès
+  //     répétés, pas de lissage de la remontée après une réduction. Décision
+  //     actée : la progression normale du plan reprend telle quelle à la
+  //     séance suivante, sans mémoire de la réduction précédente.
+  // --------------------------------------------------------------------------
   function evaluerSeancesManqueesConsecutives(seancesPlanifieesManquees) {
     if (!seancesPlanifieesManquees || seancesPlanifieesManquees.nbConsecutivesRatees < 2) {
       return null;
@@ -364,11 +388,13 @@
     const description = seances.map(s => `${s.date} (${s.type})`).join(', ');
     return {
       id: 'R-070',
-      libelle: 'Séances planifiées ratées consécutives',
+      libelle: 'Séances de qualité ratées consécutives',
       categorie: 'engagement',
-      priorite: 55, // engagement, mais signal plus précis que R-040 → priorité légèrement au-dessus
-      type: 'alerter_risque_decrochage',
-      justification: `2 séances prévues au plan ratées d'affilée : ${description}. Un ajustement du plan ou un point avec le coach peut aider avant que ça ne s'installe.`,
+      priorite: 70, // sous R-006/R-024s/R-050 (charge mesurée), au-dessus des règles informatives restantes
+      type: 'reduire_charge',
+      ampleurPourcent: -15, // fixe, cf. justification en tête de fonction — pas de palier gradué pour ce signal binaire
+      cibleQualitePrioritaire: true, // signal spécifique aux séances non tenue, cf. DecisionEngineApply.trouverProchaineSeanceCible
+      justification: `2 séances de qualité prévues au plan ratées d'affilée : ${description}. On peut alléger ta prochaine séance de qualité pour faciliter la reprise.`,
       confianceMax: 75, // signal direct sur le plan, pas une inférence statistique — confiance plus haute que R-040
       donnees: { dernieresSeances: seances },
     };
@@ -383,10 +409,12 @@
   // signal capte une sous-réalisation même sur des séances FAITES mais
   // raccourcies, invisible pour R-070. Priorité juste au-dessus de R-040
   // (désengagement global sur 14j, moins précis) mais en dessous de R-070
-  // (signal direct sur le plan, plus fiable qu'une moyenne sur 3 semaines).
+  // (signal direct sur le plan, plus fiable qu'une moyenne sur 3 semaines —
+  // R-070 est devenue reduire_charge le 23/07/2026, priorité 70 ; R-080
+  // reste informative pour l'instant, cf. justification tête de fonction).
   //
   // Décision informative (alerter_*), pas actionnable — cf. même prudence
-  // que R-062/R-070 : observer en conditions réelles avant d'envisager un
+  // que R-062 : observer en conditions réelles avant d'envisager un
   // adapter_plan. Seuil -10% calibré à dire d'expert (pas de littérature
   // trouvée pour un écart en % au plan individuel, cf. discussion du
   // 18/07/2026), à recalibrer une fois observé sur l'historique réel.
@@ -404,7 +432,7 @@
       id: 'R-080',
       libelle: 'Déficit de volume durable',
       categorie: 'engagement',
-      priorite: 52, // entre R-070 (55, plus direct) et R-040 (50, moins précis)
+      priorite: 52, // entre R-040 (50, moins précis) et R-070 (70, maintenant reduire_charge — reste au-dessus)
       type: 'alerter_deficit_volume',
       justification: signal.description,
       confianceMax: 60, // moyenne sur 3 semaines, plus incertain qu'un signal direct sur le plan (R-070, confiance 75)
