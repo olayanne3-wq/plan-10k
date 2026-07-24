@@ -1327,10 +1327,9 @@ let weatherTemp = null;
 let weatherDesc = "";
 let historicalWeatherCache = load("lk_weather_cache", {});
 
-async function fetchHistoricalWeather(date, lat, lon, hour) {
+async function fetchHistoricalWeather(date, lat, lon) {
   try {
     const params = new URLSearchParams({ lat, lon, date, type: "historical" });
-    if (Number.isInteger(hour)) params.set("hour", hour);
     const resp = await fetch(`/api/weather?${params}`);
     const data = await resp.json();
     if (!data.disponible) return null;
@@ -9007,11 +9006,7 @@ function setView(v) {
       const date = r.start_date_local?.slice(0,10);
       if (date && historicalWeatherCache[date]===undefined && r.start_latlng?.length===2) {
         historicalWeatherCache[date] = null; // marqué comme en cours
-        // Heure réelle de la séance (24/07/2026) : start_date_local Strava
-        // au format ISO "YYYY-MM-DDTHH:mm:ss" — on extrait l'heure locale
-        // plutôt que de garder l'approximation fixe 18h côté serveur.
-        const heureSeance = r.start_date_local ? Number(r.start_date_local.slice(11, 13)) : undefined;
-        const temp = await fetchHistoricalWeather(date, r.start_latlng[0], r.start_latlng[1], heureSeance);
+        const temp = await fetchHistoricalWeather(date, r.start_latlng[0], r.start_latlng[1]);
         if (temp !== null) {
           historicalWeatherCache[date] = temp;
           save("lk_weather_cache", historicalWeatherCache);
@@ -9100,6 +9095,45 @@ function render() {
   if (hdr) app.appendChild(hdr);
   app.appendChild(content);
   app.appendChild(nav);
+
+  // Swipe horizontal entre onglets principaux (24/07/2026) — limité aux
+  // vues présentes dans NAV (pas weekDetail, pas help : éviter toute
+  // ambiguïté avec une navigation propre à ces écrans, cf. décision prise
+  // avec Laurent). Détection par direction dominante du geste (deltaX vs
+  // deltaY dès le déclenchement) plutôt que par zone de l'écran — un swipe
+  // légèrement diagonal pendant un scroll vertical ne doit jamais
+  // déclencher un changement d'onglet à tort. Seuil 50px pour éviter les
+  // faux positifs sur un simple tap ou un scroll court.
+  const navIds = NAV.map(n => n.id);
+  if (navIds.includes(vueEffective)) {
+    let swipeStartX = null, swipeStartY = null, swipeDecided = null;
+    content.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 1) return;
+      swipeStartX = e.touches[0].clientX;
+      swipeStartY = e.touches[0].clientY;
+      swipeDecided = null;
+    }, { passive: true });
+    content.addEventListener("touchmove", (e) => {
+      if (swipeStartX === null || e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - swipeStartX;
+      const dy = e.touches[0].clientY - swipeStartY;
+      if (swipeDecided === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+        swipeDecided = Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
+      }
+    }, { passive: true });
+    content.addEventListener("touchend", (e) => {
+      if (swipeStartX === null || swipeDecided !== "horizontal") { swipeStartX = null; return; }
+      const dx = (e.changedTouches[0]?.clientX ?? swipeStartX) - swipeStartX;
+      swipeStartX = null;
+      if (Math.abs(dx) < 50) return;
+      const idx = navIds.indexOf(vueEffective);
+      const nextIdx = dx < 0 ? idx + 1 : idx - 1; // swipe gauche = onglet suivant
+      if (nextIdx < 0 || nextIdx >= navIds.length) return;
+      const nextId = navIds[nextIdx];
+      if (nextId === "weeks") selectedWeek = currentWeek();
+      setView(nextId);
+    }, { passive: true });
+  }
 }
 
 // ── Vérification des fonctions critiques ────────────────────────────────────
