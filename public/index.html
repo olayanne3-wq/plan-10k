@@ -98,6 +98,7 @@ input[type=text], input[type=number], input[type=password] {
 </head>
 <body>
 <div id="app"></div>
+<div id="nav-root"></div>
 
 <!-- ============================================================
      Écran d'authentification Supabase — ajouté le 13 juillet 2026.
@@ -9108,7 +9109,14 @@ function render() {
 
   if (hdr) app.appendChild(hdr);
   app.appendChild(content);
-  app.appendChild(nav);
+  // Nav montée dans un conteneur séparé de #app (24/07/2026, correctif
+  // flash) — avant, nav était un enfant de #app, donc détruite par
+  // `app.innerHTML=""` en tout début de render() puis reconstruite juste
+  // après : le navigateur pouvait peindre une frame sans aucune barre en
+  // bas d'écran, visible comme un flash/clignotement. #nav-root n'est
+  // jamais vidé par innerHTML="" — replaceChildren() remplace son unique
+  // enfant de façon atomique (pas de frame intermédiaire vide).
+  document.getElementById("nav-root").replaceChildren(nav);
 
   // Swipe horizontal entre onglets principaux (24/07/2026) — limité aux
   // vues présentes dans NAV (pas weekDetail, pas help : éviter toute
