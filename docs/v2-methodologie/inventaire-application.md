@@ -115,8 +115,10 @@ Fonctions de rendu (`render*`) :
 - `renderHelp` — aide (refonte du contenu le 24/07/2026, cf. plus bas)
 - `renderSettings` — profil coureur, records personnels, tokens, notifications, abonnement
 - `render` — orchestrateur principal
-- `ouvrirSignalementProbleme` — modale accessible via le bouton 🐛 des
-  headers, cf. §11
+- `ouvrirSignalementProbleme` — modale accessible via le bouton 💬 des
+  headers (icône changée le 24/07/2026, ex-🐛 jugé peu clair pour un
+  usage englobant bug/donnée incorrecte/suggestion, pas seulement les
+  bugs techniques)
 - `renderTestSemiCooperRow` — carte du jour, cf. §14 (Mode Forme sans
   référence)
 
@@ -318,7 +320,31 @@ restant jusqu'à la course (pas un bloc de taille fixe comme en Forme).
   "dernière semaine du plan" = semaine de course) — `jourCourseIndex` mis
   à `null` dans ce cas côté wizard.
 
-**Allures dynamiques (22/07/2026)** — jusqu'ici, les allures E/T/I
+**Refus si volume incompatible avec le nombre de jours (24/07/2026)** —
+constat fait en générant plusieurs plans de test variés (script
+`scripts/test-plans-varies.js`, cf. plus bas dans cette section) :
+certaines combinaisons
+jours disponibles / volume de départ produisaient des séances EF ou une
+sortie longue sans substance réelle (ex. EF à 0,7km, une longue à moins
+de 5km) — le warning `VOLUME_HEBDO_TROP_FAIBLE_POUR_REPARTITION`
+existait déjà pour détecter ce cas au niveau d'une semaine, mais restait
+purement informatif : le plan était généré tel quel malgré l'alerte.
+`generatePlan()` bloque désormais la génération plutôt que de produire un
+plan de ce type : si plus de la moitié des semaines de la phase
+Construction ont un EF sous `VOLUME_MIN_EF_KM` (3km) ou une longue sous
+`VOLUME_MIN_LONGUE_KM` (5km), la fonction retourne `{ planInvalide: true,
+code: 'VOLUME_JOURS_INCOMPATIBLE', message }` au lieu du plan habituel —
+jamais une exception JS (romprait tout appelant sans message
+exploitable), cohérent avec le pattern `warnings` déjà en place dans tout
+ce fichier. Seuil volontairement à "majorité de la phase Construction" et
+non "une seule semaine" : un creux ponctuel en tout début de progression
+(montée en charge qui démarre bas) est normal et ne doit pas bloquer un
+plan par ailleurs viable — seule une incompatibilité structurelle
+(persistante sur toute la phase) doit empêcher la génération. Les 3
+points d'appel de `generatePlan()` (`public/v2/index.html` : création,
+régénération propre, modification d'objectif ; `public/index.html` : plan
+de repli par défaut) gèrent explicitement ce nouveau retour et affichent
+le message à l'utilisateur plutôt que de continuer avec un plan cassé. — jusqu'ici, les allures E/T/I
 (`computeAllures()`) restaient calibrées sur `paramsOrigine.tempsReference`
 (référence de forme mesurée à la CRÉATION du plan) pendant toute sa durée,
 même quand le prédicteur détectait une vraie progression — un plan visant
@@ -347,6 +373,32 @@ S6...) :
   substituer l'un à l'autre.
 - **Non testé en conditions réelles** — le premier déclenchement possible
   n'arrive qu'à la fin d'un cycle S2 d'un plan en cours, à surveiller.
+
+**Script de test de génération de plans variés (24/07/2026)** —
+`scripts/test-plans-varies.js`, exécuté avec `node
+scripts/test-plans-varies.js` depuis la racine du repo (fonctions pures du
+moteur, pas de DOM/réseau, donc testables directement en Node sans
+navigateur). 10 profils prédéfinis couvrant des cas connus comme
+sensibles : grand débutant (Mode Forme marche-course), débutant profil
+minimal, intermédiaire/confirmé profil complet, Mode Forme via test
+semi-Cooper, plan course date proche/lointaine, changement de niveau en
+cours, profil incomplet extrême, contraintes ponctuelles + reprise après
+coupure. Vérifie deux niveaux : (1) absence de plantage/valeurs `NaN` —
+objectif et sans ambiguïté ; (2) quelques règles structurelles objectives
+(pas de qualité consécutive, allures cohérentes E>M>T>I>R, dernière
+semaine contient la course, semaines non vides). Ne vérifie jamais la
+qualité pédagogique d'un plan — jugement d'expert qui reste celui de
+Laurent, volontairement hors de portée d'un test automatisé (décision
+actée le 24/07/2026, pour éviter de figer une règle discutable en dur).
+Statut de sortie à trois valeurs par profil : OK (généré et conforme),
+REFUSÉ (le moteur a lui-même refusé de générer, cf.
+`VOLUME_JOURS_INCOMPATIBLE` plus haut — comportement attendu, pas un
+échec), FAIL (plantage ou règle violée — à corriger). `generatePlanForme`
+(Mode Forme, y compris grand-débutant) vit dans `plan-forme.js`, jamais
+dans `plan-generator.js` — erreur de conception initiale du script
+corrigée en cours de route (un profil grand-débutant ne peut déclencher
+que le flux Mode Forme, jamais `generatePlan()` classique avec
+`dateCourse`, cf. `public/v2/index.html` §17.9).
 
 ## 8. Moteur de décision
 
@@ -754,10 +806,17 @@ les endpoints serverless (clé `service_role`, contourne RLS).
   testeur crée son compte Yoria avec le **même email** que sa
   candidature — condition impérative à communiquer au testeur.
 
-**Signalements utilisateurs** — bouton 🐛 dans les headers de `index.html`
+**Signalements utilisateurs** — bouton 💬 dans les headers de `index.html`
 (`ouvrirSignalementProbleme()`) : sélecteur de type (Bug/Donnée
-incorrecte/Suggestion/Autre) + description libre. Double écriture à
-chaque envoi :
+incorrecte/Suggestion/Autre) + description libre. Icône changée le
+24/07/2026 (ex-🐛, trop spécifique "bug" pour un usage englobant aussi
+suggestions et données incorrectes) — le sous-type "🐛 Bug" dans le
+sélecteur interne reste inchangé, lui a du sens. Mentionné dans l'aide
+(nouvelle entrée FAQ, cf. §4). Ordre des icônes désormais identique sur
+toutes les vues (dashboard et header générique des vues secondaires) :
+signalement → J– (compte à rebours course) → aide — corrigé le
+24/07/2026, l'ordre différait auparavant entre le dashboard et les vues
+secondaires. Double écriture à chaque envoi :
 - **Sentry** (`Sentry.captureMessage`, best-effort, contexte technique
   brut — vue, planId, url — dans le message, jamais en second argument
   objet, cf. §15)
@@ -868,6 +927,10 @@ calcul si le temps donné venait d'une autre distance) — sélecteur compact
 - **Jamais d'apostrophe dans une chaîne JS entre guillemets doubles**
   (échec silencieux du parseur) ; `node --check` systématique avant push
 - **404 sur une route API** → vérifier `vercel.json` en premier
+- **Avant tout changement dans `plan-generator.js`/`plan-forme.js`,
+  relancer `scripts/test-plans-varies.js`** — filet de sécurité rapide
+  (10 profils, quelques secondes) sur des cas connus comme sensibles,
+  avant même de tester en conditions réelles dans l'app (cf. §7)
 - **Toute modification d'un plan existant doit exclure les séances
   passées** — pas un garde-fou générique, à implémenter dans chaque
   nouvelle fonctionnalité qui touche `plans_actif`
