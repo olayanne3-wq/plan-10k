@@ -3953,7 +3953,7 @@ function renderDashboard() {
       READINESS_OPTIONS.forEach(o=>{
         const estActif = readinessVal===o.v;
         const rb = el("button",{title:o.label,style:{
-          flex:"1",padding:"10px 0",fontSize:"20px",cursor:"pointer",
+          flex:"1",padding:"8px 0",fontSize:"32px",cursor:"pointer",
           background:estActif?"var(--accent2)":"var(--border-soft)",
           border:`1px solid ${estActif?"var(--accent2)":"var(--border)"}`,borderRadius:"8px"
         }}, o.e);
@@ -5206,7 +5206,7 @@ function renderStatusRow(uid, dateSeance) {
   SOPTS.forEach(opt=>{
     const cur=statuses[uid]||"—";
     const desactive = estFuture && opt!=="—";
-    const b=el("button",{style:{flex:"1",background:cur===opt?SCOLORS[opt]:"var(--border-soft)",border:`1px solid ${cur===opt?SCOLORS[opt]:"var(--border)"}`,borderRadius:"8px",padding:"10px 0",cursor:desactive?"not-allowed":"pointer",color:cur===opt?"#F8FAFC":"var(--text-muted)",fontSize:"18px",fontWeight:cur===opt?"700":"400",opacity:desactive?"0.35":"1"}},opt==="—"?"–":opt);
+    const b=el("button",{style:{flex:"1",background:cur===opt?SCOLORS[opt]:"var(--border-soft)",border:`1px solid ${cur===opt?SCOLORS[opt]:"var(--border)"}`,borderRadius:"8px",padding:"8px 0",cursor:desactive?"not-allowed":"pointer",color:cur===opt?"#F8FAFC":"var(--text-muted)",fontSize:"32px",fontWeight:cur===opt?"700":"400",opacity:desactive?"0.35":"1"}},opt==="—"?"–":opt);
     if (desactive) b.disabled = true;
     boutons.push({ b, opt });
     b.addEventListener("click",avecRetourTactile(()=>{
