@@ -35,7 +35,8 @@ export default async function handler(req, res) {
     return handleCurrent(req, res, lat, lon);
   }
   if (type === "historical") {
-    return handleHistorical(req, res, lat, lon, date);
+    const { hour } = req.query || {};
+    return handleHistorical(req, res, lat, lon, date, hour);
   }
   return handleForecast(req, res, lat, lon, date);
 }
@@ -116,11 +117,13 @@ async function handleCurrent(req, res, lat, lon) {
 }
 
 // Météo passée à une date donnée — remplace l'appel direct
-// fetchHistoricalWeather() de index.html. Prend la température à 18h par
-// défaut (approximation de l'heure de séance la plus courante), avec repli
-// sur 12h puis minuit si l'heure 18h n'est pas disponible (même logique que
-// l'ancien code côté client).
-async function handleHistorical(req, res, lat, lon, date) {
+// fetchHistoricalWeather() de index.html. Utilise l'heure réelle de la
+// séance si fournie (start_date_local Strava, cf. index.html), pour
+// refléter la météo au moment où la séance a vraiment eu lieu — plutôt
+// qu'une approximation fixe. Repli sur 18h puis 12h puis minuit si aucune
+// heure n'est fournie (ex. saisie manuelle sans horodatage) ou si l'heure
+// demandée n'a pas de valeur dans la réponse Open-Meteo.
+async function handleHistorical(req, res, lat, lon, date, hour) {
   if (!date) {
     return res.status(400).json({ error: "Paramètre date manquant pour type=historical" });
   }
@@ -143,7 +146,10 @@ async function handleHistorical(req, res, lat, lon, date) {
       return res.status(200).json({ disponible: false });
     }
 
-    const temperatureC = Math.round(temps[18] ?? temps[12] ?? temps[0]);
+    const heureCible = Number.isInteger(Number(hour)) && hour >= 0 && hour <= 23 ? Number(hour) : null;
+    const temperatureC = Math.round(
+      (heureCible !== null ? temps[heureCible] : undefined) ?? temps[18] ?? temps[12] ?? temps[0]
+    );
     return res.status(200).json({
       disponible: true,
       date,
