@@ -112,13 +112,51 @@ Fonctions de rendu (`render*`) :
 - `renderStatusRow`, `showSessionMenu`, `showMoveMenu`, `showRestoreMenu` — gestion des séances
 - `renderStats` — statistiques (ACWR, monotonie de charge, etc.)
 - `renderCourse` — page jour de course (horaires, parcours, résultat, stratégie)
-- `renderHelp` — aide
+- `renderHelp` — aide (refonte du contenu le 24/07/2026, cf. plus bas)
 - `renderSettings` — profil coureur, records personnels, tokens, notifications, abonnement
 - `render` — orchestrateur principal
 - `ouvrirSignalementProbleme` — modale accessible via le bouton 🐛 des
   headers, cf. §11
 - `renderTestSemiCooperRow` — carte du jour, cf. §14 (Mode Forme sans
   référence)
+
+**Aide (24/07/2026)** — `renderHelp()` réorganisé par intention plutôt que
+par écran : Démarrer / Comprendre les écrans / Comprendre le moteur Yoria
+(estimation, IE, cadence, RPE, readiness, carte d'ajustement, allures
+dynamiques) / Types de plan (Course, Mode Forme, Grand débutant) / Sources
+de données / FAQ. Accès factorisé via `boutonAide()` (réutilisé sur le
+dashboard et ajouté au header générique `hdr` des vues secondaires) —
+visible sur chaque onglet désormais, plus seulement depuis le dashboard.
+
+**Barre de navigation — conteneur séparé (24/07/2026)** — `nav` est montée
+dans `#nav-root`, un conteneur HTML distinct de `#app`, via
+`document.getElementById("nav-root").replaceChildren(nav)`. Avant, `nav`
+était un enfant de `#app`, donc détruite par `app.innerHTML=""` en début de
+`render()` puis reconstruite quelques lignes plus loin — le navigateur
+pouvait peindre une frame sans barre de navigation entre les deux,
+provoquant un flash visible à chaque changement d'onglet. `replaceChildren()`
+sur un conteneur jamais vidé par ailleurs élimine cette frame intermédiaire.
+Correctif lié : `setView()` appelle désormais `window.scrollTo(0,0)`
+**avant** `render()` (pas après), pour éviter un léger saut de position de
+la barre pendant l'instant où le nouveau contenu est affiché avec l'ancien
+scroll encore actif.
+
+**Swipe horizontal entre onglets (24/07/2026)** — actif uniquement sur les
+vues présentes dans `NAV` (pas `weekDetail`, pas `help`), attaché sur
+l'élément `content` à chaque `render()` (jamais accumulé, `content` est
+recréé à chaque appel). Détection par direction dominante du geste
+(comparaison deltaX/deltaY dès le déclenchement, pas de zone d'écran
+dédiée) pour ne jamais interférer avec le scroll vertical. Seuil 50px.
+Périmètre volontairement limité aux onglets principaux — pas de swipe
+entre semaines dans `weekDetail`, pour éviter toute ambiguïté de geste
+avec une future navigation propre à cet écran.
+
+**`predict10K()` calculé à la demande (24/07/2026)** — auparavant appelé à
+CHAQUE `render()` quelle que soit la vue, y compris Semaines/Paramètres/
+Aide qui ne l'affichent jamais. Désormais calculé uniquement pour
+`dashboard`/`stats`/`course` (`VUES_AVEC_PRED`). Chaque appelant garde son
+repli `currentPred || predict10K()` existant, donc aucun risque si un
+usage futur en dépendait ailleurs.
 
 ## 5. Persistance
 
@@ -656,6 +694,19 @@ position live du navigateur pour la prévision J+1 (alerte chaleur avant
 séance, `v2/engine/weather.js`) — deux besoins légitimement différents,
 pas un doublon.
 
+**Météo passée — heure réelle de séance (24/07/2026)** : `handleHistorical`
+(`api/weather.js`) accepte désormais un paramètre `hour` optionnel, utilisé
+en priorité sur le repli fixe 18h→12h→minuit. Côté client,
+`fetchHistoricalWeather()` extrait l'heure locale depuis `start_date_local`
+de l'activité Strava correspondante et la transmet. `lk_weather_cache`
+reste indexé par date seule (pas date+heure) — décision volontaire de ne
+pas invalider les entrées déjà en cache : les séances déjà consultées une
+fois avant ce correctif conservent leur ancienne valeur (calculée à 18h)
+jusqu'à ce que le cache soit vidé par un autre mécanisme, seules les
+nouvelles consultations bénéficient de la vraie heure. `timezone:
+"Europe/Paris"` reste fixé en dur côté serveur (toujours listé en chantier
+ouvert, cf. §16).
+
 **Coach (messages courts)** — `api/coach.js`, proxy Claude Haiku 4.5.
 
 **Sync multi-device** — Supabase (auth par compte email/mot de passe),
@@ -856,12 +907,12 @@ calcul si le temps donné venait d'une autre distance) — sélecteur compact
 | Republier la piste "V2" sur Play Console | 🔜 Pas urgent, Alpha suffit pour Laurent |
 | Passer Stripe en clés live | 🔜 Quand prêt à lancer publiquement |
 | Courir un vrai test demi-Cooper pour valider la prédiction 10K | 🔜 `RATIO_VMA_VERS_10K` (0.90) et `PACE_RATIOS.E` (1.225) corrigés le 22/07/2026 sur base théorique faute de vraies données — à comparer avec la prédiction 10K du premier vrai test demi-Cooper couru par Laurent (pas simulé) |
-| Utiliser la vraie heure de séance pour la météo passée | 🔜 Identifié le 23/07/2026 : `handleHistorical` (`api/weather.js`) utilise toujours 18h (repli 12h puis minuit), jamais la vraie heure de la séance (disponible via `start_date_local` Strava) — peut fausser l'affichage pour un coureur matinal. `timezone:"Europe/Paris"` aussi fixé en dur côté serveur, à revoir si utilisateurs hors zone (v2.5) |
 | Réécrire le swap directement dans `plan_actif` | 🔜 Suggestion de Laurent (22/07/2026), pas commencé. Complexité identifiée : annulation d'un swap, interaction avec les régénérations de plan, séparation `plans_actif`/`plans_original`, chemin de sauvegarde, interaction avec `reduire_charge` sur une séance swappée |
 | Publier une app iOS (Capacitor) | 🔜 Piste identifiée le 22/07/2026, pas de code. Pas urgent tant qu'aucun besoin iOS confirmé — TWA Android actuelle suffit |
 | Passer le repo GitHub en privé | 🔜 Prévu juste avant la commercialisation, pour protéger le code différenciant (moteur de décision, calibrations). Reste public pendant le développement solo/bêta (lecture directe économise des tokens Claude) |
 | Surveiller la convergence progressive et le fix VDOT SEUIL en conditions réelles | 🔜 En production depuis le 22/07/2026, pas encore éprouvés sur plusieurs semaines — vérifier le rythme du pas de convergence (`PAS_CONVERGENCE_BASE=0.15`) et la fidélité de la formule VDOT reconstruite |
 | Surveiller si R-062/R-080 se déclenchent un jour | 🔜 Jamais observées sur les données réelles de Laurent |
+| Rendre le fuseau horaire météo passée configurable | 🔜 `timezone:"Europe/Paris"` fixé en dur dans `handleHistorical` (`api/weather.js`), sans impact tant que Laurent est le seul utilisateur en France — à revoir si l'app accueille des utilisateurs hors zone (v2.5) |
 | Concevoir la gestion du rebond après un allègement de séance qualité | 🔜 Identifié le 23/07/2026, lié à R-070 : ni accélération (progression plus rapide après succès répétés) ni lissage de la remontée (une réduction ponctuelle 4→3 reps peut être suivie d'un saut 3→5 à la prochaine séance qualité si ça tombe sur un palier de progression) — nécessiterait de faire persister la dernière ampleur appliquée entre deux séances qualité, vraie extension structurelle. Pas pire que la situation actuelle (le saut existe déjà sans réduction), pas priorisé |
 
 Pour l'historique des versions livrées et des correctifs, voir
