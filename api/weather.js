@@ -129,20 +129,34 @@ async function handleCurrent(req, res, lat, lon) {
 // (ex. fuseau du profil coureur, à terme). Repli sur TIMEZONE_DEFAUT
 // (Europe/Paris) si absent ou vide — comportement inchangé tant qu'aucun
 // appelant ne fournit ce paramètre explicitement.
+//
+// Same-day/veille (24/07/2026) : archive-api.open-meteo.com (réanalyse)
+// n'est pas fiable pour une date très récente — le traitement de la
+// réanalyse a un délai, donnant des valeurs encore provisoires/écartées
+// de la mesure réelle (constaté : 27°C renvoyé contre ~30°C observé sur
+// Strava pour une séance du jour même). Pour date = aujourd'hui ou hier
+// (dans le fuseau demandé), on bascule sur api.open-meteo.com/forecast
+// (hourly=temperature_2m), qui couvre le présent avec un vrai modèle de
+// prévision/observation récente plutôt que la réanalyse différée.
 async function handleHistorical(req, res, lat, lon, date, hour, timezone) {
   if (!date) {
     return res.status(400).json({ error: "Paramètre date manquant pour type=historical" });
   }
+  const tz = timezone || TIMEZONE_DEFAUT;
   try {
+    const estRecente = estDateRecente(date, tz);
+    const baseUrl = estRecente
+      ? "https://api.open-meteo.com/v1/forecast"
+      : "https://archive-api.open-meteo.com/v1/archive";
     const params = new URLSearchParams({
       latitude: lat,
       longitude: lon,
       start_date: date,
       end_date: date,
       hourly: "temperature_2m",
-      timezone: timezone || TIMEZONE_DEFAUT
+      timezone: tz
     });
-    const resp = await fetch(`https://archive-api.open-meteo.com/v1/archive?${params}`);
+    const resp = await fetch(`${baseUrl}?${params}`);
     if (!resp.ok) {
       return res.status(502).json({ error: "Open-Meteo indisponible", status: resp.status });
     }
@@ -163,5 +177,21 @@ async function handleHistorical(req, res, lat, lon, date, hour, timezone) {
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
+  }
+}
+
+// Vrai si `date` (YYYY-MM-DD) correspond à aujourd'hui ou hier dans le
+// fuseau `tz` — seuil volontairement large (2 jours) car la fenêtre exacte
+// où l'archive devient fiable n'est pas documentée précisément par
+// Open-Meteo ; mieux vaut basculer un jour de trop sur forecast (qui reste
+// correct pour du passé proche) que de retomber sur l'archive encore
+// provisoire.
+function estDateRecente(date, tz) {
+  try {
+    const aujourdHui = new Date().toLocaleDateString("en-CA", { timeZone: tz }); // YYYY-MM-DD
+    const hier = new Date(Date.now() - 24 * 3600 * 1000).toLocaleDateString("en-CA", { timeZone: tz });
+    return date === aujourdHui || date === hier;
+  } catch (e) {
+    return false;
   }
 }
